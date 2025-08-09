@@ -349,4 +349,4 @@ if iller_dict:
                 key="download_all"
             )
 
-# streamlit run "C:\Users\HUSOCAN\Desktop\Projelerim\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
+# streamlit run "C:\Users\HUSOCAN\Desktop\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
