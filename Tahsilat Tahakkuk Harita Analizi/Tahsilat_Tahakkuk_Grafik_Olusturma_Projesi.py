@@ -60,7 +60,10 @@ st.title("İllere Göre Tahsilat ve Tahakkuk Harita Analizi")
 
 # Alt klasörleri listele
 if os.path.exists(ana_klasor):
-    alt_klasorler = [f for f in os.listdir(ana_klasor) if os.path.isdir(os.path.join(ana_klasor, f))]
+    alt_klasorler = sorted(
+        [f for f in os.listdir(ana_klasor) if os.path.isdir(os.path.join(ana_klasor, f))],
+        key=lambda x: int(re.search(r"\d{4}", x).group(0)) if re.search(r"\d{4}", x) else 0
+    )
 else:
     st.error("Ana klasör bulunamadı! Lütfen 'veriler' klasörünü kontrol edin.")
     st.stop()
