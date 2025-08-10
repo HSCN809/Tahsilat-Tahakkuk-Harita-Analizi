@@ -85,7 +85,7 @@ iller_dict = {}
 yillar = []
 
 for dosya_adi in excel_dosyalari:
-    match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
+    match = re.search(r"(.+?)_(\d{4})\.xlsx$", dosya_adi.strip())
     if not match:
         continue
 
