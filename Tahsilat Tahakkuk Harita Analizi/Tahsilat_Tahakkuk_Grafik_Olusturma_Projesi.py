@@ -10,24 +10,30 @@ import seaborn as sns
 from io import BytesIO
 import uuid
 import zipfile
+from pathlib import Path
 
-# 📌 Projenin bulunduğu klasör
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Excel verilerinin olduğu klasör (repo içinde "veriler" klasörüne koyacaksın)
-ana_klasor = os.path.join(BASE_DIR, "veriler", "İllere Göre Tahsilat Tahakkuk (Yıllara Göre)")
+# Proje dizinleri
+BASE_DIR = Path(__file__).resolve().parent
 
-# Harita dosyası yolu (repo içinde "veriler/tr.json")
-harita_dosyasi = os.path.join(BASE_DIR, "veriler", "tr.json")
+# veriler klasörünü birkaç olası yerde ara (script ile aynı klasör, bir üst klasör, çalışma dizini)
+for candidate in [BASE_DIR / "veriler", BASE_DIR.parent / "veriler", Path.cwd() / "veriler"]:
+    if candidate.exists():
+        VERILER_DIR = candidate
+        break
+else:
+    st.error("Ana klasör bulunamadı! Lütfen repoda 'veriler' klasörünün yerini kontrol edin.")
+    st.stop()
+
+# Excel ana klasörü ve harita dosyası
+ana_klasor = VERILER_DIR / "İllere Göre Tahsilat Tahakkuk (Yıllara Göre)"
+harita_dosyasi = VERILER_DIR / "tr.json"
 
 # Streamlit sayfa ayarları
 st.set_page_config(page_title="İl Bazlı Vergi Analizi", layout="wide")
 
 # Ana başlık
 st.title("İllere Göre Tahsilat ve Tahakkuk Harita Analizi")
-
-# Ana klasör yolu
-ana_klasor = r"C:\Users\HUSOCAN\Desktop\Yazılarım\İllere Göre Tahsilat Tahakkuk (Yıllara Göre)"
 
 # Alt klasörleri listele
 if os.path.exists(ana_klasor):
@@ -349,4 +355,4 @@ if iller_dict:
                 key="download_all"
             )
 
-# streamlit run "C:\Users\HUSOCAN\Desktop\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
+# streamlit run "C:\Users\HUSOCAN\Desktop\Projelerim\Tahsilat-Tahakkuk-Harita-Analizi\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
