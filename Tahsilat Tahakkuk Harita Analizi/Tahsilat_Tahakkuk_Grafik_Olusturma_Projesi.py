@@ -77,7 +77,10 @@ secilen_klasor = st.sidebar.selectbox("Klasör Seçin:", alt_klasorler)
 folder_path = os.path.join(ana_klasor, secilen_klasor)
 
 # Excel dosyalarını oku
-excel_dosyalari = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+excel_dosyalari = sorted(
+    [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
+    key=lambda x: int(re.search(r"(\d{4})", x).group(1))
+)
 
 # İl ve yıl bilgilerini ayır
 il_adlari = []
