@@ -12,22 +12,45 @@ import uuid
 import zipfile
 from pathlib import Path
 
-
-# Proje dizinleri
 BASE_DIR = Path(__file__).resolve().parent
 
-# veriler klasörünü birkaç olası yerde ara (script ile aynı klasör, bir üst klasör, çalışma dizini)
+# 'veriler' klasörünü bul
 for candidate in [BASE_DIR / "veriler", BASE_DIR.parent / "veriler", Path.cwd() / "veriler"]:
     if candidate.exists():
         VERILER_DIR = candidate
         break
 else:
-    st.error("Ana klasör bulunamadı! Lütfen repoda 'veriler' klasörünün yerini kontrol edin.")
+    st.error("'veriler' klasörü bulunamadı (repo kökünde olmalı).")
     st.stop()
 
-# Excel ana klasörü ve harita dosyası
-ana_klasor = VERILER_DIR / "İllere Göre Tahsilat Tahakkuk (Yıllara Göre)"
+# Excel ana klasörünü akıllı bul (iki olası isim + fallback: içinde yıl klasörleri olan bir klasör)
+olasi_adlar = [
+    "İllere Göre Tahsilat Tahakkuk (Yıllara Göre)",
+    "Tahsilat Tahakkuk Excel Dosyaları",
+]
+
+ana_klasor = None
+for name in olasi_adlar:
+    p = VERILER_DIR / name
+    if p.exists():
+        ana_klasor = p
+        break
+
+# Fallback: veriler/ içinde yıl klasörleri barındıran klasörü tara
+if ana_klasor is None:
+    for p in VERILER_DIR.iterdir():
+        if p.is_dir() and any(c.name.startswith("İllere Göre Tahsilat Tahakkuk") for c in p.iterdir() if c.is_dir()):
+            ana_klasor = p
+            break
+
+if ana_klasor is None:
+    st.error("Excel klasörü bulunamadı. 'veriler' içinde ilgili klasörün adını kontrol et.")
+    st.stop()
+
 harita_dosyasi = VERILER_DIR / "tr.json"
+if not harita_dosyasi.exists():
+    st.error("'veriler/tr.json' bulunamadı.")
+    st.stop()
 
 # Streamlit sayfa ayarları
 st.set_page_config(page_title="İl Bazlı Vergi Analizi", layout="wide")
@@ -356,3 +379,5 @@ if iller_dict:
             )
 
 # streamlit run "C:\Users\HUSOCAN\Desktop\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
+
+# streamlit run "C:\Users\HUSOCAN\Desktop\Projelerim\Tahsilat-Tahakkuk-Harita-Analizi\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
