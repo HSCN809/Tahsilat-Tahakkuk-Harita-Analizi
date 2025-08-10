@@ -85,8 +85,9 @@ iller_dict = {}
 yillar = []
 
 for dosya_adi in excel_dosyalari:
-    match = re.search(r"(.+?)_(\d{4})\.xlsx$", dosya_adi.strip())
+    match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
     if not match:
+        print(f"⚠️ Dosya adı beklenen formatta değil: {dosya_adi}")
         continue
 
     il_kodlu, yil = match.groups()
