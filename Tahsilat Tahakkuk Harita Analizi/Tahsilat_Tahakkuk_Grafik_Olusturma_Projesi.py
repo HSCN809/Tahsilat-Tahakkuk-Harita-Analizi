@@ -321,6 +321,11 @@ if iller_dict:
     # İnteraktif Miktar Haritası (Plotly)
     def ciz_interaktif_miktar_harita(df, kolon, baslik, renk_olcegi="Viridis"):
         df_clean = df.copy()
+        
+        # Logaritmik renklendirme kolonu oluştur
+        log_col = f"{kolon}_log"
+        df_clean[log_col] = np.where(df_clean[kolon] > 0, np.log1p(df_clean[kolon]), np.nan)
+        
         df_clean["Değer (Milyar TL)"] = df_clean[kolon].round(4)
         df_clean["İl Adı"] = df_clean["name"].str.capitalize()
         
@@ -329,16 +334,17 @@ if iller_dict:
             geojson=geojson_data,
             locations="name",
             featureidkey="properties.name",
-            color=kolon,
+            color=log_col,
             color_continuous_scale=renk_olcegi,
             hover_name="İl Adı",
-            hover_data={"name": False, kolon: False, "Değer (Milyar TL)": True},
+            hover_data={"name": False, log_col: False, "Değer (Milyar TL)": True},
         )
         fig.update_geos(fitbounds="locations", visible=False)
         fig.update_layout(
             title={"text": baslik, "y":0.95, "x":0.5, "xanchor": 'center', "yanchor": 'top'},
             margin={"r":0,"t":50,"l":0,"b":0},
-            height=600
+            height=600,
+            coloraxis_showscale=False # Log sayılarının kafa karıştırmaması için renk baremini gizle
         )
         return fig
 
