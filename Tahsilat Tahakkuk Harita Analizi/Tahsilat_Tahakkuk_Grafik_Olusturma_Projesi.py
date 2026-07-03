@@ -111,6 +111,12 @@ def excel_dosyalarini_oku(folder_path):
                 
     return iller_dict, yillar
 
+def temizle_metin(text):
+    if not isinstance(text, str):
+        return ""
+    clean = re.sub(r"^\d+\.\s*", "", text.strip(), flags=re.UNICODE).lower()
+    return re.sub(r"\s+", " ", clean)
+
 def veri_hazirla(iller_dict, secim):
     """
     İl sözlüğündeki verileri seçilen gelir kalemi (secim) bazında filtreleyip DataFrame'e dönüştürür.
@@ -118,8 +124,8 @@ def veri_hazirla(iller_dict, secim):
     veri_listesi = []
     for il_adi, df in iller_dict.items():
         try:
-            temiz_indexler = {re.sub(r"^\d+\.\s*", "", i.strip(), flags=re.UNICODE).lower(): i for i in df.index if isinstance(i, str)}
-            secim_clean = re.sub(r"^\d+\.\s*", "", secim.strip(), flags=re.UNICODE).lower()
+            temiz_indexler = {temizle_metin(i): i for i in df.index if isinstance(i, str)}
+            secim_clean = temizle_metin(secim)
 
             if secim_clean not in temiz_indexler:
                 continue
