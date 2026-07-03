@@ -110,7 +110,7 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
         print(f"   İndirildi ({idx}/{total}): {link_text}")
         return True, file_path
     except Exception as e:
-        print(f"❌ İndirme Hatası ({link_text}): {e}")
+        print(f"[HATA] İndirme Hatası ({link_text}): {e}")
         return False, None
 
 def convert_file(xls_file, year, indir_konumu):
@@ -239,7 +239,7 @@ def main():
     options.add_experimental_option('useAutomationExtension', False)
 
     # WebDriver'ı başlat
-    print("🤖 Tarayıcı başlatılıyor (Mevcut site yapısı analiz ediliyor)...")
+    print("[Sistem] Tarayıcı başlatılıyor (Mevcut site yapısı analiz ediliyor)...")
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
@@ -279,22 +279,23 @@ def main():
             min_year = min(found_years)
             max_year = max(found_years)
     except Exception as e:
-        print(f"⚠️ Yıl sınırları dinamik okunamadı, varsayılan değerler kullanılacak: {e}")
-
-    # Kullanıcıdan dinamik yıllara göre veri al
-    print("\n🗓️ Hangi yılın/yılların verilerini indirmek istiyorsunuz?")
-    print(f"📝 Sitede mevcut yıllar: {min_year}-{max_year} arası")
-    print("💡 Giriş formatları: '2023' veya '2022-2025' veya 'hepsi'")
-    year_input = input("➡️ Yıl girin: ").strip()
+        print(f"[UYARI] Yıl sınırları dinamik okunamadı, varsayılan değerler kullanılacak: {e}")
+        min_year = 2004
+        max_year = current_year
+        
+    print("\n[Tarih] Hangi yılın/yılların verilerini indirmek istiyorsunuz?")
+    print(f"[Bilgi] Sitede mevcut yıllar: {min_year}-{max_year} arası")
+    print("[Formatlar] Giriş formatları: '2023' veya '2022-2025' veya 'hepsi'")
+    year_input = input("Yıl girin: ").strip()
 
     valid_years = parse_years_input(year_input, min_year, max_year)
 
     if not valid_years:
-        print(f"❌ Hata: Geçerli bir yıl veya yıl aralığı girin ({min_year}-{max_year})!")
+        print(f"[HATA] Hata: Geçerli bir yıl veya yıl aralığı girin ({min_year}-{max_year})!")
         driver.quit()
         return
-
-    print(f"✅ Seçilen Yıllar: {', '.join(map(str, valid_years))}")
+        
+    print(f"[Secilen Yillar] Seçilen Yıllar: {', '.join(map(str, valid_years))}")
 
     # Proje yollarını dinamik belirle
     BASE_DIR = Path(__file__).resolve().parent.parent
@@ -325,12 +326,12 @@ def main():
 
     try:
         for y in valid_years:
-            print(f"\n🌐 {y} yılı verileri için siteye bağlanılıyor...")
+            print(f"\n[Baglanti] {y} yılı verileri için siteye bağlanılıyor...")
             driver.get(target_url)
             time.sleep(3)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             
-            print(f"🔍 {y} yılı ana başlığı aranıyor...")
+            print(f"[Arama] {y} yılı ana başlığı aranıyor...")
             year_main_found = False
             
             try:
@@ -344,7 +345,7 @@ def main():
                     visible_elements = [el for el in alt_elements if el.is_displayed()]
                     
                 for element in visible_elements:
-                    print(f"🟢 {y} ana başlığı bulundu")
+                    print(f"[OK] {y} ana başlığı bulundu")
                     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
                     time.sleep(1)
                     
@@ -360,7 +361,7 @@ def main():
                 print(f"Ana başlık arama hatası ({y}): {e}")
             
             if not year_main_found:
-                print(f"❌ {y} yılı ana başlığı bulunamadı. Sayfada '{y}' içeren elementler listeleniyor:")
+                print(f"[HATA] {y} yılı ana başlığı bulunamadı. Sayfada '{y}' içeren elementler listeleniyor:")
                 try:
                     debug_els = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y}')]")
                     for idx, d_el in enumerate(debug_els[:5], 1):
@@ -370,17 +371,17 @@ def main():
                             pass
                 except Exception as de:
                     print(f"   Hata detayları alınamadı: {de}")
-                print(f"❌ {y} yılı atlanıyor.")
+                print(f"[HATA] {y} yılı atlanıyor.")
                 continue
             
-            print(f"🔍 {y} - Bütçe Gelir Tabloları alt başlığı aranıyor...")
+            print(f"[Arama] {y} - Bütçe Gelir Tabloları alt başlığı aranıyor...")
             budget_tables_found = False
             
             try:
                 budget_elements = driver.find_elements(By.XPATH, "//a[contains(text(), 'Bütçe Gelir Tabloları')]")
                 for element in budget_elements:
                     if element.is_displayed():
-                        print(f"🟢 Bütçe Gelir Tabloları alt başlığı bulundu")
+                        print(f"[OK] Bütçe Gelir Tabloları alt başlığı bulundu")
                         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
                         time.sleep(1)
                         
@@ -396,10 +397,10 @@ def main():
                 print(f"Alt başlık arama hatası ({y}): {e}")
             
             if not budget_tables_found:
-                print(f"❌ {y} için Bütçe Gelir Tabloları bulunamadı, bu yıl atlanıyor.")
+                print(f"[HATA] {y} için Bütçe Gelir Tabloları bulunamadı, bu yıl atlanıyor.")
                 continue
             
-            print(f"🔍 {y} yılı Excel dosyaları aranıyor...")
+            print(f"[Arama] {y} yılı Excel dosyaları aranıyor...")
             excel_links = []
             
             # Excel linklerini topla
@@ -425,21 +426,21 @@ def main():
                     link_text = link.text.strip() if link.text else f"Excel_{y}_{year_links_count+1}"
                     all_links_data.append((link_text, href, y))
                     year_links_count += 1
-            print(f"📊 {y} yılı için {year_links_count} Excel linki toplandı.")
+            print(f"[Rapor] {y} yılı için {year_links_count} Excel linki toplandı.")
             
     except TimeoutException:
-        print("❌ Hata: Sayfa yükleme zaman aşımına uğradı!")
+        print("[HATA] Hata: Sayfa yükleme zaman aşımına uğradı!")
     except Exception as e:
-        print(f"❌ Genel Hata: {e}")
+        print(f"[HATA] Genel Hata: {e}")
     finally:
-        print("\n🏁 Tarayıcı kapatılıyor...")
+        print("\n[Bitis] Tarayıcı kapatılıyor...")
         driver.quit()
-        print("✅ Tarayıcı kapatıldı.")
+        print("[Bitis] Tarayıcı kapatıldı.")
 
     # İndirme aşaması (Paralel)
     if all_links_data:
-        print(f"\n🚀 Toplam {len(all_links_data)} adet Excel linki bulundu.")
-        print("📥 Paralel indirme başlatılıyor (max_workers=10)...")
+        print(f"\n[Rapor] Toplam {len(all_links_data)} adet Excel linki bulundu.")
+        print("[Indirme] Paralel indirme başlatılıyor (max_workers=10)...")
         
         downloaded_files = [] # (file_path, year)
         session = requests.Session()
@@ -461,10 +462,10 @@ def main():
                     downloaded_files.append((file_path, file_year))
                     
         download_duration = time.time() - start_time
-        print(f"⏱️ Tüm indirmeler {download_duration:.2f} saniyede tamamlandı.")
+        print(f"[Zaman] Tüm indirmeler {download_duration:.2f} saniyede tamamlandı.")
         
         # Dönüştürme Aşaması (Paralel)
-        print("\n🔄 Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
+        print("\n[Islem] Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
         conversion_start = time.time()
         
         total_provinces_expected = 0
@@ -497,7 +498,7 @@ def main():
                         year_stats[y_val]["provinces"] += 1
                 
         conversion_duration = time.time() - conversion_start
-        print(f"⏱️ Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
+        print(f"[Zaman] Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
         
         # Dinamik formül oluşturma (Örn: 22 yıl * 81 il + 1 yıl * 81 il)
         formula_groups = {}
@@ -537,7 +538,7 @@ def main():
         print(f"{'='*80}")
         print(f"{'='*60}")
     else:
-        print(f"❌ İndirilecek link bulunamadı.")
+        print(f"[HATA] İndirilecek link bulunamadı.")
 
 if __name__ == "__main__":
     main()
