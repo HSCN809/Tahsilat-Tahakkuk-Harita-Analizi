@@ -213,6 +213,16 @@ def main():
     indir_konumlari = {}
     for y in valid_years:
         path = excel_ana_dir / f"İllere Göre Tahsilat Tahakkuk {y}"
+        
+        # Eğer klasör zaten varsa, içindeki tüm eski .xlsx ve .xls dosyalarını silerek temiz kurulum yap
+        if path.exists():
+            for old_file in path.glob("*"):
+                if old_file.suffix in ('.xlsx', '.xls'):
+                    try:
+                        os.remove(old_file)
+                    except:
+                        pass
+                        
         os.makedirs(path, exist_ok=True)
         indir_konumlari[y] = path
 
