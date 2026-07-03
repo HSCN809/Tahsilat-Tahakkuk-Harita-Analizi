@@ -229,27 +229,28 @@ def main():
             year_main_found = False
             
             try:
-                # Yıla ait ana akordeon başlığını bul ve tıkla
-                year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibarıyla Tahakkuk ve Tahsilatı') or contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibariyle Tahakkuk ve Tahsilatı')]")
-                if not year_main_elements:
-                    year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı Genel Bütçe')]")
-                if not year_main_elements:
-                    year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı')]")
+                # Sınıf adı 'submenu-control-init' olan ve yılı içeren elementleri bul
+                year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(@class, 'submenu-control-init')][contains(text(), '{y}')]")
+                visible_elements = [el for el in year_main_elements if el.is_displayed()]
+                
+                if not visible_elements:
+                    # Çift boşluk veya farklı metin yapısı için yedek arama
+                    alt_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı') or contains(text(), '{y}  Yılı') or contains(text(), '{y}')]")
+                    visible_elements = [el for el in alt_elements if el.is_displayed()]
                     
-                for element in year_main_elements:
-                    if element.is_displayed():
-                        print(f"🟢 {y} ana başlığı bulundu")
-                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
-                        time.sleep(1)
-                        
-                        try:
-                            element.click()
-                        except ElementClickInterceptedException:
-                            driver.execute_script("arguments[0].click();", element)
-                        
-                        year_main_found = True
-                        time.sleep(2)
-                        break
+                for element in visible_elements:
+                    print(f"🟢 {y} ana başlığı bulundu")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                    time.sleep(1)
+                    
+                    try:
+                        element.click()
+                    except ElementClickInterceptedException:
+                        driver.execute_script("arguments[0].click();", element)
+                    
+                    year_main_found = True
+                    time.sleep(2)
+                    break
             except Exception as e:
                 print(f"Ana başlık arama hatası ({y}): {e}")
             
