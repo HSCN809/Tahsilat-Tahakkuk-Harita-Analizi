@@ -137,7 +137,7 @@ def convert_file(xls_file, year, indir_konumu):
         cleaned_name = clean_and_format_filename(base_name, year)
         if not cleaned_name:
             os.remove(xls_file)
-            return True, False, 0, 0, int(year)
+            return True, False, 0, 0, int(year), "", []
             
         # İl klasör adını dosya adından çıkar (01_Adana_2024.xlsx -> 01_Adana)
         province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
@@ -155,6 +155,7 @@ def convert_file(xls_file, year, indir_konumu):
         expected_months = valid_sheets_count if int(year) == current_year else 12
         
         saved_months = 0
+        saved_month_names = []
         for sheet in sheet_names:
             normalized = normalize_month_name(sheet)
             display_name = MONTH_DISPLAY_NAMES.get(normalized)
@@ -164,6 +165,7 @@ def convert_file(xls_file, year, indir_konumu):
                 month_xlsx_path = province_dir / f"{display_name}.xlsx"
                 df.to_excel(month_xlsx_path, index=False)
                 saved_months += 1
+                saved_month_names.append(display_name)
         
         # Geriye uyumluluk: en güncel ayı (Aralık) yıl klasörüne de kaydet
         best_sheet = get_best_sheet_name(sheet_names)
@@ -174,11 +176,22 @@ def convert_file(xls_file, year, indir_konumu):
         # ExcelFile handle'ını kapat (Windows dosya kilidi)
         xls.close()
         
+        # Hangi ayların eksik olduğunu tespit et
+        missing_months = []
+        if saved_months < expected_months:
+            all_standard_months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+            for m in all_standard_months:
+                if m not in saved_month_names:
+                    # Cari yıl ise sadece şimdiye kadar olan geçerli ayları kontrol et
+                    if int(year) == current_year and normalize_month_name(m) not in [normalize_month_name(sh) for sh in sheet_names]:
+                        continue
+                    missing_months.append(m)
+                    
         print(f"   Donusturuldu: {base_name} -> {province_folder_name}/ ({saved_months}/{expected_months} ay) + {cleaned_name}")
         
         # Orijinal .xls dosyasını temizle
         os.remove(xls_file)
-        return True, True, saved_months, expected_months, int(year)
+        return True, True, saved_months, expected_months, int(year), province_folder_name, missing_months
     except Exception as e:
         print(f"[HATA] Donusturme hatasi ({base_name}): {e}")
         if os.path.exists(xls_file):
@@ -187,7 +200,7 @@ def convert_file(xls_file, year, indir_konumu):
             except:
                 pass
         expected = 5 if int(year) == current_year else 12
-        return False, True, 0, expected, int(year)
+        return False, True, 0, expected, int(year), os.path.basename(xls_file), []
 
 def parse_years_input(input_str, min_year, max_year):
     """
@@ -475,6 +488,8 @@ def main():
         
         # Yıl bazlı istatistikleri topla (dinamik formül için)
         year_stats = {}
+        # Eksik verileri takip etmek için liste
+        missing_data_list = []
         
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = [
@@ -484,13 +499,17 @@ def main():
             for future in as_completed(futures):
                 res = future.result()
                 if res:
-                    success, is_province, saved, expected, y_val = res
+                    success, is_province, saved, expected, y_val, prov_name, missing_months = res
                     if is_province:
                         total_provinces_expected += 1
                         total_months_expected += expected
                         if success:
                             total_provinces_converted += 1
                             total_months_converted += saved
+                            if missing_months:
+                                missing_data_list.append((y_val, prov_name, missing_months))
+                        else:
+                            missing_data_list.append((y_val, prov_name, ["Tüm Aylar"]))
                             
                         # Yıl bazlı istatistikleri güncelle
                         if y_val not in year_stats:
@@ -535,6 +554,15 @@ def main():
         if total_months_expected > 0:
             basari_orani = (total_months_converted / total_months_expected) * 100
             print(f"  - Veri Başarı Oranı         : %{basari_orani:.2f}")
+            
+        # Eksik verileri raporla
+        if missing_data_list:
+            print(f"{'-'*80}")
+            print("⚠️ EKSİK VEYA ÇEKİLEMEYEN AYLIK VERİ DETAYLARI:")
+            for y_val, prov_name, months in sorted(missing_data_list, key=lambda x: (x[0], x[1])):
+                months_str = ", ".join(months)
+                print(f"  - Yıl: {y_val} | İl: {prov_name:<20} | Eksik Aylar: [{months_str}]")
+                
         print(f"{'='*80}")
         print(f"{'='*60}")
     else:
