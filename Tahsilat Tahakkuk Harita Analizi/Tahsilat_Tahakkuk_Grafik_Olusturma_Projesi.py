@@ -79,51 +79,49 @@ secilen_klasor = st.sidebar.selectbox("Klasör Seçin:", alt_klasorler)
 # Seçilen klasörün tam yolu
 folder_path = os.path.join(ana_klasor, secilen_klasor)
 
-# Excel dosyalarını oku
-excel_dosyalari = sorted(
-    [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
-    key=lambda x: int(re.search(r"(\d{4})", x).group(1))
-)
+# Excel dosyalarını okumayı önbelleğe al
+@st.cache_data
+def excel_dosyalarini_oku(folder_path):
+    excel_dosyalari = sorted(
+        [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
+        key=lambda x: int(re.search(r"(\d{4})", x).group(1)) if re.search(r"(\d{4})", x) else 0
+    )
+    
+    iller_dict = {}
+    yillar = []
+    
+    # Sayı temizleme fonksiyonu
+    def temizle_sayi_kolon(kolon):
+        return pd.to_numeric(kolon, errors="coerce").round(2)
+        
+    for dosya_adi in excel_dosyalari:
+        match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
+        if not match:
+            continue
+            
+        il_kodlu, yil = match.groups()
+        il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
+        yillar.append(int(yil))
+        dosya_yolu = os.path.join(folder_path, dosya_adi)
+        
+        try:
+            df = pd.read_excel(dosya_yolu, skiprows=2)
+            df = df.drop(index=0)
+            df = df.drop(columns=['Unnamed: 0'], errors='ignore')
+            df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
+            df.set_index('index', inplace=True)
+            
+            for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
+                df[col] = temizle_sayi_kolon(df[col])
+                
+            iller_dict[il_adi] = df
+        except Exception:
+            continue
+            
+    return iller_dict, yillar
 
-# İl ve yıl bilgilerini ayır
-il_adlari = []
-iller_dict = {}
-yillar = []
-
-for dosya_adi in excel_dosyalari:
-    match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
-    if not match:
-        print(f"⚠️ Dosya adı beklenen formatta değil: {dosya_adi}")
-        continue
-
-    il_kodlu, yil = match.groups()
-    il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
-    il_adlari.append(il_adi)
-    yillar.append(int(yil))
-    dosya_yolu = os.path.join(folder_path, dosya_adi)
-
-    try:
-        df = pd.read_excel(dosya_yolu, skiprows=2)
-        df = df.drop(index=0)
-        df = df.drop(columns=['Unnamed: 0'])
-        df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
-        df.set_index('index', inplace=True)
-
-
-        # Sayı temizleme fonksiyonu
-        def temizle_sayi_kolon(kolon):
-            return (
-                pd.to_numeric(kolon, errors="coerce")
-                .round(2)  # ← Ya da round(0) istiyorsan onu koy
-            )
-
-        for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-            df[col] = temizle_sayi_kolon(df[col])
-
-        iller_dict[il_adi] = df
-    except Exception as e:
-        st.warning(f"{il_adi} ({yil}) dosyasında hata: {e}")
-
+# Excel dosyalarını oku (Önbellekli fonksiyon çağrısı)
+iller_dict, yillar = excel_dosyalarini_oku(folder_path)
 st.sidebar.success(f"{len(iller_dict)} il başarıyla yüklendi")
 
 # Yıl başlığı belirle
@@ -324,42 +322,43 @@ if iller_dict:
         fig3 = ciz_oran_harita(merged, "tahsilat/tahakkuk", f"{yil_str} İllere Göre {secim_baslik} Tahsilat Oranı (%)",
                                cmap="coolwarm_r")
 
-        # Kalıcı olarak sakla
-        st.session_state["fig1"] = fig1
-        st.session_state["fig2"] = fig2
-        st.session_state["fig3"] = fig3
-
+        # PNG formatında hafızada sakla
         st.session_state["png1"] = fig_to_png_bytes(fig1)
         st.session_state["png2"] = fig_to_png_bytes(fig2)
         st.session_state["png3"] = fig_to_png_bytes(fig3)
 
+        # Bellek sızıntısını önlemek için matplotlib figürlerini hemen kapat
+        plt.close(fig1)
+        plt.close(fig2)
+        plt.close(fig3)
+
     # Haritalar çizildiyse ekranda göster ve indirilebilir yap
     if st.session_state.get("harita_olusturuldu", False):
         st.subheader(f"{yil_str} İllere Göre {secim_baslik} Tahakkuku")
-        st.pyplot(st.session_state["fig1"])
+        st.image(st.session_state["png1"], use_column_width=True)
         st.download_button(
             label="📥 Tahakkuk Haritasını İndir (PNG)",
-            data=fig_to_png_bytes(st.session_state["fig1"]),
+            data=st.session_state["png1"],
             file_name=f"{yil_str}_{secim_baslik}_Tahakkuk_Haritasi.png",
             mime="image/png",
             key="download_tahakkuk"
         )
 
         st.subheader(f"{yil_str} İllere Göre {secim_baslik} Tahsilatı")
-        st.pyplot(st.session_state["fig2"])
+        st.image(st.session_state["png2"], use_column_width=True)
         st.download_button(
             label="📥 Tahsilat Haritasını İndir (PNG)",
-            data=fig_to_png_bytes(st.session_state["fig2"]),
+            data=st.session_state["png2"],
             file_name=f"{yil_str}_{secim_baslik}_Tahsilat_Haritasi.png",
             mime="image/png",
             key="download_tahsilat"
         )
 
         st.subheader(f"{yil_str} İllere Göre {secim_baslik} Tahsilat Oranı")
-        st.pyplot(st.session_state["fig3"])
+        st.image(st.session_state["png3"], use_column_width=True)
         st.download_button(
             label="📥 Tahsilat Oranı Haritasını İndir (PNG)",
-            data=fig_to_png_bytes(st.session_state["fig3"]),
+            data=st.session_state["png3"],
             file_name=f"{yil_str}_{secim_baslik}_Tahsilat_Orani_Haritasi.png",
             mime="image/png",
             key="download_oran"
@@ -384,7 +383,3 @@ if iller_dict:
                 mime="application/zip",
                 key="download_all"
             )
-
-# streamlit run "C:\Users\HUSOCAN\Desktop\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
-
-# streamlit run "C:\Users\HUSOCAN\Desktop\Projelerim\Tahsilat-Tahakkuk-Harita-Analizi\Tahsilat Tahakkuk Harita Analizi\Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.py"
