@@ -414,7 +414,7 @@ if iller_dict:
         if harita_tipi == "İnteraktif (Plotly)":
             st.plotly_chart(st.session_state["plotly_fig1"], use_container_width=True)
         else:
-            st.image(st.session_state["png1"], use_column_width=True)
+            st.image(st.session_state["png1"], width="stretch")
             
         st.download_button(
             label="📥 Tahakkuk Haritasını İndir (PNG)",
@@ -429,7 +429,7 @@ if iller_dict:
         if harita_tipi == "İnteraktif (Plotly)":
             st.plotly_chart(st.session_state["plotly_fig2"], use_container_width=True)
         else:
-            st.image(st.session_state["png2"], use_column_width=True)
+            st.image(st.session_state["png2"], width="stretch")
             
         st.download_button(
             label="📥 Tahsilat Haritasını İndir (PNG)",
@@ -444,7 +444,7 @@ if iller_dict:
         if harita_tipi == "İnteraktif (Plotly)":
             st.plotly_chart(st.session_state["plotly_fig3"], use_container_width=True)
         else:
-            st.image(st.session_state["png3"], use_column_width=True)
+            st.image(st.session_state["png3"], width="stretch")
             
         st.download_button(
             label="📥 Tahsilat Oranı Haritasını İndir (PNG)",
