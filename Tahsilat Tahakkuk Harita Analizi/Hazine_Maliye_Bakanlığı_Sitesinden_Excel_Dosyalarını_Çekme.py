@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+import datetime
 import re
 import glob
 import pandas as pd
@@ -73,15 +74,16 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
 
 def main():
     print("🗓️ Hangi yılın verilerini indirmek istiyorsunuz?")
-    print("📝 Mevcut yıllar: 2004-2025 arası")
+    current_year = datetime.date.today().year
+    print(f"📝 Mevcut yıllar: 2004-{current_year} arası")
     year = input("➡️ Yıl girin (örn: 2023): ").strip()
 
     try:
         year_int = int(year)
-        if year_int < 2004 or year_int > 2025:
+        if year_int < 2004 or year_int > current_year:
             raise ValueError("Yıl aralık dışında.")
     except ValueError:
-        print("❌ Hata: Geçerli bir yıl girin (2004-2025)!")
+        print(f"❌ Hata: Geçerli bir yıl girin (2004-{current_year})!")
         return
 
     print(f"✅ {year} yılı seçildi")
