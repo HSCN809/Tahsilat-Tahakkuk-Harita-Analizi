@@ -11,6 +11,8 @@ from io import BytesIO
 import uuid
 import zipfile
 from pathlib import Path
+import json
+import plotly.express as px
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -133,8 +135,10 @@ else:
 # 📌 Harita dosyasını oku
 try:
     gdf = gpd.read_file(harita_dosyasi)
-except:
-    st.error("tr.json harita dosyası bulunamadı! Lütfen 'veriler' klasörünü kontrol edin.")
+    with open(harita_dosyasi, "r", encoding="utf-8") as f:
+        geojson_data = json.load(f)
+except Exception as e:
+    st.error(f"tr.json harita dosyası bulunamadı veya okunamadı! Hata: {e}")
     st.stop()
 
 
@@ -158,6 +162,9 @@ if iller_dict:
 
     # Başlığı düzgün göstermek için
     secim_baslik = re.sub(r"^\d+\.\s*", "", secim.strip()).title()
+
+    st.sidebar.markdown("---")
+    harita_tipi = st.sidebar.radio("Harita Görünümü:", ["İnteraktif (Plotly)", "Statik Görsel (Matplotlib)"])
 
     # Veri listesi oluştur
     veri_listesi = []
@@ -311,10 +318,61 @@ if iller_dict:
         return fig
 
 
+    # İnteraktif Miktar Haritası (Plotly)
+    def ciz_interaktif_miktar_harita(df, kolon, baslik, renk_olcegi="Viridis"):
+        df_clean = df.copy()
+        df_clean["Değer (Milyar TL)"] = df_clean[kolon].round(4)
+        df_clean["İl Adı"] = df_clean["name"].str.capitalize()
+        
+        fig = px.choropleth(
+            df_clean,
+            geojson=geojson_data,
+            locations="name",
+            featureidkey="properties.name",
+            color=kolon,
+            color_continuous_scale=renk_olcegi,
+            hover_name="İl Adı",
+            hover_data={"name": False, kolon: False, "Değer (Milyar TL)": True},
+        )
+        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_layout(
+            title={"text": baslik, "y":0.95, "x":0.5, "xanchor": 'center', "yanchor": 'top'},
+            margin={"r":0,"t":50,"l":0,"b":0},
+            height=600
+        )
+        return fig
+
+    # İnteraktif Oran Haritası (Plotly)
+    def ciz_interaktif_oran_harita(df, baslik, renk_olcegi="RdYlGn"):
+        df_clean = df.copy()
+        df_clean["oran"] = np.where((df_clean["tahakkuk"] > 0) & (df_clean["tahsilat"] > 0),
+                                    df_clean["tahsilat"] / df_clean["tahakkuk"] * 100, np.nan)
+        df_clean["Oran (%)"] = df_clean["oran"].round(2)
+        df_clean["İl Adı"] = df_clean["name"].str.capitalize()
+        
+        fig = px.choropleth(
+            df_clean,
+            geojson=geojson_data,
+            locations="name",
+            featureidkey="properties.name",
+            color="oran",
+            color_continuous_scale=renk_olcegi,
+            hover_name="İl Adı",
+            hover_data={"name": False, "oran": False, "Oran (%)": True},
+        )
+        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_layout(
+            title={"text": baslik, "y":0.95, "x":0.5, "xanchor": 'center', "yanchor": 'top'},
+            margin={"r":0,"t":50,"l":0,"b":0},
+            height=600
+        )
+        return fig
+
     # Harita oluşturma butonu – sadece bir kez oluşturur
     if st.button("Haritaları Oluştur"):
         st.session_state["harita_olusturuldu"] = True
 
+        # Statik figürleri çiz (Arka plan indirmeleri için)
         fig1 = ciz_miktar_harita(merged, "tahakkuk", f"{yil_str} İllere Göre {secim_baslik} Tahakkuku (Milyar TL)",
                                  cmap="coolwarm_r")
         fig2 = ciz_miktar_harita(merged, "tahsilat", f"{yil_str} İllere Göre {secim_baslik} Tahsilatı (Milyar TL)",
@@ -332,10 +390,26 @@ if iller_dict:
         plt.close(fig2)
         plt.close(fig3)
 
+        # İnteraktif figürleri çiz ve hafızada sakla
+        st.session_state["plotly_fig1"] = ciz_interaktif_miktar_harita(
+            merged, "tahakkuk", f"{yil_str} İllere Göre {secim_baslik} Tahakkuku (Milyar TL)", renk_olcegi="Viridis"
+        )
+        st.session_state["plotly_fig2"] = ciz_interaktif_miktar_harita(
+            merged, "tahsilat", f"{yil_str} İllere Göre {secim_baslik} Tahsilatı (Milyar TL)", renk_olcegi="Viridis"
+        )
+        st.session_state["plotly_fig3"] = ciz_interaktif_oran_harita(
+            merged, f"{yil_str} İllere Göre {secim_baslik} Tahsilat Oranı (%)", renk_olcegi="RdYlGn"
+        )
+
     # Haritalar çizildiyse ekranda göster ve indirilebilir yap
     if st.session_state.get("harita_olusturuldu", False):
+        # 1. Tahakkuk Haritası
         st.subheader(f"{yil_str} İllere Göre {secim_baslik} Tahakkuku")
-        st.image(st.session_state["png1"], use_column_width=True)
+        if harita_tipi == "İnteraktif (Plotly)":
+            st.plotly_chart(st.session_state["plotly_fig1"], use_container_width=True)
+        else:
+            st.image(st.session_state["png1"], use_column_width=True)
+            
         st.download_button(
             label="📥 Tahakkuk Haritasını İndir (PNG)",
             data=st.session_state["png1"],
@@ -344,8 +418,13 @@ if iller_dict:
             key="download_tahakkuk"
         )
 
+        # 2. Tahsilat Haritası
         st.subheader(f"{yil_str} İllere Göre {secim_baslik} Tahsilatı")
-        st.image(st.session_state["png2"], use_column_width=True)
+        if harita_tipi == "İnteraktif (Plotly)":
+            st.plotly_chart(st.session_state["plotly_fig2"], use_container_width=True)
+        else:
+            st.image(st.session_state["png2"], use_column_width=True)
+            
         st.download_button(
             label="📥 Tahsilat Haritasını İndir (PNG)",
             data=st.session_state["png2"],
@@ -354,8 +433,13 @@ if iller_dict:
             key="download_tahsilat"
         )
 
+        # 3. Tahsilat Oranı Haritası
         st.subheader(f"{yil_str} İllere Göre {secim_baslik} Tahsilat Oranı")
-        st.image(st.session_state["png3"], use_column_width=True)
+        if harita_tipi == "İnteraktif (Plotly)":
+            st.plotly_chart(st.session_state["plotly_fig3"], use_container_width=True)
+        else:
+            st.image(st.session_state["png3"], use_column_width=True)
+            
         st.download_button(
             label="📥 Tahsilat Oranı Haritasını İndir (PNG)",
             data=st.session_state["png3"],
@@ -364,22 +448,19 @@ if iller_dict:
             key="download_oran"
         )
 
-        if st.session_state.get("harita_olusturuldu", False):
-            from io import BytesIO
+        # 4. ZIP İndirme Butonu
+        from io import BytesIO
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zipf:
+            zipf.writestr(f"{yil_str}_{secim_baslik}_Tahakkuk_Haritasi.png", st.session_state["png1"])
+            zipf.writestr(f"{yil_str}_{secim_baslik}_Tahsilat_Haritasi.png", st.session_state["png2"])
+            zipf.writestr(f"{yil_str}_{secim_baslik}_Tahsilat_Orani_Haritasi.png", st.session_state["png3"])
+        zip_buffer.seek(0)
 
-            # ZIP dosyasını bellek içinde oluştur
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w") as zipf:
-                zipf.writestr(f"{yil_str}_{secim_baslik}_Tahakkuk_Haritasi.png", st.session_state["png1"])
-                zipf.writestr(f"{yil_str}_{secim_baslik}_Tahsilat_Haritasi.png", st.session_state["png2"])
-                zipf.writestr(f"{yil_str}_{secim_baslik}_Tahsilat_Orani_Haritasi.png", st.session_state["png3"])
-            zip_buffer.seek(0)
-
-            # ZIP dosyasını indirme butonu
-            st.download_button(
-                label="📦 Tüm Haritaları İndir (ZIP)",
-                data=zip_buffer,
-                file_name=f"{yil_str}_{secim_baslik}_Haritalar.zip",
-                mime="application/zip",
-                key="download_all"
-            )
+        st.download_button(
+            label="📦 Tüm Haritaları İndir (ZIP)",
+            data=zip_buffer,
+            file_name=f"{yil_str}_{secim_baslik}_Haritalar.zip",
+            mime="application/zip",
+            key="download_all"
+        )

@@ -11,3 +11,4 @@ openpyxl
 selenium
 webdriver-manager
 xlrd
+plotly
