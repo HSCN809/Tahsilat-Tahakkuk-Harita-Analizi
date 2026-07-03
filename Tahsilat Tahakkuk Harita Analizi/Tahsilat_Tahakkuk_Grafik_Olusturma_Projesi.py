@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 import json
 import plotly.express as px
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -81,6 +82,29 @@ secilen_klasor = st.sidebar.selectbox("Klasör Seçin:", alt_klasorler)
 # Seçilen klasörün tam yolu
 folder_path = os.path.join(ana_klasor, secilen_klasor)
 
+def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
+    match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
+    if not match:
+        return None
+        
+    il_kodlu, yil = match.groups()
+    il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
+    dosya_yolu = os.path.join(folder_path, dosya_adi)
+    
+    try:
+        df = pd.read_excel(dosya_yolu, skiprows=2)
+        df = df.drop(index=0)
+        df = df.drop(columns=['Unnamed: 0'], errors='ignore')
+        df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
+        df.set_index('index', inplace=True)
+        
+        for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
+            df[col] = pd.to_numeric(df[col], errors="coerce").round(2)
+            
+        return il_adi, int(yil), df
+    except Exception:
+        return None
+
 # Excel dosyalarını okumayı önbelleğe al
 @st.cache_data
 def excel_dosyalarini_oku(folder_path):
@@ -92,34 +116,20 @@ def excel_dosyalarini_oku(folder_path):
     iller_dict = {}
     yillar = []
     
-    # Sayı temizleme fonksiyonu
-    def temizle_sayi_kolon(kolon):
-        return pd.to_numeric(kolon, errors="coerce").round(2)
+    # 16 paralel işçi ile Excel dosyalarını eşzamanlı okut
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        futures = [
+            executor.submit(oku_ve_temizle_tek_dosya, dosya_adi, folder_path)
+            for dosya_adi in excel_dosyalari
+        ]
         
-    for dosya_adi in excel_dosyalari:
-        match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
-        if not match:
-            continue
-            
-        il_kodlu, yil = match.groups()
-        il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
-        yillar.append(int(yil))
-        dosya_yolu = os.path.join(folder_path, dosya_adi)
-        
-        try:
-            df = pd.read_excel(dosya_yolu, skiprows=2)
-            df = df.drop(index=0)
-            df = df.drop(columns=['Unnamed: 0'], errors='ignore')
-            df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
-            df.set_index('index', inplace=True)
-            
-            for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-                df[col] = temizle_sayi_kolon(df[col])
+        for future in as_completed(futures):
+            res = future.result()
+            if res:
+                il_adi, yil, df = res
+                iller_dict[il_adi] = df
+                yillar.append(yil)
                 
-            iller_dict[il_adi] = df
-        except Exception:
-            continue
-            
     return iller_dict, yillar
 
 # Excel dosyalarını oku (Önbellekli fonksiyon çağrısı)
