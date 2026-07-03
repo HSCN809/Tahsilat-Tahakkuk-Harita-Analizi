@@ -150,3 +150,6 @@ graphify-out/
 
 # Data files
 veriler/
+
+# scratch files
+scratch/

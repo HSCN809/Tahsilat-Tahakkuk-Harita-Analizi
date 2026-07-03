@@ -70,7 +70,6 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     il_kodlu, yil = match.groups()
     il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
     dosya_yolu = os.path.join(folder_path, dosya_adi)
-    
     try:
         df = pd.read_excel(dosya_yolu, skiprows=2)
         df = df.drop(index=0)
@@ -139,16 +138,6 @@ def veri_hazirla(iller_dict, secim):
 
     gelir_df = pd.DataFrame(veri_listesi)
 
-    # İl adı düzeltmeleri
-    duzeltmeler = {
-        "Adıyaman": "Adiyaman", "Afyon_Karahisar": "Afyonkarahisar", "Ağrı": "Agri", "Aydın": "Aydin",
-        "Balıkesir": "Balikesir", "Diyarbakır": "Diyarbakir", "Elazığ": "Elazig", "Eskişehir": "Eskisehir",
-        "Gümüşhane": "Gümüshane", "Iğdır": "Iğdir", "İstanbul": "Istanbul", "İzmir": "Izmir",
-        "K.Maraş": "K. Maras", "KMaraş": "K. Maras", "Kırklareli": "Kirklareli", "Kırıkkale": "Kinkkale", "Kırşehir": "Kirsehir",
-        "Muğla": "Mugla", "Muş": "Mus", "Nevşehir": "Nevsehir", "Niğde": "Nigde", "Tekirdağ": "Tekirdag",
-        "Urfa": "Sanliurfa", "Şanlıurfa": "Sanliurfa", "Uşak": "Usak", "Zonguldak": "Zinguldak", "Çankırı": "Çankiri", "Şırnak": "Sirnak"
-    }
-    gelir_df["İl"] = gelir_df["İl"].replace(duzeltmeler)
     gelir_df[["tahakkuk", "tahsilat", "tahsilat/tahakkuk"]] = gelir_df[["tahakkuk", "tahsilat", "tahsilat/tahakkuk"]].round(2)
 
     # Harita sınırları ile verileri birleştir
