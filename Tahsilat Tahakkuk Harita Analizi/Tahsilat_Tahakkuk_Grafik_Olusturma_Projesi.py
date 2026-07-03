@@ -212,15 +212,15 @@ if iller_dict:
 
 
     # Miktar haritası fonksiyonu
-    def ciz_miktar_harita(df, kolon, baslik, cmap="YlGnBu", log_scale=True):
+    def ciz_miktar_harita(df, kolon, baslik, cmap="YlGnBu"):
         fig, ax = plt.subplots(1, 1, figsize=(14, 12))
         plot_df = df.copy()
 
-        if log_scale:
-            pozitif_mask = plot_df[kolon] > 0
-            plot_df[kolon] = plot_df[kolon].astype(float)
-            plot_df.loc[pozitif_mask, kolon] = np.log1p(plot_df.loc[pozitif_mask, kolon])
-            plot_df.loc[~pozitif_mask, kolon] = np.nan
+        # Doğrudan logaritmik ölçekleme uygulanır
+        pozitif_mask = plot_df[kolon] > 0
+        plot_df[kolon] = plot_df[kolon].astype(float)
+        plot_df.loc[pozitif_mask, kolon] = np.log1p(plot_df.loc[pozitif_mask, kolon])
+        plot_df.loc[~pozitif_mask, kolon] = np.nan
 
         plot_df.plot(
             column=kolon,
