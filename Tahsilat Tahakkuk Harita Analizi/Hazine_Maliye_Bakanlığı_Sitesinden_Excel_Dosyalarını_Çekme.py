@@ -189,12 +189,14 @@ def main():
             year_main_found = False
             
             try:
-                # Yıla ait ana akordeon başlığını bul ve tıkla
-                year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibarıyla Tahakkuk ve Tahsilatı')]")
+                # Etiket bağımsız ve alternatif Türkçe karakter varyasyonları ile arama yapılıyor
+                year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibarıyla Tahakkuk ve Tahsilatı') or contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibariyle Tahakkuk ve Tahsilatı')]")
                 if not year_main_elements:
-                    year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{y} Yılı Genel Bütçe')]")
+                    year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı Genel Bütçe')]")
                 if not year_main_elements:
-                    year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{y} Yılı')]")
+                    year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı')]")
+                if not year_main_elements:
+                    year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y}')]")
                     
                 for element in year_main_elements:
                     if element.is_displayed():
@@ -214,7 +216,17 @@ def main():
                 print(f"Ana başlık arama hatası ({y}): {e}")
             
             if not year_main_found:
-                print(f"❌ {y} yılı ana başlığı bulunamadı, bu yıl atlanıyor.")
+                print(f"❌ {y} yılı ana başlığı bulunamadı. Sayfada '{y}' içeren elementler listeleniyor:")
+                try:
+                    debug_els = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y}')]")
+                    for idx, d_el in enumerate(debug_els[:5], 1):
+                        try:
+                            print(f"   [Debug {idx}] Tag: <{d_el.tag_name}> Class: '{d_el.get_attribute('class')}' Text: '{d_el.text.strip()[:60]}'")
+                        except:
+                            pass
+                except Exception as de:
+                    print(f"   Hata detayları alınamadı: {de}")
+                print(f"❌ {y} yılı atlanıyor.")
                 continue
             
             print(f"🔍 {y} - Bütçe Gelir Tabloları alt başlığı aranıyor...")
