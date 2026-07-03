@@ -16,6 +16,13 @@ from webdriver_manager.chrome import ChromeDriverManager
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için yamala (monkey patch)
+import xlrd
+xlrd.biffh.unicode = lambda b, enc: b.decode(enc, 'replace')
+xlrd.book.unicode = lambda b, enc: b.decode(enc, 'replace')
+xlrd.formatting.unicode = lambda b, enc: b.decode(enc, 'replace')
+
+
 def clean_and_format_filename(link_text, year):
     """
     Indirilen dosya adini standardize eder.
@@ -247,20 +254,18 @@ def main():
         print(f"⏱️ İndirmeler {download_duration:.2f} saniyede tamamlandı.")
         
         # .xls dosyalarını .xlsx formatına dönüştür ve isimlendir
-        if downloaded_files:
+        xls_files = glob.glob(os.path.join(indir_konumu, "*.xls"))
+        if xls_files:
             print("\n🔄 Dosya biçimleri dönüştürülüyor (Excel conversion)...")
             conversion_start = time.time()
             
-            for xls_file in downloaded_files:
+            for xls_file in xls_files:
+                base_name = os.path.basename(xls_file)
                 try:
-                    if not os.path.exists(xls_file):
-                        continue
-                    
-                    base_name = os.path.basename(xls_file)
                     cleaned_name = clean_and_format_filename(base_name, year)
                     if cleaned_name:
                         xlsx_path = indir_konumu / cleaned_name
-                        # xlrd motoru ile oku, openpyxl ile kaydet
+                        # Yamalanmış xlrd motoru ile dosyayı oku
                         df = pd.read_excel(xls_file, engine='xlrd')
                         df.to_excel(xlsx_path, index=False)
                         print(f"   Dönüştürüldü: {base_name} -> {cleaned_name}")
