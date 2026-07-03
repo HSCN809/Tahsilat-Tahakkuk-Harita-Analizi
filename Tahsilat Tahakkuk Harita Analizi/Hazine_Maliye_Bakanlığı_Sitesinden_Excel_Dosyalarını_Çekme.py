@@ -22,12 +22,10 @@ xlrd.biffh.unicode = lambda b, enc: b.decode(enc, 'replace')
 xlrd.book.unicode = lambda b, enc: b.decode(enc, 'replace')
 xlrd.formatting.unicode = lambda b, enc: b.decode(enc, 'replace')
 
-
 def clean_and_format_filename(link_text, year):
     """
     Indirilen dosya adini standardize eder.
     Ornek: 01-Adana-2022.xls -> 01_Adana_2022.xlsx
-    Ornek: 03-Afyon Karahisar-2022.xls -> 03_Afyon_Karahisar_2022.xlsx
     """
     name = re.sub(r"\.xlsx?$", "", link_text, flags=re.IGNORECASE).strip()
     parts = re.split(r"[-_]", name)
@@ -47,7 +45,7 @@ def clean_and_format_filename(link_text, year):
 def download_file(session, link_text, link_href, target_dir, idx, total):
     """
     Tek bir Excel dosyasini requests.Session kullanarak indirir.
-    WAF/Cloudflare ve rate-limit engellerini asmak icin tarayici basliklari (Headers) kullanir.
+    WAF/Cloudflare engellerini asmak icin tarayici basliklari (Headers) kullanir.
     """
     try:
         # Guvenli dosya adi olustur
@@ -57,7 +55,6 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
         
         file_path = target_dir / safe_filename
         
-        # Tarayıcı taklidi yapan basliklar
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*',
@@ -66,14 +63,13 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
             'Connection': 'keep-alive'
         }
         
-        # Dosyayı indir
         response = session.get(link_href, headers=headers, timeout=20)
         response.raise_for_status()
         
         with open(file_path, 'wb') as file:
             file.write(response.content)
             
-        print(f"✅ İndirildi ({idx}/{total}): {link_text}")
+        print(f"   İndirildi ({idx}/{total}): {link_text}")
         return True, file_path
     except Exception as e:
         print(f"❌ İndirme Hatası ({link_text}): {e}")
@@ -98,36 +94,70 @@ def convert_file(xls_file, year, indir_konumu):
     except Exception as e:
         print(f"❌ Dönüştürme hatası ({base_name}): {e}")
 
+def parse_years_input(input_str, current_year):
+    """
+    Yil veya yil araligini cozumler.
+    Ornek: 2023 -> [2023]
+    Ornek: 2022-2025 -> [2022, 2023, 2024, 2025]
+    Ornek: 2020, 2023 -> [2020, 2023]
+    """
+    years = []
+    input_str = input_str.replace(" ", "")
+    
+    if "," in input_str:
+        parts = input_str.split(",")
+    else:
+        parts = [input_str]
+        
+    for part in parts:
+        if "-" in part:
+            subparts = part.split("-")
+            if len(subparts) == 2:
+                try:
+                    start = int(subparts[0])
+                    end = int(subparts[1])
+                    if start <= end:
+                        years.extend(list(range(start, end + 1)))
+                except ValueError:
+                    pass
+        else:
+            try:
+                years.append(int(part))
+            except ValueError:
+                pass
+                
+    valid_years = [y for y in sorted(list(set(years))) if 2004 <= y <= current_year]
+    return valid_years
+
 def main():
-    print("🗓️ Hangi yılın verilerini indirmek istiyorsunuz?")
+    print("🗓️ Hangi yılın/yılların verilerini indirmek istiyorsunuz?")
     current_year = datetime.date.today().year
     print(f"📝 Mevcut yıllar: 2004-{current_year} arası")
-    year = input("➡️ Yıl girin (örn: 2023): ").strip()
+    print("💡 Giriş formatları: '2023' veya '2022-2025' veya '2020, 2022, 2024'")
+    year_input = input("➡️ Yıl girin: ").strip()
 
-    try:
-        year_int = int(year)
-        if year_int < 2004 or year_int > current_year:
-            raise ValueError("Yıl aralık dışında.")
-    except ValueError:
-        print(f"❌ Hata: Geçerli bir yıl girin (2004-{current_year})!")
+    valid_years = parse_years_input(year_input, current_year)
+
+    if not valid_years:
+        print(f"❌ Hata: Geçerli bir yıl veya yıl aralığı girin (2004-{current_year})!")
         return
 
-    print(f"✅ {year} yılı seçildi")
+    print(f"✅ Seçilen Yıllar: {', '.join(map(str, valid_years))}")
 
-    # Proje yolunu dinamik belirle
+    # Proje yollarını dinamik belirle
     BASE_DIR = Path(__file__).resolve().parent.parent
     veriler_dir = BASE_DIR / "veriler"
-    
-    if not veriler_dir.exists():
-        os.makedirs(veriler_dir, exist_ok=True)
-        
     excel_ana_dir = veriler_dir / "Tahsilat Tahakkuk Excel Dosyaları"
-    os.makedirs(excel_ana_dir, exist_ok=True)
     
-    indir_konumu = excel_ana_dir / f"İllere Göre Tahsilat Tahakkuk {year}"
-    os.makedirs(indir_konumu, exist_ok=True)
+    os.makedirs(veriler_dir, exist_ok=True)
+    os.makedirs(excel_ana_dir, exist_ok=True)
 
-    print(f"📁 İndirme konumu: {indir_konumu}")
+    # Her yil icin indirme klasorlerini hazirla
+    indir_konumlari = {}
+    for y in valid_years:
+        path = excel_ana_dir / f"İllere Göre Tahsilat Tahakkuk {y}"
+        os.makedirs(path, exist_ok=True)
+        indir_konumlari[y] = path
 
     # Chrome seçeneklerini yapılandır
     options = ChromeOptions()
@@ -140,161 +170,164 @@ def main():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
 
-    # WebDriver'ı dinamik olarak başlat
-    print("🤖 Tarayıcı başlatılıyor (Linkler toplanıyor)...")
+    # WebDriver'ı başlat
+    print("\n🤖 Tarayıcı başlatılıyor (Linkler toplanıyor)...")
     driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     wait = WebDriverWait(driver, 20)
-    links_data = []
+    all_links_data = [] # (link_text, href, year)
 
     try:
-        print("🌐 Siteye bağlanılıyor...")
-        driver.get("https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-2026")
-        time.sleep(3)
-        
-        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-        print("✅ Sayfa yüklendi")
-        
-        print(f"\n{'='*50}")
-        print(f"📅 {year} YILI LİNKLERİ TOPLANIYOR")
-        print(f"{'='*50}")
-        
-        print(f"🔍 {year} yılı ana başlığı aranıyor...")
-        year_main_found = False
-        
-        try:
-            year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{year} Yılı Genel Bütçe Gelirlerinin İller İtibarıyla Tahakkuk ve Tahsilatı')]")
-            for element in year_main_elements:
-                if element.is_displayed():
-                    print(f"🟢 {year} ana başlığı bulundu")
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
-                    time.sleep(1)
+        for y in valid_years:
+            print(f"\n🌐 {y} yılı verileri için siteye bağlanılıyor...")
+            driver.get("https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-2026")
+            time.sleep(3)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            
+            print(f"🔍 {y} yılı ana başlığı aranıyor...")
+            year_main_found = False
+            
+            try:
+                # Yıla ait ana akordeon başlığını bul ve tıkla
+                year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibarıyla Tahakkuk ve Tahsilatı')]")
+                if not year_main_elements:
+                    year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{y} Yılı Genel Bütçe')]")
+                if not year_main_elements:
+                    year_main_elements = driver.find_elements(By.XPATH, f"//a[contains(text(), '{y} Yılı')]")
                     
-                    try:
-                        element.click()
-                    except ElementClickInterceptedException:
-                        driver.execute_script("arguments[0].click();", element)
-                    
-                    year_main_found = True
-                    time.sleep(2)
-                    break
-        except Exception as e:
-            print(f"Ana başlık arama hatası: {e}")
-        
-        if not year_main_found:
-            raise RuntimeError(f"{year} ana başlığı bulunamadı!")
-        
-        print(f"✅ {year} ana başlığı açıldı")
-        
-        print(f"🔍 {year} - Bütçe Gelir Tabloları alt başlığı aranıyor...")
-        budget_tables_found = False
-        
-        try:
-            budget_elements = driver.find_elements(By.XPATH, "//a[contains(text(), 'Bütçe Gelir Tabloları')]")
-            for element in budget_elements:
-                if element.is_displayed():
-                    print(f"🟢 Bütçe Gelir Tabloları alt başlığı bulundu")
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
-                    time.sleep(1)
-                    
-                    try:
-                        element.click()
-                    except ElementClickInterceptedException:
-                        driver.execute_script("arguments[0].click();", element)
-                    
-                    budget_tables_found = True
-                    time.sleep(2)
-                    break
-        except Exception as e:
-            print(f"Alt başlık arama hatası: {e}")
-        
-        if not budget_tables_found:
-            raise RuntimeError(f"{year} için Bütçe Gelir Tabloları bulunamadı!")
-        
-        print(f"✅ {year} - Bütçe Gelir Tabloları açıldı")
-        
-        print(f"🔍 Excel dosyaları aranıyor...")
-        excel_links = []
-        
-        # Linkleri bul
-        xlsx_links = driver.find_elements(By.XPATH, "//a[contains(@href, '.xlsx') or contains(@href, '.xls')]")
-        excel_links.extend(xlsx_links)
-        
-        excel_text_links = driver.find_elements(By.XPATH, "//a[contains(text(), 'Excel') or contains(text(), 'excel')]")
-        excel_links.extend(excel_text_links)
-        
-        il_excel_links = driver.find_elements(By.XPATH, "//a[contains(text(), 'Adana') or contains(text(), 'Ankara') or contains(text(), 'İstanbul') or contains(text(), 'Merkezi') or contains(text(), 'İl ')]")
-        for link in il_excel_links:
-            href = link.get_attribute('href')
-            if href and ('.xlsx' in href or '.xls' in href):
-                excel_links.append(link)
-        
-        # Tekilleştir ve verileri çıkar
-        seen_hrefs = set()
-        for link in excel_links:
-            href = link.get_attribute('href')
-            if href and href not in seen_hrefs and link.is_displayed():
-                seen_hrefs.add(href)
-                link_text = link.text.strip() if link.text else f"Excel_{year}_{len(links_data)+1}"
-                links_data.append((link_text, href))
-                
+                for element in year_main_elements:
+                    if element.is_displayed():
+                        print(f"🟢 {y} ana başlığı bulundu")
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                        time.sleep(1)
+                        
+                        try:
+                            element.click()
+                        except ElementClickInterceptedException:
+                            driver.execute_script("arguments[0].click();", element)
+                        
+                        year_main_found = True
+                        time.sleep(2)
+                        break
+            except Exception as e:
+                print(f"Ana başlık arama hatası ({y}): {e}")
+            
+            if not year_main_found:
+                print(f"❌ {y} yılı ana başlığı bulunamadı, bu yıl atlanıyor.")
+                continue
+            
+            print(f"🔍 {y} - Bütçe Gelir Tabloları alt başlığı aranıyor...")
+            budget_tables_found = False
+            
+            try:
+                budget_elements = driver.find_elements(By.XPATH, "//a[contains(text(), 'Bütçe Gelir Tabloları')]")
+                for element in budget_elements:
+                    if element.is_displayed():
+                        print(f"🟢 Bütçe Gelir Tabloları alt başlığı bulundu")
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                        time.sleep(1)
+                        
+                        try:
+                            element.click()
+                        except ElementClickInterceptedException:
+                            driver.execute_script("arguments[0].click();", element)
+                        
+                        budget_tables_found = True
+                        time.sleep(2)
+                        break
+            except Exception as e:
+                print(f"Alt başlık arama hatası ({y}): {e}")
+            
+            if not budget_tables_found:
+                print(f"❌ {y} için Bütçe Gelir Tabloları bulunamadı, bu yıl atlanıyor.")
+                continue
+            
+            print(f"🔍 {y} yılı Excel dosyaları aranıyor...")
+            excel_links = []
+            
+            # Excel linklerini topla
+            xlsx_links = driver.find_elements(By.XPATH, "//a[contains(@href, '.xlsx') or contains(@href, '.xls')]")
+            excel_links.extend(xlsx_links)
+            
+            excel_text_links = driver.find_elements(By.XPATH, "//a[contains(text(), 'Excel') or contains(text(), 'excel')]")
+            excel_links.extend(excel_text_links)
+            
+            il_excel_links = driver.find_elements(By.XPATH, "//a[contains(text(), 'Adana') or contains(text(), 'Ankara') or contains(text(), 'İstanbul') or contains(text(), 'Merkezi') or contains(text(), 'İl ')]")
+            for link in il_excel_links:
+                href = link.get_attribute('href')
+                if href and ('.xlsx' in href or '.xls' in href):
+                    excel_links.append(link)
+            
+            # Tekilleştir ve listeye ekle
+            seen_hrefs = set()
+            year_links_count = 0
+            for link in excel_links:
+                href = link.get_attribute('href')
+                if href and href not in seen_hrefs and link.is_displayed():
+                    seen_hrefs.add(href)
+                    link_text = link.text.strip() if link.text else f"Excel_{y}_{year_links_count+1}"
+                    all_links_data.append((link_text, href, y))
+                    year_links_count += 1
+            print(f"📊 {y} yılı için {year_links_count} Excel linki toplandı.")
+            
     except TimeoutException:
         print("❌ Hata: Sayfa yükleme zaman aşımına uğradı!")
     except Exception as e:
         print(f"❌ Genel Hata: {e}")
     finally:
-        print("🏁 Tarayıcı kapatılıyor...")
+        print("\n🏁 Tarayıcı kapatılıyor...")
         driver.quit()
         print("✅ Tarayıcı kapatıldı.")
 
     # İndirme aşaması (Paralel)
-    if links_data:
-        print(f"\n🚀 {len(links_data)} adet Excel linki bulundu.")
+    if all_links_data:
+        print(f"\n🚀 Toplam {len(all_links_data)} adet Excel linki bulundu.")
         print("📥 Paralel indirme başlatılıyor (max_workers=10)...")
         
-        downloaded_files = []
+        downloaded_files = [] # (file_path, year)
         session = requests.Session()
         
         start_time = time.time()
         
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [
-                executor.submit(download_file, session, text, href, indir_konumu, idx, len(links_data))
-                for idx, (text, href) in enumerate(links_data, 1)
+                executor.submit(download_file, session, text, href, indir_konumlari[y], idx, len(all_links_data))
+                for idx, (text, href, y) in enumerate(all_links_data, 1)
             ]
             
             for future in as_completed(futures):
                 success, file_path = future.result()
                 if success and file_path:
-                    downloaded_files.append(file_path)
+                    # Hangi yıla ait olduğunu klasör isminden çıkar
+                    parent_name = file_path.parent.name
+                    year_match = re.search(r"\d{4}", parent_name)
+                    file_year = year_match.group(0) if year_match else str(current_year)
+                    downloaded_files.append((file_path, file_year))
                     
         download_duration = time.time() - start_time
-        print(f"⏱️ İndirmeler {download_duration:.2f} saniyede tamamlandı.")
+        print(f"⏱️ Tüm indirmeler {download_duration:.2f} saniyede tamamlandı.")
         
-        # .xls dosyalarını .xlsx formatına dönüştür ve isimlendir
-        xls_files = glob.glob(os.path.join(indir_konumu, "*.xls"))
-        if xls_files:
-            print("\n🔄 Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
-            conversion_start = time.time()
-            
-            # CPU ve I/O yükünü dengelemek için max_workers=8 kullanıldı
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                futures = [
-                    executor.submit(convert_file, xls_file, year, indir_konumu)
-                    for xls_file in xls_files
-                ]
-                # Tüm dönüştürmelerin tamamlanmasını bekle
-                for future in as_completed(futures):
-                    pass
-                    
-            conversion_duration = time.time() - conversion_start
-            print(f"⏱️ Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
-            
+        # Dönüştürme Aşaması (Paralel)
+        print("\n🔄 Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
+        conversion_start = time.time()
+        
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [
+                executor.submit(convert_file, filepath, file_year, indir_konumlari[int(file_year)])
+                for filepath, file_year in downloaded_files
+            ]
+            for future in as_completed(futures):
+                pass
+                
+        conversion_duration = time.time() - conversion_start
+        print(f"⏱️ Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
+        
+        # Sonuç özeti
         print(f"\n{'='*60}")
-        print(f"🎉 {year} YILI TAMAMLANDI!")
-        print(f"📊 Toplam {len(downloaded_files)} dosya hazırlandı.")
-        print(f"📁 Konum: {indir_konumu}")
+        print("🎉 TÜM İŞLEMLER BAŞARIYLA TAMAMLANDI!")
+        print(f"📊 İndirilen ve Dönüştürülen Yıllar: {', '.join(map(str, valid_years))}")
+        print(f"📁 Dosyaların Ana Konumu: {excel_ana_dir}")
         print(f"{'='*60}")
     else:
         print(f"❌ İndirilecek link bulunamadı.")
