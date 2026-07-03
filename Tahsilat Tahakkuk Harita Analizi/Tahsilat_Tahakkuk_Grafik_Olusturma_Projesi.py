@@ -208,9 +208,9 @@ if iller_dict:
         "Adıyaman": "Adiyaman", "Afyon_Karahisar": "Afyonkarahisar", "Ağrı": "Agri", "Aydın": "Aydin",
         "Balıkesir": "Balikesir", "Diyarbakır": "Diyarbakir", "Elazığ": "Elazig", "Eskişehir": "Eskisehir",
         "Gümüşhane": "Gümüshane", "Iğdır": "Iğdir", "İstanbul": "Istanbul", "İzmir": "Izmir",
-        "K.Maraş": "K. Maras", "Kırklareli": "Kirklareli", "Kırıkkalae": "Kinkkale", "Kırşehir": "Kirsehir",
+        "K.Maraş": "K. Maras", "KMaraş": "K. Maras", "Kırklareli": "Kirklareli", "Kırıkkale": "Kinkkale", "Kırşehir": "Kirsehir",
         "Muğla": "Mugla", "Muş": "Mus", "Nevşehir": "Nevsehir", "Niğde": "Nigde", "Tekirdağ": "Tekirdag",
-        "Urfa": "Sanliurfa", "Uşak": "Usak", "Zonguldak": "Zinguldak", "Çankırı": "Çankiri", "Şırnak": "Sirnak"
+        "Urfa": "Sanliurfa", "Şanlıurfa": "Sanliurfa", "Uşak": "Usak", "Zonguldak": "Zinguldak", "Çankırı": "Çankiri", "Şırnak": "Sirnak"
     }
     gelir_df["İl"] = gelir_df["İl"].replace(duzeltmeler)
 
