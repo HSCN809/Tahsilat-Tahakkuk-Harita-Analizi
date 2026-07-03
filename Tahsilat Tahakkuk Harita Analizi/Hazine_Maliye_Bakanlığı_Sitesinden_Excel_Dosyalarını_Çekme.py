@@ -79,6 +79,25 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
         print(f"❌ İndirme Hatası ({link_text}): {e}")
         return False, None
 
+def convert_file(xls_file, year, indir_konumu):
+    """
+    Tek bir .xls dosyasını .xlsx formatına dönüştürür ve orijinalini siler.
+    """
+    base_name = os.path.basename(xls_file)
+    try:
+        cleaned_name = clean_and_format_filename(base_name, year)
+        if cleaned_name:
+            xlsx_path = indir_konumu / cleaned_name
+            # Yamalanmış xlrd motoru ile dosyayı oku
+            df = pd.read_excel(xls_file, engine='xlrd')
+            df.to_excel(xlsx_path, index=False)
+            print(f"   Dönüştürüldü: {base_name} -> {cleaned_name}")
+        
+        # Orijinal .xls dosyasını temizle
+        os.remove(xls_file)
+    except Exception as e:
+        print(f"❌ Dönüştürme hatası ({base_name}): {e}")
+
 def main():
     print("🗓️ Hangi yılın verilerini indirmek istiyorsunuz?")
     current_year = datetime.date.today().year
@@ -256,24 +275,18 @@ def main():
         # .xls dosyalarını .xlsx formatına dönüştür ve isimlendir
         xls_files = glob.glob(os.path.join(indir_konumu, "*.xls"))
         if xls_files:
-            print("\n🔄 Dosya biçimleri dönüştürülüyor (Excel conversion)...")
+            print("\n🔄 Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
             conversion_start = time.time()
             
-            for xls_file in xls_files:
-                base_name = os.path.basename(xls_file)
-                try:
-                    cleaned_name = clean_and_format_filename(base_name, year)
-                    if cleaned_name:
-                        xlsx_path = indir_konumu / cleaned_name
-                        # Yamalanmış xlrd motoru ile dosyayı oku
-                        df = pd.read_excel(xls_file, engine='xlrd')
-                        df.to_excel(xlsx_path, index=False)
-                        print(f"   Dönüştürüldü: {base_name} -> {cleaned_name}")
-                    
-                    # Orijinal .xls dosyasını temizle
-                    os.remove(xls_file)
-                except Exception as e:
-                    print(f"❌ Dönüştürme hatası ({os.path.basename(xls_file)}): {e}")
+            # CPU ve I/O yükünü dengelemek için max_workers=8 kullanıldı
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = [
+                    executor.submit(convert_file, xls_file, year, indir_konumu)
+                    for xls_file in xls_files
+                ]
+                # Tüm dönüştürmelerin tamamlanmasını bekle
+                for future in as_completed(futures):
+                    pass
                     
             conversion_duration = time.time() - conversion_start
             print(f"⏱️ Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
