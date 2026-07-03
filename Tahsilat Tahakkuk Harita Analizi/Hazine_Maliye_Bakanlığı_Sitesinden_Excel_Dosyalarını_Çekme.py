@@ -199,8 +199,8 @@ def main():
             continue
             
     if not target_url:
-        target_url = "https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-2026"
-        print(f"⚠️ Yeni adres tespit edilemedi, bilinen son adres kullanılıyor: {target_url}")
+        target_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{current_year}"
+        print(f"⚠️ Yeni adres tespit edilemedi, güncel yıl adresi varsayılan olarak seçildi: {target_url}")
 
     try:
         for y in valid_years:
