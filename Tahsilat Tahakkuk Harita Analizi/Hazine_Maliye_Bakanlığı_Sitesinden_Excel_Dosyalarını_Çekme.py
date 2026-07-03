@@ -6,6 +6,7 @@ import datetime
 import re
 import glob
 import pandas as pd
+import shutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -323,14 +324,12 @@ def main():
     for y in valid_years:
         path = excel_ana_dir / f"İllere Göre Tahsilat Tahakkuk {y}"
         
-        # Eğer klasör zaten varsa, içindeki tüm eski .xlsx ve .xls dosyalarını silerek temiz kurulum yap
+        # Eğer klasör zaten varsa, içindeki tüm eski dosyaları ve alt klasörleri silerek temiz kurulum yap
         if path.exists():
-            for old_file in path.glob("*"):
-                if old_file.suffix in ('.xlsx', '.xls'):
-                    try:
-                        os.remove(old_file)
-                    except:
-                        pass
+            try:
+                shutil.rmtree(path)
+            except Exception as e:
+                print(f"[UYARI] Klasör temizlenirken hata oluştu ({y}): {e}")
                         
         os.makedirs(path, exist_ok=True)
         indir_konumlari[y] = path
