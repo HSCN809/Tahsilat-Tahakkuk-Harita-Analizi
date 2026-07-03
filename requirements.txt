@@ -8,3 +8,6 @@ shapely
 pyproj
 fiona
 openpyxl
+selenium
+webdriver-manager
+xlrd
