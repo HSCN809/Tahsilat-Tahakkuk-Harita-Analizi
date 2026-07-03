@@ -42,6 +42,11 @@ def normalize_month_name(name):
     replacements = {
         'ı': 'i', 'ş': 's', 'ğ': 'g', 'ü': 'u', 'ö': 'o', 'ç': 'c',
         'i̇': 'i',  # İ decomposed
+        '00 merkez': 'mayis',
+        'eyul': 'eylul',
+        'nisin': 'nisan',
+        'ankara': 'aralik',
+        'eylul)': 'eylul'
     }
     for k, v in replacements.items():
         name = name.replace(k, v)
