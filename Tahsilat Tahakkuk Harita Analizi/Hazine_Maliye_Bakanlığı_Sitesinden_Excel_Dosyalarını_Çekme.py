@@ -118,14 +118,8 @@ def convert_file(xls_file, year, indir_konumu):
     Tek bir .xls dosyasını il alt klasörüne aylık .xlsx dosyaları olarak dönüştürür.
     Ayrıca yıl klasörüne en güncel ayın (Aralık) tek dosyasını da kaydeder (geriye uyumluluk).
     
-    Yapı:
-      İllere Göre Tahsilat Tahakkuk {yıl}/
-        01_Adana_2024.xlsx          <-- en güncel ay (Aralık)
-        01_Adana/
-          Ocak.xlsx
-          Şubat.xlsx
-          ...
-          Aralık.xlsx
+    Dönüş Değeri:
+      (başarılı_mı, il_mi, kaydedilen_ay_sayısı, beklenen_ay_sayısı)
     """
     base_name = os.path.basename(xls_file)
     
@@ -137,11 +131,13 @@ def convert_file(xls_file, year, indir_konumu):
         "ekim": "Ekim", "kasim": "Kasım", "aralik": "Aralık"
     }
     
+    current_year = datetime.date.today().year
+    
     try:
         cleaned_name = clean_and_format_filename(base_name, year)
         if not cleaned_name:
             os.remove(xls_file)
-            return
+            return True, False, 0, 0
             
         # İl klasör adını dosya adından çıkar (01_Adana_2024.xlsx -> 01_Adana)
         province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
@@ -151,6 +147,12 @@ def convert_file(xls_file, year, indir_konumu):
         # Excel dosyasını aç ve tüm sayfaları oku
         xls = pd.ExcelFile(xls_file, engine='xlrd')
         sheet_names = xls.sheet_names
+        
+        # Beklenen ay sayısı tespiti:
+        # Cari yıl ise HMB'deki dosyanın sahip olduğu geçerli sayfa sayısı kadardır.
+        # Geçmiş yıl ise 12 aydır.
+        valid_sheets_count = sum(1 for sh in sheet_names if normalize_month_name(sh) in MONTH_DISPLAY_NAMES)
+        expected_months = valid_sheets_count if int(year) == current_year else 12
         
         saved_months = 0
         for sheet in sheet_names:
@@ -172,12 +174,20 @@ def convert_file(xls_file, year, indir_konumu):
         # ExcelFile handle'ını kapat (Windows dosya kilidi)
         xls.close()
         
-        print(f"   Donusturuldu: {base_name} -> {province_folder_name}/ ({saved_months} ay) + {cleaned_name}")
+        print(f"   Donusturuldu: {base_name} -> {province_folder_name}/ ({saved_months}/{expected_months} ay) + {cleaned_name}")
         
         # Orijinal .xls dosyasını temizle
         os.remove(xls_file)
+        return True, True, saved_months, expected_months
     except Exception as e:
         print(f"[HATA] Donusturme hatasi ({base_name}): {e}")
+        if os.path.exists(xls_file):
+            try:
+                os.remove(xls_file)
+            except:
+                pass
+        expected = 5 if int(year) == current_year else 12
+        return False, True, 0, expected
 
 def parse_years_input(input_str, min_year, max_year):
     """
@@ -457,13 +467,26 @@ def main():
         print("\n🔄 Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
         conversion_start = time.time()
         
+        total_provinces_expected = 0
+        total_provinces_converted = 0
+        total_months_expected = 0
+        total_months_converted = 0
+        
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = [
                 executor.submit(convert_file, filepath, file_year, indir_konumlari[int(file_year)])
                 for filepath, file_year in downloaded_files
             ]
             for future in as_completed(futures):
-                pass
+                res = future.result()
+                if res:
+                    success, is_province, saved, expected = res
+                    if is_province:
+                        total_provinces_expected += 1
+                        total_months_expected += expected
+                        if success:
+                            total_provinces_converted += 1
+                            total_months_converted += saved
                 
         conversion_duration = time.time() - conversion_start
         print(f"⏱️ Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
@@ -473,6 +496,17 @@ def main():
         print("🎉 TÜM İŞLEMLER BAŞARIYLA TAMAMLANDI!")
         print(f"📊 İndirilen ve Dönüştürülen Yıllar: {', '.join(map(str, valid_years))}")
         print(f"📁 Dosyaların Ana Konumu: {excel_ana_dir}")
+        print(f"{'-'*60}")
+        print(f"📈 SONUÇ RAPORU:")
+        print(f"  - Beklenen İl Sayısı        : {total_provinces_expected}")
+        print(f"  - Dönüştürülen İl Sayısı    : {total_provinces_converted}")
+        print(f"  - Beklenen Toplam Ay Sayısı : {total_months_expected}")
+        print(f"  - Çekilen Toplam Ay Sayısı  : {total_months_converted}")
+        
+        if total_months_expected > 0:
+            basari_orani = (total_months_converted / total_months_expected) * 100
+            print(f"  - Veri Başarı Oranı         : %{basari_orani:.2f}")
+        print(f"{'='*60}")
         print(f"{'='*60}")
     else:
         print(f"❌ İndirilecek link bulunamadı.")
