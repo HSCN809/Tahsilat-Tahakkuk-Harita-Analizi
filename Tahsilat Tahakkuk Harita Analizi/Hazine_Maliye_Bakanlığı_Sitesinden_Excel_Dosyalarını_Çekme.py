@@ -97,10 +97,15 @@ def convert_file(xls_file, year, indir_konumu):
 def parse_years_input(input_str, current_year):
     """
     Yil veya yil araligini cozumler.
+    Ornek: hepsi / tümü / all -> tüm yıllar (2004-current_year)
     Ornek: 2023 -> [2023]
     Ornek: 2022-2025 -> [2022, 2023, 2024, 2025]
     Ornek: 2020, 2023 -> [2020, 2023]
     """
+    input_str_clean = input_str.strip().lower()
+    if input_str_clean in ("hepsi", "tümü", "tüm", "all", "tüm yıllar"):
+        return list(range(2004, current_year + 1))
+        
     years = []
     input_str = input_str.replace(" ", "")
     
@@ -133,7 +138,7 @@ def main():
     print("🗓️ Hangi yılın/yılların verilerini indirmek istiyorsunuz?")
     current_year = datetime.date.today().year
     print(f"📝 Mevcut yıllar: 2004-{current_year} arası")
-    print("💡 Giriş formatları: '2023' veya '2022-2025' veya '2020, 2022, 2024'")
+    print("💡 Giriş formatları: '2023' veya '2022-2025' veya 'hepsi'")
     year_input = input("➡️ Yıl girin: ").strip()
 
     valid_years = parse_years_input(year_input, current_year)
