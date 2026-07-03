@@ -61,7 +61,7 @@ gdf = gpd.read_file(harita_dosyasi)
 
 def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     """
-    Tek bir Excel dosyasını okuyup temizler.
+    Tek bir Excel dosyasını dinamik satır tespiti yaparak okuyup temizler.
     """
     match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
     if not match:
@@ -71,15 +71,34 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
     dosya_yolu = os.path.join(folder_path, dosya_adi)
     try:
-        df = pd.read_excel(dosya_yolu, skiprows=2)
-        df = df.drop(index=0)
-        df = df.drop(columns=['Unnamed: 0'], errors='ignore')
+        df_raw = pd.read_excel(dosya_yolu)
+        
+        # Başlık satırını bul (Tahakkuk ve Tahsilat içeren satır)
+        header_row_idx = None
+        for idx in range(len(df_raw)):
+            row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
+            if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
+                header_row_idx = idx
+                break
+                
+        if header_row_idx is None:
+            return None
+            
+        df = df_raw.iloc[header_row_idx + 1:].copy()
+        
+        # Eğer kolon sayısı 5 ise ilk kolonu at (Unnamed/boş kolon)
+        if df.shape[1] == 5:
+            df = df.iloc[:, 1:]
+            
         df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
         df.set_index('index', inplace=True)
         
         for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
             df[col] = pd.to_numeric(df[col], errors="coerce").round(2)
             
+        # Boş satırları filtrele
+        df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
+        
         return il_adi, int(yil), df
     except Exception:
         return None

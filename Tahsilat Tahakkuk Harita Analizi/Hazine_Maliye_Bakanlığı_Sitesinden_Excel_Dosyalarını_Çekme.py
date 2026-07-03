@@ -1,4 +1,5 @@
 import os
+import unicodedata
 import time
 import requests
 import datetime
@@ -18,9 +19,41 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için yamala (monkey patch)
 import xlrd
-xlrd.biffh.unicode = lambda b, enc: b.decode(enc, 'replace')
-xlrd.book.unicode = lambda b, enc: b.decode(enc, 'replace')
-xlrd.formatting.unicode = lambda b, enc: b.decode(enc, 'replace')
+
+def safe_decode(b, enc):
+    try:
+        return b.decode(enc, 'replace')
+    except Exception:
+        try:
+            return b.decode('utf-8', 'replace')
+        except Exception:
+            return b.decode('latin1', 'replace')
+
+xlrd.biffh.unicode = safe_decode
+xlrd.book.unicode = safe_decode
+xlrd.formatting.unicode = safe_decode
+
+def normalize_month_name(name):
+    """Ay adını normalize eder: combining marks, Türkçe karakterler ve büyük/küçük harf farkını kaldırır."""
+    # Unicode NFKD ile decompose et ve combining mark'ları sil
+    name = unicodedata.normalize('NFKD', name)
+    name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+    name = name.strip().lower()
+    replacements = {
+        'ı': 'i', 'ş': 's', 'ğ': 'g', 'ü': 'u', 'ö': 'o', 'ç': 'c',
+        'i̇': 'i',  # İ decomposed
+    }
+    for k, v in replacements.items():
+        name = name.replace(k, v)
+    return name
+
+def get_best_sheet_name(sheet_names):
+    month_priority = ["aralik", "kasim", "ekim", "eylul", "agustos", "temmuz", "haziran", "mayis", "nisan", "mart", "subat", "ocak"]
+    normalized_sheets = {normalize_month_name(sh): sh for sh in sheet_names}
+    for month in month_priority:
+        if month in normalized_sheets:
+            return normalized_sheets[month]
+    return sheet_names[0]
 
 def clean_and_format_filename(link_text, year):
     """
@@ -77,22 +110,69 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
 
 def convert_file(xls_file, year, indir_konumu):
     """
-    Tek bir .xls dosyasını .xlsx formatına dönüştürür ve orijinalini siler.
+    Tek bir .xls dosyasını il alt klasörüne aylık .xlsx dosyaları olarak dönüştürür.
+    Ayrıca yıl klasörüne en güncel ayın (Aralık) tek dosyasını da kaydeder (geriye uyumluluk).
+    
+    Yapı:
+      İllere Göre Tahsilat Tahakkuk {yıl}/
+        01_Adana_2024.xlsx          <-- en güncel ay (Aralık)
+        01_Adana/
+          Ocak.xlsx
+          Şubat.xlsx
+          ...
+          Aralık.xlsx
     """
     base_name = os.path.basename(xls_file)
+    
+    # Standart ay isimleri (xlrd bozuk karakterlerle döndürebilir, normalize ederek eşleştireceğiz)
+    MONTH_DISPLAY_NAMES = {
+        "ocak": "Ocak", "subat": "Şubat", "mart": "Mart",
+        "nisan": "Nisan", "mayis": "Mayıs", "haziran": "Haziran",
+        "temmuz": "Temmuz", "agustos": "Ağustos", "eylul": "Eylül",
+        "ekim": "Ekim", "kasim": "Kasım", "aralik": "Aralık"
+    }
+    
     try:
         cleaned_name = clean_and_format_filename(base_name, year)
-        if cleaned_name:
-            xlsx_path = indir_konumu / cleaned_name
-            # Yamalanmış xlrd motoru ile dosyayı oku
-            df = pd.read_excel(xls_file, engine='xlrd')
-            df.to_excel(xlsx_path, index=False)
-            print(f"   Dönüştürüldü: {base_name} -> {cleaned_name}")
+        if not cleaned_name:
+            os.remove(xls_file)
+            return
+            
+        # İl klasör adını dosya adından çıkar (01_Adana_2024.xlsx -> 01_Adana)
+        province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
+        province_dir = indir_konumu / province_folder_name
+        os.makedirs(province_dir, exist_ok=True)
+        
+        # Excel dosyasını aç ve tüm sayfaları oku
+        xls = pd.ExcelFile(xls_file, engine='xlrd')
+        sheet_names = xls.sheet_names
+        
+        saved_months = 0
+        for sheet in sheet_names:
+            normalized = normalize_month_name(sheet)
+            display_name = MONTH_DISPLAY_NAMES.get(normalized)
+            
+            if display_name:
+                df = pd.read_excel(xls, sheet_name=sheet)
+                month_xlsx_path = province_dir / f"{display_name}.xlsx"
+                df.to_excel(month_xlsx_path, index=False)
+                saved_months += 1
+        
+        # Geriye uyumluluk: en güncel ayı (Aralık) yıl klasörüne de kaydet
+        best_sheet = get_best_sheet_name(sheet_names)
+        df_best = pd.read_excel(xls, sheet_name=best_sheet)
+        best_xlsx_path = indir_konumu / cleaned_name
+        df_best.to_excel(best_xlsx_path, index=False)
+        
+        # ExcelFile handle'ını kapat (Windows dosya kilidi)
+        xls.close()
+        
+        print(f"   Donusturuldu: {base_name} -> {province_folder_name}/ ({saved_months} ay) + {cleaned_name}")
         
         # Orijinal .xls dosyasını temizle
         os.remove(xls_file)
     except Exception as e:
-        print(f"❌ Dönüştürme hatası ({base_name}): {e}")
+        print(f"[HATA] Donusturme hatasi ({base_name}): {e}")
 
 def parse_years_input(input_str, min_year, max_year):
     """
