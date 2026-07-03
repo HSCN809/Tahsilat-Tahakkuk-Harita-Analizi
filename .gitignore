@@ -147,3 +147,6 @@ Desktop.ini
 .gemini/
 .agents/
 graphify-out/
+
+# Data files
+veriler/
