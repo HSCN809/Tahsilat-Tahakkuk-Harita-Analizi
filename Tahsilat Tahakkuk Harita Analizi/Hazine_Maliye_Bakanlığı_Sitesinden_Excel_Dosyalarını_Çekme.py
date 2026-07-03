@@ -137,7 +137,7 @@ def convert_file(xls_file, year, indir_konumu):
         cleaned_name = clean_and_format_filename(base_name, year)
         if not cleaned_name:
             os.remove(xls_file)
-            return True, False, 0, 0
+            return True, False, 0, 0, int(year)
             
         # İl klasör adını dosya adından çıkar (01_Adana_2024.xlsx -> 01_Adana)
         province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
