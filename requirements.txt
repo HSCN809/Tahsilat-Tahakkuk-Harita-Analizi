@@ -12,3 +12,5 @@ selenium
 webdriver-manager
 xlrd
 plotly
+fastapi
+uvicorn
