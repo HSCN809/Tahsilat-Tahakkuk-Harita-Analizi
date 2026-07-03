@@ -178,7 +178,7 @@ def convert_file(xls_file, year, indir_konumu):
         
         # Orijinal .xls dosyasını temizle
         os.remove(xls_file)
-        return True, True, saved_months, expected_months
+        return True, True, saved_months, expected_months, int(year)
     except Exception as e:
         print(f"[HATA] Donusturme hatasi ({base_name}): {e}")
         if os.path.exists(xls_file):
@@ -187,7 +187,7 @@ def convert_file(xls_file, year, indir_konumu):
             except:
                 pass
         expected = 5 if int(year) == current_year else 12
-        return False, True, 0, expected
+        return False, True, 0, expected, int(year)
 
 def parse_years_input(input_str, min_year, max_year):
     """
@@ -472,6 +472,9 @@ def main():
         total_months_expected = 0
         total_months_converted = 0
         
+        # Yıl bazlı istatistikleri topla (dinamik formül için)
+        year_stats = {}
+        
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = [
                 executor.submit(convert_file, filepath, file_year, indir_konumlari[int(file_year)])
@@ -480,33 +483,58 @@ def main():
             for future in as_completed(futures):
                 res = future.result()
                 if res:
-                    success, is_province, saved, expected = res
+                    success, is_province, saved, expected, y_val = res
                     if is_province:
                         total_provinces_expected += 1
                         total_months_expected += expected
                         if success:
                             total_provinces_converted += 1
                             total_months_converted += saved
+                            
+                        # Yıl bazlı istatistikleri güncelle
+                        if y_val not in year_stats:
+                            year_stats[y_val] = {"provinces": 0, "expected_months_per_province": expected}
+                        year_stats[y_val]["provinces"] += 1
                 
         conversion_duration = time.time() - conversion_start
         print(f"⏱️ Dönüştürme {conversion_duration:.2f} saniyede tamamlandı.")
         
+        # Dinamik formül oluşturma (Örn: 22 yıl * 81 il + 1 yıl * 81 il)
+        formula_groups = {}
+        for y_val, stats in sorted(year_stats.items()):
+            p_count = stats["provinces"]
+            m_count = stats["expected_months_per_province"]
+            key = (p_count, m_count)
+            if key not in formula_groups:
+                formula_groups[key] = []
+            formula_groups[key].append(y_val)
+            
+        prov_parts = []
+        month_parts = []
+        for (p_count, m_count), years in sorted(formula_groups.items(), key=lambda x: x[0][1], reverse=True):
+            y_len = len(years)
+            prov_parts.append(f"({y_len} yıl * {p_count} il)")
+            month_parts.append(f"({y_len} yıl * {p_count} il * {m_count} ay)")
+            
+        province_formula = " + ".join(prov_parts)
+        month_formula = " + ".join(month_parts)
+        
         # Sonuç özeti
-        print(f"\n{'='*60}")
+        print(f"\n{'='*80}")
         print("🎉 TÜM İŞLEMLER BAŞARIYLA TAMAMLANDI!")
         print(f"📊 İndirilen ve Dönüştürülen Yıllar: {', '.join(map(str, valid_years))}")
         print(f"📁 Dosyaların Ana Konumu: {excel_ana_dir}")
-        print(f"{'-'*60}")
+        print(f"{'-'*80}")
         print(f"📈 SONUÇ RAPORU:")
-        print(f"  - Beklenen İl Sayısı        : {total_provinces_expected}")
+        print(f"  - Beklenen İl Sayısı        : {total_provinces_expected}  <- Hesaplama: {province_formula}")
         print(f"  - Dönüştürülen İl Sayısı    : {total_provinces_converted}")
-        print(f"  - Beklenen Toplam Ay Sayısı : {total_months_expected}")
+        print(f"  - Beklenen Toplam Ay Sayısı : {total_months_expected}  <- Hesaplama: {month_formula}")
         print(f"  - Çekilen Toplam Ay Sayısı  : {total_months_converted}")
         
         if total_months_expected > 0:
             basari_orani = (total_months_converted / total_months_expected) * 100
             print(f"  - Veri Başarı Oranı         : %{basari_orani:.2f}")
-        print(f"{'='*60}")
+        print(f"{'='*80}")
         print(f"{'='*60}")
     else:
         print(f"❌ İndirilecek link bulunamadı.")
