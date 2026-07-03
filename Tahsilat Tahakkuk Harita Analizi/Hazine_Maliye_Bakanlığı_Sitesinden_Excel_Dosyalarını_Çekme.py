@@ -183,10 +183,29 @@ def main():
     wait = WebDriverWait(driver, 20)
     all_links_data = [] # (link_text, href, year)
 
+    # Doğru URL'yi dinamik olarak tespit et (Örn: 2004-2026 veya 2004-2028 vb.)
+    target_url = None
+    print("\n🔍 Aktif web adresi doğrulanıyor...")
+    for temp_year in [current_year, current_year - 1, current_year - 2]:
+        temp_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{temp_year}"
+        try:
+            driver.get(temp_url)
+            time.sleep(2)
+            if "404" not in driver.title and len(driver.find_elements(By.XPATH, "//*[contains(text(), 'Genel Bütçe')]")) > 0:
+                target_url = temp_url
+                print(f"🎯 Doğrulandı: {target_url}")
+                break
+        except Exception:
+            continue
+            
+    if not target_url:
+        target_url = "https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-2026"
+        print(f"⚠️ Yeni adres tespit edilemedi, bilinen son adres kullanılıyor: {target_url}")
+
     try:
         for y in valid_years:
             print(f"\n🌐 {y} yılı verileri için siteye bağlanılıyor...")
-            driver.get("https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-2026")
+            driver.get(target_url)
             time.sleep(3)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             
