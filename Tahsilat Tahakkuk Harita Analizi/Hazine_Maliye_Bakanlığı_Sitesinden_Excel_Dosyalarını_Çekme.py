@@ -94,17 +94,14 @@ def convert_file(xls_file, year, indir_konumu):
     except Exception as e:
         print(f"❌ Dönüştürme hatası ({base_name}): {e}")
 
-def parse_years_input(input_str, current_year):
+def parse_years_input(input_str, min_year, max_year):
     """
     Yil veya yil araligini cozumler.
-    Ornek: hepsi / tümü / all -> tüm yıllar (2004-current_year)
-    Ornek: 2023 -> [2023]
-    Ornek: 2022-2025 -> [2022, 2023, 2024, 2025]
-    Ornek: 2020, 2023 -> [2020, 2023]
+    Ornek: hepsi / tümü / all -> tüm yıllar (min_year-max_year)
     """
     input_str_clean = input_str.strip().lower()
     if input_str_clean in ("hepsi", "tümü", "tüm", "all", "tüm yıllar"):
-        return list(range(2004, current_year + 1))
+        return list(range(min_year, max_year + 1))
         
     years = []
     input_str = input_str.replace(" ", "")
@@ -131,20 +128,75 @@ def parse_years_input(input_str, current_year):
             except ValueError:
                 pass
                 
-    valid_years = [y for y in sorted(list(set(years))) if 2004 <= y <= current_year]
+    valid_years = [y for y in sorted(list(set(years))) if min_year <= y <= max_year]
     return valid_years
 
 def main():
-    print("🗓️ Hangi yılın/yılların verilerini indirmek istiyorsunuz?")
+    # Chrome seçeneklerini yapılandır
+    options = ChromeOptions()
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--headless=new")  # Arka planda calis
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+
+    # WebDriver'ı başlat
+    print("🤖 Tarayıcı başlatılıyor (Mevcut site yapısı analiz ediliyor)...")
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
+    wait = WebDriverWait(driver, 20)
     current_year = datetime.date.today().year
-    print(f"📝 Mevcut yıllar: 2004-{current_year} arası")
+
+    # Doğru URL'yi dinamik olarak tespit et (Örn: 2004-2026 veya 2004-2028 vb.)
+    target_url = None
+    for temp_year in [current_year, current_year - 1, current_year - 2]:
+        temp_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{temp_year}"
+        try:
+            driver.get(temp_url)
+            time.sleep(2)
+            if "404" not in driver.title and len(driver.find_elements(By.XPATH, "//*[contains(text(), 'Genel Bütçe')]")) > 0:
+                target_url = temp_url
+                break
+        except Exception:
+            continue
+            
+    if not target_url:
+        target_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{current_year}"
+
+    # Sitedeki mevcut en küçük ve en büyük yılları dinamik topla
+    min_year = 2004
+    max_year = current_year
+    try:
+        all_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Yılı')]")
+        found_years = []
+        for el in all_elements:
+            try:
+                match = re.search(r"(\d{4})\s*Yılı", el.text)
+                if match:
+                    found_years.append(int(match.group(1)))
+            except:
+                pass
+        if found_years:
+            min_year = min(found_years)
+            max_year = max(found_years)
+    except Exception as e:
+        print(f"⚠️ Yıl sınırları dinamik okunamadı, varsayılan değerler kullanılacak: {e}")
+
+    # Kullanıcıdan dinamik yıllara göre veri al
+    print("\n🗓️ Hangi yılın/yılların verilerini indirmek istiyorsunuz?")
+    print(f"📝 Sitede mevcut yıllar: {min_year}-{max_year} arası")
     print("💡 Giriş formatları: '2023' veya '2022-2025' veya 'hepsi'")
     year_input = input("➡️ Yıl girin: ").strip()
 
-    valid_years = parse_years_input(year_input, current_year)
+    valid_years = parse_years_input(year_input, min_year, max_year)
 
     if not valid_years:
-        print(f"❌ Hata: Geçerli bir yıl veya yıl aralığı girin (2004-{current_year})!")
+        print(f"❌ Hata: Geçerli bir yıl veya yıl aralığı girin ({min_year}-{max_year})!")
+        driver.quit()
         return
 
     print(f"✅ Seçilen Yıllar: {', '.join(map(str, valid_years))}")
@@ -164,43 +216,7 @@ def main():
         os.makedirs(path, exist_ok=True)
         indir_konumlari[y] = path
 
-    # Chrome seçeneklerini yapılandır
-    options = ChromeOptions()
-    options.add_argument("--start-maximized")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--headless=new")  # Arka planda calis
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-
-    # WebDriver'ı başlat
-    print("\n🤖 Tarayıcı başlatılıyor (Linkler toplanıyor)...")
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-
-    wait = WebDriverWait(driver, 20)
     all_links_data = [] # (link_text, href, year)
-
-    # Doğru URL'yi dinamik olarak tespit et (Örn: 2004-2026 veya 2004-2028 vb.)
-    target_url = None
-    print("\n🔍 Aktif web adresi doğrulanıyor...")
-    for temp_year in [current_year, current_year - 1, current_year - 2]:
-        temp_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{temp_year}"
-        try:
-            driver.get(temp_url)
-            time.sleep(2)
-            if "404" not in driver.title and len(driver.find_elements(By.XPATH, "//*[contains(text(), 'Genel Bütçe')]")) > 0:
-                target_url = temp_url
-                print(f"🎯 Doğrulandı: {target_url}")
-                break
-        except Exception:
-            continue
-            
-    if not target_url:
-        target_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{current_year}"
-        print(f"⚠️ Yeni adres tespit edilemedi, güncel yıl adresi varsayılan olarak seçildi: {target_url}")
 
     try:
         for y in valid_years:
@@ -213,14 +229,12 @@ def main():
             year_main_found = False
             
             try:
-                # Etiket bağımsız ve alternatif Türkçe karakter varyasyonları ile arama yapılıyor
+                # Yıla ait ana akordeon başlığını bul ve tıkla
                 year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibarıyla Tahakkuk ve Tahsilatı') or contains(text(), '{y} Yılı Genel Bütçe Gelirlerinin İller İtibariyle Tahakkuk ve Tahsilatı')]")
                 if not year_main_elements:
                     year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı Genel Bütçe')]")
                 if not year_main_elements:
                     year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y} Yılı')]")
-                if not year_main_elements:
-                    year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{y}')]")
                     
                 for element in year_main_elements:
                     if element.is_displayed():
@@ -335,7 +349,6 @@ def main():
             for future in as_completed(futures):
                 success, file_path = future.result()
                 if success and file_path:
-                    # Hangi yıla ait olduğunu klasör isminden çıkar
                     parent_name = file_path.parent.name
                     year_match = re.search(r"\d{4}", parent_name)
                     file_year = year_match.group(0) if year_match else str(current_year)
