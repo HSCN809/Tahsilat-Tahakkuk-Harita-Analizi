@@ -28,6 +28,14 @@ const normalizeProvinceName = (name: string): string => {
     .trim();
 };
 
+const interpolateColor = (color1: [number, number, number], color2: [number, number, number], factor: number): string => {
+  const f = Math.max(0, Math.min(1, factor));
+  const r = Math.round(color1[0] + f * (color2[0] - color1[0]));
+  const g = Math.round(color1[1] + f * (color2[1] - color1[1]));
+  const b = Math.round(color1[2] + f * (color2[2] - color1[2]));
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType }) => {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,24 +60,24 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
 
   const getColor = (name: string) => {
     const record = recordsMap.get(normalizeProvinceName(name));
-    if (!record) return '#1e293b';
+    if (!record) return '#1e293b'; 
 
     if (mapType === 'ratio') {
       const ratio = record.ratio || 0;
-      if (ratio < 40) return '#f43f5e';
-      if (ratio < 60) return '#f97316';
-      if (ratio < 80) return '#eab308';
-      return '#10b981';
+      const factor = ratio / 100;
+      // Smooth gradient: Red [244, 63, 94] -> Yellow [234, 179, 8] -> Green [16, 185, 129]
+      if (factor < 0.5) {
+        return interpolateColor([244, 63, 94], [234, 179, 8], factor * 2);
+      } else {
+        return interpolateColor([234, 179, 8], [16, 185, 129], (factor - 0.5) * 2);
+      }
     } else {
       const val = mapType === 'tahsilat' ? record.collection : record.accrual;
       if (!val || val <= 0) return '#1e293b';
-
-      const fraction = Math.log1p(val) / Math.log1p(maxVal);
-      if (fraction < 0.2) return '#1e1b4b';
-      if (fraction < 0.4) return '#312e81';
-      if (fraction < 0.6) return '#4338ca';
-      if (fraction < 0.8) return '#3b82f6';
-      return '#06b6d4';
+      
+      const factor = Math.log1p(val) / Math.log1p(maxVal);
+      // Smooth gradient: Dark Indigo [30, 27, 75] -> Bright Cyan [6, 182, 212]
+      return interpolateColor([30, 27, 75], [6, 182, 212], factor);
     }
   };
 
