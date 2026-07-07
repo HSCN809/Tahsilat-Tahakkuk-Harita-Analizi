@@ -18,13 +18,13 @@ interface Summary {
 function App() {
   const [years, setYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchCategory, setSearchCategory] = useState<string>('');
-  
+
   const [mapType, setMapType] = useState<'tahsilat' | 'tahakkuk' | 'ratio'>('ratio');
-  
+
   const [geoJsonData, setGeoJsonData] = useState<any>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [records, setRecords] = useState<any[]>([]);
@@ -162,10 +162,10 @@ function App() {
 
         {/* Outer Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* Left Panel: Sidebar (Filters) */}
           <div className="lg:col-span-4 flex flex-col gap-6">
-            
+
             {/* Filter Section */}
             <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex flex-col gap-5">
               <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -199,31 +199,28 @@ function App() {
                 <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-slate-800 rounded-xl">
                   <button
                     onClick={() => setMapType('tahsilat')}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${
-                      mapType === 'tahsilat'
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahsilat'
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     Tahsilat
                   </button>
                   <button
                     onClick={() => setMapType('tahakkuk')}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${
-                      mapType === 'tahakkuk'
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahakkuk'
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     Tahakkuk
                   </button>
                   <button
                     onClick={() => setMapType('ratio')}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${
-                      mapType === 'ratio'
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'ratio'
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     Oran (%)
                   </button>
@@ -233,7 +230,7 @@ function App() {
               {/* Category Search & Select */}
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Gelir Kalemi / Vergi Türü</label>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">GELİR KALEMİ / VERGİ TÜRÜ</label>
                   {categories.length > 0 && (
                     <span className="text-[10px] text-slate-500 font-mono">Toplam: {categories.length}</span>
                   )}
@@ -262,11 +259,10 @@ function App() {
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                            selectedCategory === cat.id
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
                               ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
                               : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
-                          }`}
+                            }`}
                         >
                           <span className="truncate pr-2">{cat.name}</span>
                           <MapPin className={`w-3.5 h-3.5 flex-shrink-0 opacity-50 ${selectedCategory === cat.id ? 'opacity-100' : ''}`} />
@@ -281,7 +277,7 @@ function App() {
 
           {/* Right Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-            
+
             {/* Header info */}
             <div className="flex flex-col gap-1">
               <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
@@ -303,13 +299,13 @@ function App() {
                   <span className="text-sm text-slate-400 font-medium animate-pulse">Harita ve veriler yükleniyor...</span>
                 </div>
               )}
-              
+
               <TurkeyMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
             </div>
 
             {/* Leaderboards */}
             <Leaderboard data={records} loading={loadingData} />
-            
+
           </div>
         </div>
       </main>
