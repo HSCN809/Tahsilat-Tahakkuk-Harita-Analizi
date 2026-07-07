@@ -145,7 +145,11 @@ function App() {
 
   // Fetch summary and records when year/category/month changes
   useEffect(() => {
-    if (selectedYear === null || !selectedCategory || !selectedMonth) return;
+    // Bağımlı seçimler hazır değilse fetch başlatma; takılı kalan loading'i de temizle
+    if (selectedYear === null || !selectedCategory || !selectedMonth) {
+      setLoadingData(false);
+      return;
+    }
 
     const controller = new AbortController();
 
@@ -175,7 +179,14 @@ function App() {
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
 
-  const isMapLoading = loadingGeoJson || loadingData || loadingMonths;
+  // Veri gösterimi için gerekli seçimler hazır mı?
+  const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
+
+  // Gerçek "veri yükleniyor" durumu: ya fetch sürüyor ya da bağımlı seçimler henüz hazır değil.
+  // loadingMonths/loadingCategories sırasında data fetch'in guard'ı erken döneceği için bunları da kapsa.
+  const isDataLoading = loadingData || loadingMonths || loadingCategories || !selectionsReady;
+
+  const isMapLoading = loadingGeoJson || isDataLoading;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
@@ -346,7 +357,7 @@ function App() {
           <div className="lg:col-span-8 flex flex-col gap-6">
 
             {/* KPI Cards */}
-            <StatsCards stats={summary} loading={loadingData} />
+            <StatsCards stats={summary} loading={isDataLoading} />
 
             {/* Map Visualizer Container */}
             <div className="relative">
@@ -361,7 +372,7 @@ function App() {
             </div>
 
             {/* Leaderboards */}
-            <Leaderboard data={records} loading={loadingData} />
+            <Leaderboard data={records} loading={isDataLoading} />
 
           </div>
         </div>
