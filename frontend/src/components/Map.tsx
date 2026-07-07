@@ -18,7 +18,7 @@ interface TurkeyMapProps {
 
 const normalizeProvinceName = (name: string): string => {
   if (!name) return '';
-  return name
+  const normalized = name
     .toLowerCase()
     .replace(/ı/g, 'i')
     .replace(/ğ/g, 'g')
@@ -26,7 +26,15 @@ const normalizeProvinceName = (name: string): string => {
     .replace(/ş/g, 's')
     .replace(/ö/g, 'o')
     .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]/g, '') // remove spaces, underscores, and special characters
     .trim();
+
+  // Handle known variation mappings to match GeoJSON normalized names
+  if (normalized === 'urfa') return 'sanliurfa';
+  if (normalized === 'kmaras' || normalized === 'maras') return 'kahramanmaras';
+  if (normalized === 'elazi') return 'elazig';
+
+  return normalized;
 };
 
 const interpolateColor = (color1: [number, number, number], color2: [number, number, number], factor: number): string => {
