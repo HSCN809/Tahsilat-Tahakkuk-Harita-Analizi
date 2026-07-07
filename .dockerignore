@@ -1,0 +1,14 @@
+venv
+frontend/node_modules
+**/node_modules
+.git
+.gemini
+.agents
+graphify-out
+__pycache__
+*.pyc
+dist
+dist-ssr
+*.log
+veriler/
+node_modules/
