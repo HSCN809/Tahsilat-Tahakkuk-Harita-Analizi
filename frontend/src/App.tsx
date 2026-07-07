@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Layers, Calendar, MapPin, Eye } from 'lucide-react';
+import { Layers, Calendar, MapPin } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
-import { SimpleMap } from './components/SimpleMap';
-import { MapLibreMap } from './components/MapLibreMap';
-import { DeckGLMap } from './components/DeckGLMap';
+import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
-import { ScraperControl } from './components/ScraperControl';
 
 interface Category {
   id: string;
@@ -27,7 +24,6 @@ function App() {
   const [searchCategory, setSearchCategory] = useState<string>('');
   
   const [mapType, setMapType] = useState<'tahsilat' | 'tahakkuk' | 'ratio'>('ratio');
-  const [mapMode, setMapMode] = useState<'simple' | 'maplibre' | 'deckgl'>('simple');
   
   const [geoJsonData, setGeoJsonData] = useState<any>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -151,7 +147,7 @@ function App() {
           </div>
         </div>
         <div className="text-xs text-slate-500 font-mono hidden md:block">
-          Backend: FastAPI | Frontend: React & Vector Tiles
+          Backend: FastAPI | Frontend: React & SVG Map
         </div>
       </header>
 
@@ -281,61 +277,19 @@ function App() {
                 )}
               </div>
             </div>
-
-            {/* Scraper Panel */}
-            <ScraperControl />
           </div>
 
           {/* Right Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             
-            {/* Header info about the current query & Map Mode Switcher */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
-                  {selectedYear} Analiz Raporu
-                </span>
-                <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
-                  {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}
-                </h2>
-              </div>
-              
-              {/* Map Mode Tabs */}
-              <div className="flex items-center gap-1.5 bg-slate-950/60 p-1 border border-slate-800 rounded-xl self-start md:self-auto">
-                <button
-                  onClick={() => setMapMode('simple')}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
-                    mapMode === 'simple'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  Sade (SVG)
-                </button>
-                <button
-                  onClick={() => setMapMode('maplibre')}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
-                    mapMode === 'maplibre'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  Modern (Vector)
-                </button>
-                <button
-                  onClick={() => setMapMode('deckgl')}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
-                    mapMode === 'deckgl'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5 animate-pulse" />
-                  3D (Deck.gl)
-                </button>
-              </div>
+            {/* Header info */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
+                {selectedYear} Analiz Raporu
+              </span>
+              <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
+                {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}
+              </h2>
             </div>
 
             {/* KPI Cards */}
@@ -350,15 +304,7 @@ function App() {
                 </div>
               )}
               
-              {mapMode === 'simple' && (
-                <SimpleMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
-              )}
-              {mapMode === 'maplibre' && (
-                <MapLibreMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
-              )}
-              {mapMode === 'deckgl' && (
-                <DeckGLMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
-              )}
+              <TurkeyMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
             </div>
 
             {/* Leaderboards */}
