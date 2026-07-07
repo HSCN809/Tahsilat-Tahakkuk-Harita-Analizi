@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Layers, Calendar, MapPin } from 'lucide-react';
+import { Layers, Calendar, MapPin, Eye } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
-import { Map } from './components/Map';
+import { SimpleMap } from './components/SimpleMap';
+import { MapLibreMap } from './components/MapLibreMap';
+import { DeckGLMap } from './components/DeckGLMap';
 import { Leaderboard } from './components/Leaderboard';
 import { ScraperControl } from './components/ScraperControl';
 
@@ -25,18 +27,19 @@ function App() {
   const [searchCategory, setSearchCategory] = useState<string>('');
   
   const [mapType, setMapType] = useState<'tahsilat' | 'tahakkuk' | 'ratio'>('ratio');
+  const [mapMode, setMapMode] = useState<'simple' | 'maplibre' | 'deckgl'>('simple');
   
+  const [geoJsonData, setGeoJsonData] = useState<any>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [records, setRecords] = useState<any[]>([]);
-  const [mapFigure, setMapFigure] = useState<any>(null);
 
   const [loadingYears, setLoadingYears] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [loadingMap, setLoadingMap] = useState(false);
+  const [loadingGeoJson, setLoadingGeoJson] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch years on mount
+  // Fetch years and GeoJSON on mount
   useEffect(() => {
     const fetchYears = async () => {
       try {
@@ -46,7 +49,6 @@ function App() {
         const data = await response.json();
         setYears(data.years);
         if (data.years && data.years.length > 0) {
-          // Select latest year by default
           setSelectedYear(data.years[data.years.length - 1]);
         }
       } catch (err: any) {
@@ -56,7 +58,22 @@ function App() {
       }
     };
 
+    const fetchGeoJson = async () => {
+      try {
+        setLoadingGeoJson(true);
+        const response = await fetch('/api/geojson');
+        if (!response.ok) throw new Error('Harita sınır verisi yüklenemedi.');
+        const data = await response.json();
+        setGeoJsonData(data);
+      } catch (err: any) {
+        setError(err.message || 'Harita verisi alınırken bir sorun oluştu.');
+      } finally {
+        setLoadingGeoJson(false);
+      }
+    };
+
     fetchYears();
+    fetchGeoJson();
   }, []);
 
   // Fetch categories when year changes
@@ -85,66 +102,38 @@ function App() {
     fetchCategories();
   }, [selectedYear]);
 
-  // Fetch data (summary/records) and map figure when year, category or mapType changes
+  // Fetch summary and records when year/category changes
   useEffect(() => {
     if (selectedYear === null || !selectedCategory) return;
 
-    const fetchDataAndMap = async () => {
-      setError(null);
-      
-      // Fetch stats and leaderboard data
-      const fetchStats = async () => {
-        try {
-          setLoadingData(true);
-          const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}`);
-          if (!response.ok) throw new Error('İl verileri yüklenemedi.');
-          const data = await response.json();
-          setSummary(data.summary);
-          setRecords(data.data);
-        } catch (err: any) {
-          console.error(err);
-        } finally {
-          setLoadingData(false);
-        }
-      };
-
-      // Fetch Plotly map JSON
-      const fetchMap = async () => {
-        try {
-          setLoadingMap(true);
-          let url = '';
-          if (mapType === 'ratio') {
-            url = `/api/map/ratio?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}`;
-          } else {
-            url = `/api/map/amount?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}&type=${mapType}`;
-          }
-
-          const response = await fetch(url);
-          if (!response.ok) throw new Error('Harita çizimi başarısız oldu.');
-          const mapJson = await response.json();
-          setMapFigure(mapJson);
-        } catch (err: any) {
-          console.error(err);
-          setMapFigure(null);
-        } finally {
-          setLoadingMap(false);
-        }
-      };
-
-      fetchStats();
-      fetchMap();
+    const fetchStats = async () => {
+      try {
+        setLoadingData(true);
+        setError(null);
+        const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}`);
+        if (!response.ok) throw new Error('İl verileri yüklenemedi.');
+        const data = await response.json();
+        setSummary(data.summary);
+        setRecords(data.data);
+      } catch (err: any) {
+        setError(err.message || 'Veriler alınırken bir sorun oluştu.');
+      } finally {
+        setLoadingData(false);
+      }
     };
 
-    fetchDataAndMap();
-  }, [selectedYear, selectedCategory, mapType]);
+    fetchStats();
+  }, [selectedYear, selectedCategory]);
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
 
+  const isMapLoading = loadingGeoJson || loadingData;
+
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
-      {/* Background decoration elements */}
+      {/* Background gradients */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -162,7 +151,7 @@ function App() {
           </div>
         </div>
         <div className="text-xs text-slate-500 font-mono hidden md:block">
-          Backend: FastAPI | Frontend: React & Plotly
+          Backend: FastAPI | Frontend: React & Vector Tiles
         </div>
       </header>
 
@@ -300,21 +289,77 @@ function App() {
           {/* Right Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             
-            {/* Header info about the current query */}
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
-                {selectedYear} Analiz Raporu
-              </span>
-              <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
-                {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}
-              </h2>
+            {/* Header info about the current query & Map Mode Switcher */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
+                  {selectedYear} Analiz Raporu
+                </span>
+                <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
+                  {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}
+                </h2>
+              </div>
+              
+              {/* Map Mode Tabs */}
+              <div className="flex items-center gap-1.5 bg-slate-950/60 p-1 border border-slate-800 rounded-xl self-start md:self-auto">
+                <button
+                  onClick={() => setMapMode('simple')}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    mapMode === 'simple'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Sade (SVG)
+                </button>
+                <button
+                  onClick={() => setMapMode('maplibre')}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    mapMode === 'maplibre'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Modern (Vector)
+                </button>
+                <button
+                  onClick={() => setMapMode('deckgl')}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    mapMode === 'deckgl'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 animate-pulse" />
+                  3D (Deck.gl)
+                </button>
+              </div>
             </div>
 
             {/* KPI Cards */}
             <StatsCards stats={summary} loading={loadingData} />
 
-            {/* Map Visualizer */}
-            <Map figureData={mapFigure} loading={loadingMap} />
+            {/* Map Visualizer Container */}
+            <div className="relative">
+              {isMapLoading && (
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-30 rounded-2xl h-[550px]">
+                  <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm text-slate-400 font-medium animate-pulse">Harita ve veriler yükleniyor...</span>
+                </div>
+              )}
+              
+              {mapMode === 'simple' && (
+                <SimpleMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
+              )}
+              {mapMode === 'maplibre' && (
+                <MapLibreMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
+              )}
+              {mapMode === 'deckgl' && (
+                <DeckGLMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
+              )}
+            </div>
 
             {/* Leaderboards */}
             <Leaderboard data={records} loading={loadingData} />
@@ -331,4 +376,3 @@ function App() {
 }
 
 export default App;
-//

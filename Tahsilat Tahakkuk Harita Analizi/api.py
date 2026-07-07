@@ -17,12 +17,12 @@ sys.path.append(str(CURRENT_DIR))
 import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
 
 app = FastAPI(
-    title="Tahsilat Tahakkuk Harita Analiz API",
+    title="Tahsilat Tahakkuk Veri API",
     description="İl bazında vergi gelirleri tahsilat-tahakkuk ve oran analizlerini sunan backend servisi.",
-    version="1.0.0"
+    version="2.0.0"
 )
 
-# CORS ayarları - Yeni Frontend uygulamalarının (React, Next.js vb.) bağlanabilmesi için
+# CORS ayarları
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -57,13 +57,12 @@ def run_scraper_bg(year_input: str):
 def read_root():
     return {
         "status": "online",
-        "message": "Tahsilat Tahakkuk Harita Analiz API aktif durumda.",
+        "message": "Tahsilat Tahakkuk Veri API aktif durumda.",
         "endpoints": {
             "GET /api/years": "Mevcut yılları listeler",
             "GET /api/categories?year=2025": "Yıla ait gelir kalemlerini listeler",
             "GET /api/data?year=2025&category=Özel Tüketim Vergisi": "Yıl ve kalem bazlı ham il verilerini listeler",
-            "GET /api/map/amount?year=2025&category=Özel Tüketim Vergisi&type=tahsilat": "İl miktar haritasını Plotly JSON olarak döner",
-            "GET /api/map/ratio?year=2025&category=Özel Tüketim Vergisi": "İl oran haritasını Plotly JSON olarak döner",
+            "GET /api/geojson": "Türkiye sınırları GeoJSON dosyasını döner",
             "POST /api/scrape?year_input=2024-2025": "Arka planda veri indirmeyi başlatır"
         }
     }
@@ -132,21 +131,34 @@ def get_data(year: int, category: str):
 
     try:
         iller_dict, _ = lib.excel_dosyalarini_oku(folder_path)
-        merged = lib.veri_hazirla(iller_dict, category)
+        data_df = lib.veri_hazirla(iller_dict, category)
         
-        # Coğrafi verileri çıkararak sade bir veri DataFrame'i oluştur
-        data_df = pd.DataFrame(merged.drop(columns=['geometry'], errors='ignore'))
-        data_df = data_df[['İl', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']]
-        data_df.columns = ['province', 'accrual', 'collection', 'ratio']
+        if data_df.empty:
+            return {
+                "year": year,
+                "category": category,
+                "summary": {"total_accrual": 0, "total_collection": 0, "overall_ratio": 0},
+                "data": []
+            }
+            
         data_df = data_df.replace({np.nan: None})
-        
         records = data_df.to_dict(orient="records")
         
         # Türkiye geneli özet istatistikler
-        accrual_sum = data_df['accrual'].sum(skipna=True) if data_df['accrual'].any() else 0
-        collection_sum = data_df['collection'].sum(skipna=True) if data_df['collection'].any() else 0
+        accrual_sum = data_df['tahakkuk'].sum(skipna=True) if data_df['tahakkuk'].any() else 0
+        collection_sum = data_df['tahsilat'].sum(skipna=True) if data_df['tahsilat'].any() else 0
         overall_ratio = (collection_sum / accrual_sum * 100) if accrual_sum else 0
         
+        # Frontend için standart alan isimlerine eşleştir
+        mapped_records = []
+        for r in records:
+            mapped_records.append({
+                "province": r["İl"],
+                "accrual": r["tahakkuk"],
+                "collection": r["tahsilat"],
+                "ratio": r["tahsilat/tahakkuk"]
+            })
+            
         return {
             "year": year,
             "category": category,
@@ -155,64 +167,30 @@ def get_data(year: int, category: str):
                 "total_collection": float(collection_sum),
                 "overall_ratio": float(round(overall_ratio, 2))
             },
-            "data": records
+            "data": mapped_records
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Veriler işlenirken hata oluştu: {str(e)}")
 
-@app.get("/api/map/amount")
-def get_map_amount(year: int, category: str, type: str = "tahsilat"):
+@app.get("/api/geojson")
+def get_geojson():
     """
-    Plotly formatında miktar (tahsilat veya tahakkuk) haritası nesnesi döner.
-    Geri dönen JSON nesnesi doğrudan frontend'deki Plotly.js kütüphanesiyle render edilebilir.
+    Türkiye coğrafi sınırlarını gösteren GeoJSON verisini döner.
     """
-    if type not in ("tahsilat", "tahakkuk"):
-        raise HTTPException(status_code=400, detail="Tip parametresi 'tahsilat' veya 'tahakkuk' olmalıdır.")
-
-    folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
-    folder_path = os.path.join(lib.ana_klasor, folder_name)
-    
-    if not os.path.exists(folder_path):
-        raise HTTPException(status_code=404, detail=f"{year} yılı verisi bulunamadı.")
-
+    geojson_path = lib.VERILER_DIR / "tr.json"
+    if not geojson_path.exists():
+        raise HTTPException(status_code=404, detail="GeoJSON harita dosyası bulunamadı.")
     try:
-        iller_dict, _ = lib.excel_dosyalarini_oku(folder_path)
-        merged = lib.veri_hazirla(iller_dict, category)
-        
-        title = f"{year} İllere Göre {category} {type.capitalize()}ı (Milyar TL)"
-        fig = lib.ciz_interaktif_miktar_harita(merged, type, title, renk_olcegi="Viridis")
-        
-        return json.loads(fig.to_json())
+        with open(geojson_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Harita çizilirken hata oluştu: {str(e)}")
-
-@app.get("/api/map/ratio")
-def get_map_ratio(year: int, category: str):
-    """
-    Plotly formatında tahsilat/tahakkuk oran haritası nesnesi döner.
-    """
-    folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
-    folder_path = os.path.join(lib.ana_klasor, folder_name)
-    
-    if not os.path.exists(folder_path):
-        raise HTTPException(status_code=404, detail=f"{year} yılı verisi bulunamadı.")
-
-    try:
-        iller_dict, _ = lib.excel_dosyalarini_oku(folder_path)
-        merged = lib.veri_hazirla(iller_dict, category)
-        
-        title = f"{year} İllere Göre {category} Tahsilat Oranı (%)"
-        fig = lib.ciz_interaktif_oran_harita(merged, title, renk_olcegi="RdYlGn")
-        
-        return json.loads(fig.to_json())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Harita çizilirken hata oluştu: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"GeoJSON okuma hatası: {str(e)}")
 
 @app.post("/api/scrape")
 def trigger_scrape(year_input: str, background_tasks: BackgroundTasks):
     """
     Arka planda paralel veri çekme/güncelleme işlemini başlatır.
-    İşlem asenkron olarak arka planda çalışırken anında istek yanıtlanır.
     """
     background_tasks.add_task(run_scraper_bg, year_input)
     return {
