@@ -12,13 +12,8 @@ interface StatsCardsProps {
   loading: boolean;
 }
 
-const formatCurrency = (val: number | undefined | null) => {
-  if (val === undefined || val === null) return '- ₺';
-  if (val >= 1_000_000) {
-    return `${(val / 1_000_000).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} Milyon ₺`;
-  }
-  return `${val.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
-};
+import { formatCurrency } from '../utils/format';
+
 
 export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading }) => {
   return (

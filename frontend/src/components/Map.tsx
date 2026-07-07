@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 // @ts-ignore
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
+import { formatCurrency } from '../utils/format';
 
 interface ProvinceData {
   province: string;
@@ -81,9 +82,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
   };
 
   const formatTooltipValue = (val: number | null | undefined) => {
-    if (val === null || val === undefined) return '-';
-    if (val >= 1000000) return `${(val / 1000000).toFixed(2)} Milyon ₺`;
-    return `${val.toLocaleString('tr-TR')} ₺`;
+    return formatCurrency(val);
   };
 
   return (

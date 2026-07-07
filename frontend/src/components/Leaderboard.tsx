@@ -13,13 +13,8 @@ interface LeaderboardProps {
   loading: boolean;
 }
 
-const formatCurrency = (val: number | null | undefined) => {
-  if (val === null || val === undefined) return '-';
-  if (val >= 1_000_000) {
-    return `${(val / 1_000_000).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}M ₺`;
-  }
-  return `${val.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} ₺`;
-};
+import { formatCurrency } from '../utils/format';
+
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({ data, loading }) => {
   // Filter records with valid ratios
