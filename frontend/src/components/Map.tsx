@@ -62,22 +62,21 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     const record = recordsMap.get(normalizeProvinceName(name));
     if (!record) return '#1e293b'; 
 
+    let factor = 0;
     if (mapType === 'ratio') {
       const ratio = record.ratio || 0;
-      const factor = ratio / 100;
-      // Smooth gradient: Red [244, 63, 94] -> Yellow [234, 179, 8] -> Green [16, 185, 129]
-      if (factor < 0.5) {
-        return interpolateColor([244, 63, 94], [234, 179, 8], factor * 2);
-      } else {
-        return interpolateColor([234, 179, 8], [16, 185, 129], (factor - 0.5) * 2);
-      }
+      factor = ratio / 100;
     } else {
       const val = mapType === 'tahsilat' ? record.collection : record.accrual;
       if (!val || val <= 0) return '#1e293b';
-      
-      const factor = Math.log1p(val) / Math.log1p(maxVal);
-      // Smooth gradient: Dark Indigo [30, 27, 75] -> Bright Cyan [6, 182, 212]
-      return interpolateColor([30, 27, 75], [6, 182, 212], factor);
+      factor = Math.log1p(val) / Math.log1p(maxVal);
+    }
+
+    // Smooth gradient: Red [244, 63, 94] -> Yellow [234, 179, 8] -> Green [16, 185, 129]
+    if (factor < 0.5) {
+      return interpolateColor([244, 63, 94], [234, 179, 8], factor * 2);
+    } else {
+      return interpolateColor([234, 179, 8], [16, 185, 129], (factor - 0.5) * 2);
     }
   };
 
