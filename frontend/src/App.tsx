@@ -28,8 +28,11 @@ function App() {
   const [geoJsonData, setGeoJsonData] = useState<any>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [records, setRecords] = useState<any[]>([]);
+  const [months, setMonths] = useState<string[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>('Yıl Geneli');
 
   const [loadingYears, setLoadingYears] = useState(true);
+  const [loadingMonths, setLoadingMonths] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingGeoJson, setLoadingGeoJson] = useState(true);
@@ -72,6 +75,28 @@ function App() {
     fetchGeoJson();
   }, []);
 
+  // Fetch months when year changes
+  useEffect(() => {
+    if (selectedYear === null) return;
+
+    const fetchMonths = async () => {
+      try {
+        setLoadingMonths(true);
+        const response = await fetch(`/api/months?year=${selectedYear}`);
+        if (!response.ok) throw new Error('Aylar yüklenemedi.');
+        const data = await response.json();
+        setMonths(data.months);
+        setSelectedMonth("Yıl Geneli");
+      } catch (err: any) {
+        setError(err.message || 'Aylar alınırken bir sorun oluştu.');
+      } finally {
+        setLoadingMonths(false);
+      }
+    };
+
+    fetchMonths();
+  }, [selectedYear]);
+
   // Fetch categories when year changes
   useEffect(() => {
     if (selectedYear === null) return;
@@ -98,7 +123,7 @@ function App() {
     fetchCategories();
   }, [selectedYear]);
 
-  // Fetch summary and records when year/category changes
+  // Fetch summary and records when year/category/month changes
   useEffect(() => {
     if (selectedYear === null || !selectedCategory) return;
 
@@ -106,7 +131,7 @@ function App() {
       try {
         setLoadingData(true);
         setError(null);
-        const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}`);
+        const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}&month=${encodeURIComponent(selectedMonth)}`);
         if (!response.ok) throw new Error('İl verileri yüklenemedi.');
         const data = await response.json();
         setSummary(data.summary);
@@ -119,7 +144,7 @@ function App() {
     };
 
     fetchStats();
-  }, [selectedYear, selectedCategory]);
+  }, [selectedYear, selectedCategory, selectedMonth]);
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
@@ -187,6 +212,26 @@ function App() {
                     {years.map((y) => (
                       <option key={y} value={y} className="bg-slate-950 text-slate-100">
                         {y} Yılı
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Month Select */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
+                {loadingMonths ? (
+                  <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
+                ) : (
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
+                  >
+                    {months.map((m) => (
+                      <option key={m} value={m} className="bg-slate-950 text-slate-100">
+                        {m}
                       </option>
                     ))}
                   </select>
@@ -281,7 +326,7 @@ function App() {
             {/* Header info */}
             <div className="flex flex-col gap-1">
               <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
-                {selectedYear} Analiz Raporu
+                {selectedYear} {selectedMonth !== "Yıl Geneli" ? `- ${selectedMonth}` : ""} Analiz Raporu
               </span>
               <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
                 {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}

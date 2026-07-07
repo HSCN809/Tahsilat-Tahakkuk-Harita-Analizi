@@ -118,10 +118,46 @@ def get_categories(year: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Kategoriler okunurken hata oluştu: {str(e)}")
 
-@app.get("/api/data")
-def get_data(year: int, category: str):
+@app.get("/api/months")
+def get_months(year: int):
     """
-    Belirli bir yıl ve vergi kalemi için 81 ilin tahakkuk, tahsilat ve oran verilerini döner.
+    Belirli bir yıla ait veri klasöründeki mevcut ayları listeler.
+    """
+    folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
+    folder_path = os.path.join(lib.ana_klasor, folder_name)
+    
+    if not os.path.exists(folder_path):
+        return {"year": year, "months": ["Yıl Geneli"]}
+
+    # İl klasörlerini tespit et (örn: 01_Adana)
+    il_dirs = [
+        d for d in os.listdir(folder_path) 
+        if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
+    ]
+    
+    if not il_dirs:
+        return {"year": year, "months": ["Yıl Geneli"]}
+        
+    # İlk il klasörünün içindeki aylık Excel dosyalarını listele
+    ilk_il_klasoru = os.path.join(folder_path, il_dirs[0])
+    aylik_dosyalar = [f for f in os.listdir(ilk_il_klasoru) if f.endswith('.xlsx')]
+    
+    # Dosya adlarından ayları al (.xlsx kısmını at)
+    aylar = [os.path.splitext(f)[0] for f in aylik_dosyalar]
+    
+    # Türkçe ayların sıralaması
+    AY_SIRALAMASI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    
+    # Sadece klasörde mevcut olan ayları sıralı olarak filtrele
+    aylar_lower = [a.lower() for a in aylar]
+    mevcut_aylar = [ay for ay in AY_SIRALAMASI if ay.lower() in aylar_lower]
+    
+    return {"year": year, "months": ["Yıl Geneli"] + mevcut_aylar}
+
+@app.get("/api/data")
+def get_data(year: int, category: str, month: str = "Yıl Geneli"):
+    """
+    Belirli bir yıl, vergi kalemi ve ay için 81 ilin tahakkuk, tahsilat ve oran verilerini döner.
     """
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
@@ -130,7 +166,7 @@ def get_data(year: int, category: str):
         raise HTTPException(status_code=404, detail=f"{year} yılına ait veri klasörü bulunamadı.")
 
     try:
-        iller_dict, _ = lib.excel_dosyalarini_oku(folder_path)
+        iller_dict, _ = lib.excel_dosyalarini_oku(folder_path, month=month)
         data_df = lib.veri_hazirla(iller_dict, category)
         
         if data_df.empty:

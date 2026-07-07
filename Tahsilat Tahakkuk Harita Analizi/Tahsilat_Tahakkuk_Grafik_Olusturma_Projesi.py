@@ -88,31 +88,92 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     except Exception:
         return None
 
-def excel_dosyalarini_oku(folder_path):
+def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
     """
-    Klasördeki tüm il Excel dosyalarını paralel olarak okur.
+    Belirli bir il klasörü içindeki aylık Excel dosyasını okur.
     """
-    excel_dosyalari = sorted(
-        [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
-        key=lambda x: int(re.search(r"(\d{4})", x).group(1)) if re.search(r"(\d{4})", x) else 0
-    )
-    
+    il_adi = "_".join(folder_name.split("_")[1:]) if "_" in folder_name else folder_name
+    dosya_yolu = os.path.join(parent_folder_path, folder_name, f"{month}.xlsx")
+    if not os.path.exists(dosya_yolu):
+        return None
+    try:
+        df_raw = pd.read_excel(dosya_yolu)
+        
+        # Başlık satırını bul
+        header_row_idx = None
+        for idx in range(len(df_raw)):
+            row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
+            if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
+                header_row_idx = idx
+                break
+                
+        if header_row_idx is None:
+            return None
+            
+        df = df_raw.iloc[header_row_idx + 1:].copy()
+        if df.shape[1] == 5:
+            df = df.iloc[:, 1:]
+            
+        df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
+        df.set_index('index', inplace=True)
+        
+        for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
+            df[col] = pd.to_numeric(df[col], errors="coerce").round(2)
+            
+        df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
+        return il_adi, int(yil), df
+    except Exception:
+        return None
+
+def excel_dosyalarini_oku(folder_path, month=None):
+    """
+    Klasördeki tüm il Excel dosyalarını (yıllık veya belirli bir aya ait) paralel olarak okur.
+    """
+    match_yil = re.search(r"(\d{4})", folder_path)
+    yil = int(match_yil.group(1)) if match_yil else 0
+
     iller_dict = {}
     yillar = []
-    
-    with ThreadPoolExecutor(max_workers=16) as executor:
-        futures = [
-            executor.submit(oku_ve_temizle_tek_dosya, dosya_adi, folder_path)
-            for dosya_adi in excel_dosyalari
-        ]
+
+    if month and month != "Yıl Geneli":
+        # Aylık veriyi oku
+        il_klasorleri = sorted([
+            d for d in os.listdir(folder_path) 
+            if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
+        ])
         
-        for future in as_completed(futures):
-            res = future.result()
-            if res:
-                il_adi, yil, df = res
-                iller_dict[il_adi] = df
-                yillar.append(yil)
-                
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            futures = [
+                executor.submit(oku_ve_temizle_aylik_dosya, klasor_adi, month, folder_path, yil)
+                for klasor_adi in il_klasorleri
+            ]
+            
+            for future in as_completed(futures):
+                res = future.result()
+                if res:
+                    il_adi, _, df = res
+                    iller_dict[il_adi] = df
+                    yillar.append(yil)
+    else:
+        # Yıllık veriyi oku
+        excel_dosyalari = sorted(
+            [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
+            key=lambda x: int(re.search(r"(\d{4})", x).group(1)) if re.search(r"(\d{4})", x) else 0
+        )
+        
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            futures = [
+                executor.submit(oku_ve_temizle_tek_dosya, dosya_adi, folder_path)
+                for dosya_adi in excel_dosyalari
+            ]
+            
+            for future in as_completed(futures):
+                res = future.result()
+                if res:
+                    il_adi, yil_res, df = res
+                    iller_dict[il_adi] = df
+                    yillar.append(yil_res)
+                    
     return iller_dict, yillar
 
 def temizle_metin(text):
