@@ -88,6 +88,9 @@ function App() {
     setSummary(null);
 
     const controller = new AbortController();
+    // cancelled flag: AbortController tamamlanmış fetch'leri durduramayabilir,
+    // bu yüzden await sonrası state güncellemelerini de guard'lamamız gerek.
+    let cancelled = false;
 
     const fetchMonths = async () => {
       try {
@@ -95,21 +98,22 @@ function App() {
         const response = await fetch(`/api/months?year=${selectedYear}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Aylar yüklenemedi.');
         const data = await response.json();
+        if (cancelled) return;
         setMonths(data.months);
         // Yıl içindeki sonuncu ayı varsayılan olarak seç (Ocak→Aralık sıralı geldiği için)
         const mevcutAy = data.months && data.months.length > 0 ? data.months[data.months.length - 1] : '';
         setSelectedMonth(mevcutAy);
       } catch (err: any) {
-        if (err.name === 'AbortError') return;
+        if (cancelled || err.name === 'AbortError') return;
         setError(err.message || 'Aylar alınırken bir sorun oluştu.');
       } finally {
-        if (!controller.signal.aborted) setLoadingMonths(false);
+        if (!cancelled) setLoadingMonths(false);
       }
     };
 
     fetchMonths();
 
-    return () => controller.abort();
+    return () => { cancelled = true; controller.abort(); };
   }, [selectedYear]);
 
   // Fetch categories when year changes
@@ -117,6 +121,7 @@ function App() {
     if (selectedYear === null) return;
 
     const controller = new AbortController();
+    let cancelled = false;
 
     const fetchCategories = async () => {
       try {
@@ -124,6 +129,7 @@ function App() {
         const response = await fetch(`/api/categories?year=${selectedYear}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Kategoriler yüklenemedi.');
         const data = await response.json();
+        if (cancelled) return;
         setCategories(data.categories);
         if (data.categories && data.categories.length > 0) {
           setSelectedCategory(data.categories[0].id);
@@ -131,16 +137,16 @@ function App() {
           setSelectedCategory('');
         }
       } catch (err: any) {
-        if (err.name === 'AbortError') return;
+        if (cancelled || err.name === 'AbortError') return;
         setError(err.message || 'Kategoriler alınırken bir sorun oluştu.');
       } finally {
-        if (!controller.signal.aborted) setLoadingCategories(false);
+        if (!cancelled) setLoadingCategories(false);
       }
     };
 
     fetchCategories();
 
-    return () => controller.abort();
+    return () => { cancelled = true; controller.abort(); };
   }, [selectedYear]);
 
   // Fetch summary and records when year/category/month changes
@@ -152,6 +158,7 @@ function App() {
     }
 
     const controller = new AbortController();
+    let cancelled = false;
 
     const fetchStats = async () => {
       try {
@@ -160,19 +167,20 @@ function App() {
         const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}&month=${encodeURIComponent(selectedMonth)}`, { signal: controller.signal });
         if (!response.ok) throw new Error('İl verileri yüklenemedi.');
         const data = await response.json();
+        if (cancelled) return;
         setSummary(data.summary);
         setRecords(data.data);
       } catch (err: any) {
-        if (err.name === 'AbortError') return;
+        if (cancelled || err.name === 'AbortError') return;
         setError(err.message || 'Veriler alınırken bir sorun oluştu.');
       } finally {
-        if (!controller.signal.aborted) setLoadingData(false);
+        if (!cancelled) setLoadingData(false);
       }
     };
 
     fetchStats();
 
-    return () => controller.abort();
+    return () => { cancelled = true; controller.abort(); };
   }, [selectedYear, selectedCategory, selectedMonth]);
 
   const filteredCategories = categories.filter((cat) =>

@@ -122,11 +122,17 @@ def get_categories(year: int):
         if df.shape[1] == 5:
             df = df.iloc[:, 1:]
         df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
-        categories = [str(i).strip() for i in df['index'] if isinstance(i, str)]
-        
+        # 2005 öncesi dosyalarda hiyerarşik kategoriler girintiyle ayrılır:
+        # "    Dahilde Alınan KDV" (üst) ve "      Dahilde Alınan KDV" (alt)
+        # aynı isme sahip olduğundan id'yi orijinal (girintili) string yap.
+        # Aksi halde duplicate React key'ler sıralama kaymasına yol açar.
+        # veri_hazirla zaten temizle_metin ile normalize edip eşleştirdiği için
+        # girintili id backend'de doğru satırla eşleşir.
+        raw_categories = [i for i in df['index'] if isinstance(i, str)]
+
         cleaned_categories = []
-        for cat in categories:
-            clean_name = re.sub(r"^\d+\.\s*", "", cat).title()
+        for cat in raw_categories:
+            clean_name = re.sub(r"^\d+\.\s*", "", cat.strip()).title()
             cleaned_categories.append({"id": cat, "name": clean_name})
             
         return {"year": year, "categories": cleaned_categories}
