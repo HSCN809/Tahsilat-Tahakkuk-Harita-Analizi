@@ -87,7 +87,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-[550px] bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 overflow-hidden flex items-center justify-center">
+    <div ref={containerRef} className="relative w-full h-[450px] bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 overflow-hidden flex items-center justify-center">
       {tooltip && (
         <div
           className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px] whitespace-nowrap"
@@ -107,7 +107,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{
-              scale: 2600,
+              scale: 3400,
               center: [35.2433, 38.9637],
             }}
             style={{ width: '100%', height: '100%' }}
