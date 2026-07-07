@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 // @ts-ignore
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 
@@ -29,7 +29,8 @@ const normalizeProvinceName = (name: string): string => {
 };
 
 export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType }) => {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; alignLeft: boolean } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const recordsMap = useMemo(() => {
     const map = new Map<string, ProvinceData>();
@@ -79,11 +80,15 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
   };
 
   return (
-    <div className="relative w-full h-[550px] bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 overflow-hidden flex items-center justify-center">
+    <div ref={containerRef} className="relative w-full h-[550px] bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 overflow-hidden flex items-center justify-center">
       {tooltip && (
         <div
-          className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px]"
-          style={{ left: tooltip.x + 15, top: tooltip.y - 15 }}
+          className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px] whitespace-nowrap"
+          style={{ 
+            left: tooltip.alignLeft ? tooltip.x - 15 : tooltip.x + 15, 
+            top: tooltip.y - 15,
+            transform: tooltip.alignLeft ? 'translateX(-100%)' : 'none'
+          }}
           dangerouslySetInnerHTML={{ __html: tooltip.content }}
         />
       )}
@@ -110,9 +115,11 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
                       key={geo.rsmKey}
                       geography={geo}
                       onMouseMove={(e: React.MouseEvent) => {
-                        const bounds = e.currentTarget.parentElement?.getBoundingClientRect();
+                        const bounds = containerRef.current?.getBoundingClientRect();
                         const x = e.clientX - (bounds?.left || 0);
                         const y = e.clientY - (bounds?.top || 0);
+                        const containerWidth = bounds?.width || 0;
+                        const alignLeft = x > containerWidth / 2;
 
                         let content = `<span class="font-bold text-sm text-slate-200 border-b border-slate-800 pb-1 mb-1 block">${name.toUpperCase()}</span>`;
                         if (record) {
@@ -125,7 +132,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
                           content += `<span class="text-slate-500">Veri bulunamadı</span>`;
                         }
 
-                        setTooltip({ x, y, content });
+                        setTooltip({ x, y, content, alignLeft });
                       }}
                       onMouseLeave={() => setTooltip(null)}
                       style={{
