@@ -29,7 +29,7 @@ function App() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [records, setRecords] = useState<any[]>([]);
   const [months, setMonths] = useState<string[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>('Yıl Geneli');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   const [loadingYears, setLoadingYears] = useState(true);
   const [loadingMonths, setLoadingMonths] = useState(false);
@@ -79,32 +79,49 @@ function App() {
   useEffect(() => {
     if (selectedYear === null) return;
 
+    // Yıl geçişinde bağımlı state'leri anında temizle ki eski yıl render edilmesin
+    setMonths([]);
+    setSelectedMonth('');
+    setCategories([]);
+    setSelectedCategory('');
+    setRecords([]);
+    setSummary(null);
+
+    const controller = new AbortController();
+
     const fetchMonths = async () => {
       try {
         setLoadingMonths(true);
-        const response = await fetch(`/api/months?year=${selectedYear}`);
+        const response = await fetch(`/api/months?year=${selectedYear}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Aylar yüklenemedi.');
         const data = await response.json();
         setMonths(data.months);
-        setSelectedMonth("Yıl Geneli");
+        // Yıl içindeki sonuncu ayı varsayılan olarak seç (Ocak→Aralık sıralı geldiği için)
+        const mevcutAy = data.months && data.months.length > 0 ? data.months[data.months.length - 1] : '';
+        setSelectedMonth(mevcutAy);
       } catch (err: any) {
+        if (err.name === 'AbortError') return;
         setError(err.message || 'Aylar alınırken bir sorun oluştu.');
       } finally {
-        setLoadingMonths(false);
+        if (!controller.signal.aborted) setLoadingMonths(false);
       }
     };
 
     fetchMonths();
+
+    return () => controller.abort();
   }, [selectedYear]);
 
   // Fetch categories when year changes
   useEffect(() => {
     if (selectedYear === null) return;
 
+    const controller = new AbortController();
+
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
-        const response = await fetch(`/api/categories?year=${selectedYear}`);
+        const response = await fetch(`/api/categories?year=${selectedYear}`, { signal: controller.signal });
         if (!response.ok) throw new Error('Kategoriler yüklenemedi.');
         const data = await response.json();
         setCategories(data.categories);
@@ -114,43 +131,51 @@ function App() {
           setSelectedCategory('');
         }
       } catch (err: any) {
+        if (err.name === 'AbortError') return;
         setError(err.message || 'Kategoriler alınırken bir sorun oluştu.');
       } finally {
-        setLoadingCategories(false);
+        if (!controller.signal.aborted) setLoadingCategories(false);
       }
     };
 
     fetchCategories();
+
+    return () => controller.abort();
   }, [selectedYear]);
 
   // Fetch summary and records when year/category/month changes
   useEffect(() => {
-    if (selectedYear === null || !selectedCategory) return;
+    if (selectedYear === null || !selectedCategory || !selectedMonth) return;
+
+    const controller = new AbortController();
 
     const fetchStats = async () => {
       try {
         setLoadingData(true);
         setError(null);
-        const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}&month=${encodeURIComponent(selectedMonth)}`);
+        const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}&month=${encodeURIComponent(selectedMonth)}`, { signal: controller.signal });
         if (!response.ok) throw new Error('İl verileri yüklenemedi.');
         const data = await response.json();
         setSummary(data.summary);
         setRecords(data.data);
       } catch (err: any) {
+        if (err.name === 'AbortError') return;
         setError(err.message || 'Veriler alınırken bir sorun oluştu.');
       } finally {
-        setLoadingData(false);
+        if (!controller.signal.aborted) setLoadingData(false);
       }
     };
 
     fetchStats();
+
+    return () => controller.abort();
   }, [selectedYear, selectedCategory, selectedMonth]);
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
 
-  const isMapLoading = loadingGeoJson || loadingData;
+  const isMapLoading = loadingGeoJson || loadingData || loadingMonths;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
@@ -326,7 +351,7 @@ function App() {
             {/* Header info */}
             <div className="flex flex-col gap-1">
               <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
-                {selectedYear} {selectedMonth !== "Yıl Geneli" ? `- ${selectedMonth}` : ""} Analiz Raporu
+                {selectedYear}{selectedMonth ? ` - ${selectedMonth}` : ""} Analiz Raporu
               </span>
               <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
                 {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}

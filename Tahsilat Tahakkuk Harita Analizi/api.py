@@ -127,16 +127,16 @@ def get_months(year: int):
     folder_path = os.path.join(lib.ana_klasor, folder_name)
     
     if not os.path.exists(folder_path):
-        return {"year": year, "months": ["Yıl Geneli"]}
+        return {"year": year, "months": []}
 
     # İl klasörlerini tespit et (örn: 01_Adana)
     il_dirs = [
-        d for d in os.listdir(folder_path) 
+        d for d in os.listdir(folder_path)
         if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
     ]
-    
+
     if not il_dirs:
-        return {"year": year, "months": ["Yıl Geneli"]}
+        return {"year": year, "months": []}
         
     # İlk il klasörünün içindeki aylık Excel dosyalarını listele
     ilk_il_klasoru = os.path.join(folder_path, il_dirs[0])
@@ -151,13 +151,14 @@ def get_months(year: int):
     # Sadece klasörde mevcut olan ayları sıralı olarak filtrele
     aylar_lower = [a.lower() for a in aylar]
     mevcut_aylar = [ay for ay in AY_SIRALAMASI if ay.lower() in aylar_lower]
-    
-    return {"year": year, "months": ["Yıl Geneli"] + mevcut_aylar}
+
+    return {"year": year, "months": mevcut_aylar}
 
 @app.get("/api/data")
-def get_data(year: int, category: str, month: str = "Yıl Geneli"):
+def get_data(year: int, category: str, month: str = ""):
     """
     Belirli bir yıl, vergi kalemi ve ay için 81 ilin tahakkuk, tahsilat ve oran verilerini döner.
+    Ay belirtilmezse (boş) yıllık özet veri kullanılır.
     """
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
