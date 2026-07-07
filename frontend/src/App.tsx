@@ -196,9 +196,6 @@ function App() {
             <p className="text-xs text-slate-400 mt-0.5">Hazine ve Maliye Bakanlığı Vergi İstatistikleri Portalı</p>
           </div>
         </div>
-        <div className="text-xs text-slate-500 font-mono hidden md:block">
-          Backend: FastAPI | Frontend: React & SVG Map
-        </div>
       </header>
 
       {/* Main Workspace */}
@@ -270,8 +267,8 @@ function App() {
                   <button
                     onClick={() => setMapType('tahsilat')}
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahsilat'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
                     Tahsilat
@@ -279,8 +276,8 @@ function App() {
                   <button
                     onClick={() => setMapType('tahakkuk')}
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahakkuk'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
                     Tahakkuk
@@ -288,8 +285,8 @@ function App() {
                   <button
                     onClick={() => setMapType('ratio')}
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'ratio'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
                     Oran (%)
@@ -330,8 +327,8 @@ function App() {
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
-                              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-                              : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
+                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
+                            : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
                             }`}
                         >
                           <span className="truncate pr-2">{cat.name}</span>
@@ -347,16 +344,6 @@ function App() {
 
           {/* Right Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-
-            {/* Header info */}
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-bold text-blue-500 uppercase tracking-widest font-mono">
-                {selectedYear}{selectedMonth ? ` - ${selectedMonth}` : ""} Analiz Raporu
-              </span>
-              <h2 className="text-2xl font-extrabold text-slate-100 tracking-tight">
-                {categories.find((c) => c.id === selectedCategory)?.name || 'Kategori Seçilmedi'}
-              </h2>
-            </div>
 
             {/* KPI Cards */}
             <StatsCards stats={summary} loading={loadingData} />

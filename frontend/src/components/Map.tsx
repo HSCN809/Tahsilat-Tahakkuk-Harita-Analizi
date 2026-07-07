@@ -60,7 +60,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
 
   const getColor = (name: string) => {
     const record = recordsMap.get(normalizeProvinceName(name));
-    if (!record) return '#1e293b'; 
+    if (!record) return '#1e293b';
 
     let factor = 0;
     if (mapType === 'ratio') {
@@ -91,8 +91,8 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
       {tooltip && (
         <div
           className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px] whitespace-nowrap"
-          style={{ 
-            left: tooltip.alignLeft ? tooltip.x - 15 : tooltip.x + 15, 
+          style={{
+            left: tooltip.alignLeft ? tooltip.x - 15 : tooltip.x + 15,
             top: tooltip.y - 15,
             transform: tooltip.alignLeft ? 'translateX(-100%)' : 'none'
           }}
@@ -107,7 +107,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{
-              scale: 2800,
+              scale: 2600,
               center: [35.2433, 38.9637],
             }}
             style={{ width: '100%', height: '100%' }}
