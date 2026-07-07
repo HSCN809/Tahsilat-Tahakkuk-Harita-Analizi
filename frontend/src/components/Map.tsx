@@ -30,9 +30,14 @@ const normalizeProvinceName = (name: string): string => {
     .trim();
 
   // Handle known variation mappings to match GeoJSON normalized names
-  if (normalized === 'urfa') return 'sanliurfa';
+  if (normalized === 'urfa' || normalized === 'urdfa') return 'sanliurfa';
   if (normalized === 'kmaras' || normalized === 'maras') return 'kahramanmaras';
   if (normalized === 'elazi') return 'elazig';
+  if (normalized === 'aksarat') return 'aksaray';
+  if (normalized === 'izmit') return 'izmir'; // plate 35 is mapped as 'izmit' in 2008
+  if (normalized === 'kirikkalae') return 'kirikkale';
+  if (normalized === 'mardim') return 'mardin';
+  if (normalized === 'afyon') return 'afyonkarahisar'; // 2026 directory is '03_Afyon'
 
   return normalized;
 };

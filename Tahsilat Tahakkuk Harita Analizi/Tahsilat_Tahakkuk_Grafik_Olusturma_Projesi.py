@@ -44,6 +44,39 @@ if ana_klasor is None:
 if ana_klasor is None:
     raise FileNotFoundError("❌ Excel klasörü bulunamadı. 'veriler' içindeki klasör adlarını kontrol edin.")
 
+def kolonlari_ayarla(df_raw, header_row_idx):
+    header_row = [str(val).lower().strip() for val in df_raw.iloc[header_row_idx].tolist()]
+    
+    tahakkuk_idx = None
+    tahsilat_idx = None
+    ratio_idx = None
+    
+    for i, val in enumerate(header_row):
+        if "/" in val or "oran" in val or ("tahakkuk" in val and "tahsilat" in val):
+            ratio_idx = i
+        elif "tahakkuk" in val:
+            tahakkuk_idx = i
+        elif "tahsilat" in val:
+            tahsilat_idx = i
+                
+    if ratio_idx is None and tahsilat_idx is not None and tahsilat_idx + 1 < len(header_row):
+        ratio_idx = tahsilat_idx + 1
+        
+    if tahakkuk_idx is None or tahsilat_idx is None:
+        return None
+        
+    index_idx = tahakkuk_idx - 1
+    df = df_raw.iloc[header_row_idx + 1:].copy()
+    
+    if ratio_idx is not None and ratio_idx < df_raw.shape[1]:
+        df = df.iloc[:, [index_idx, tahakkuk_idx, tahsilat_idx, ratio_idx]]
+    else:
+        df = df.iloc[:, [index_idx, tahakkuk_idx, tahsilat_idx]]
+        df['tahsilat/tahakkuk'] = None
+        
+    df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
+    return df
+
 def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     """
     Tek bir Excel dosyasını dinamik satır tespiti yaparak okuyup temizler.
@@ -69,13 +102,10 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
         if header_row_idx is None:
             return None
             
-        df = df_raw.iloc[header_row_idx + 1:].copy()
-        
-        # Eğer kolon sayısı 5 ise ilk kolonu at (Unnamed/boş kolon)
-        if df.shape[1] == 5:
-            df = df.iloc[:, 1:]
+        df = kolonlari_ayarla(df_raw, header_row_idx)
+        if df is None:
+            return None
             
-        df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
         df.set_index('index', inplace=True)
         
         for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
@@ -110,11 +140,10 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
         if header_row_idx is None:
             return None
             
-        df = df_raw.iloc[header_row_idx + 1:].copy()
-        if df.shape[1] == 5:
-            df = df.iloc[:, 1:]
+        df = kolonlari_ayarla(df_raw, header_row_idx)
+        if df is None:
+            return None
             
-        df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
         df.set_index('index', inplace=True)
         
         for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:

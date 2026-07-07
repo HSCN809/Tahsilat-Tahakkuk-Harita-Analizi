@@ -117,11 +117,9 @@ def get_categories(year: int):
         if header_row_idx is None:
             raise HTTPException(status_code=500, detail=f"{year} yılına ait dosyada başlık satırı bulunamadı.")
 
-        df = df_raw.iloc[header_row_idx + 1:].copy()
-        # 5 kolonlu (2006+) formatlarda ilk kolon boş spacer'tır, at
-        if df.shape[1] == 5:
-            df = df.iloc[:, 1:]
-        df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
+        df = lib.kolonlari_ayarla(df_raw, header_row_idx)
+        if df is None:
+            raise HTTPException(status_code=500, detail=f"{year} yılına ait dosyada kolonlar tespit edilemedi.")
         # 2005 öncesi dosyalarda hiyerarşik kategoriler girintiyle ayrılır:
         # "    Dahilde Alınan KDV" (üst) ve "      Dahilde Alınan KDV" (alt)
         # aynı isme sahip olduğundan id'yi orijinal (girintili) string yap.
