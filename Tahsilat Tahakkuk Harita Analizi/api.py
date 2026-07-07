@@ -103,9 +103,24 @@ def get_categories(year: int):
 
     dosya_yolu = os.path.join(folder_path, excel_files[0])
     try:
-        df = pd.read_excel(dosya_yolu, skiprows=2)
-        df = df.drop(index=0)
-        df = df.drop(columns=['Unnamed: 0'], errors='ignore')
+        # 2005 öncesi ve sonrası Excel formatları farklı olduğundan,
+        # sabit skiprows yerine başlık satırını dinamik tespit et
+        # (Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.oku_ve_temizle_tek_dosya ile aynı mantık).
+        df_raw = pd.read_excel(dosya_yolu)
+        header_row_idx = None
+        for idx in range(len(df_raw)):
+            row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
+            if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
+                header_row_idx = idx
+                break
+
+        if header_row_idx is None:
+            raise HTTPException(status_code=500, detail=f"{year} yılına ait dosyada başlık satırı bulunamadı.")
+
+        df = df_raw.iloc[header_row_idx + 1:].copy()
+        # 5 kolonlu (2006+) formatlarda ilk kolon boş spacer'tır, at
+        if df.shape[1] == 5:
+            df = df.iloc[:, 1:]
         df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
         categories = [str(i).strip() for i in df['index'] if isinstance(i, str)]
         
