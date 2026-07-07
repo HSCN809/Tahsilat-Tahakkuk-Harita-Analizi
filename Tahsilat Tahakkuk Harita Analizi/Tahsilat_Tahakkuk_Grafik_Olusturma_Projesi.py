@@ -79,7 +79,7 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
         df.set_index('index', inplace=True)
         
         for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-            df[col] = pd.to_numeric(df[col], errors="coerce").round(2)
+            df[col] = pd.to_numeric(df[col], errors="coerce")
             
         # Boş satırları filtrele
         df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
@@ -118,7 +118,7 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
         df.set_index('index', inplace=True)
         
         for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-            df[col] = pd.to_numeric(df[col], errors="coerce").round(2)
+            df[col] = pd.to_numeric(df[col], errors="coerce")
             
         df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
         return il_adi, int(yil), df
@@ -208,6 +208,4 @@ def veri_hazirla(iller_dict, secim):
             continue
 
     gelir_df = pd.DataFrame(veri_listesi)
-    if not gelir_df.empty:
-        gelir_df[["tahakkuk", "tahsilat", "tahsilat/tahakkuk"]] = gelir_df[["tahakkuk", "tahsilat", "tahsilat/tahakkuk"]].round(2)
     return gelir_df

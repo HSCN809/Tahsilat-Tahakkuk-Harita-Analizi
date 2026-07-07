@@ -189,11 +189,27 @@ def get_data(year: int, category: str, month: str = ""):
         # Frontend için standart alan isimlerine eşleştir
         mapped_records = []
         for r in records:
+            accrual = r["tahakkuk"]
+            collection = r["tahsilat"]
+            
+            # Recalculate ratio dynamically to avoid excel formula errors or NaNs
+            if accrual is not None and accrual > 0:
+                val_coll = collection if collection is not None else 0.0
+                ratio = round((val_coll / accrual) * 100, 2)
+            elif accrual is not None and accrual == 0 and collection is not None and collection > 0:
+                ratio = 100.0
+            else:
+                excel_ratio = r["tahsilat/tahakkuk"]
+                if excel_ratio is not None and not (isinstance(excel_ratio, (int, float)) and np.isnan(excel_ratio)):
+                    ratio = float(excel_ratio)
+                else:
+                    ratio = 0.0
+
             mapped_records.append({
                 "province": r["İl"],
-                "accrual": r["tahakkuk"],
-                "collection": r["tahsilat"],
-                "ratio": r["tahsilat/tahakkuk"]
+                "accrual": accrual,
+                "collection": collection,
+                "ratio": ratio
             })
             
         return {
