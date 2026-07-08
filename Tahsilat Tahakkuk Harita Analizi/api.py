@@ -3,11 +3,10 @@ import re
 import json
 import sys
 import subprocess
-import pandas as pd
-import numpy as np
 from pathlib import Path
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 # api.py dosyasının bulunduğu dizini Python sistem yoluna ekle (İçe aktarmaların sorunsuz çalışması için)
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -22,18 +21,25 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS ayarları
+# CORS ayarları — izin verilen origin'ler env değişkeninden okunur
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173"
+    ).split(",") if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def run_scraper_bg(year_input: str):
+async def run_scraper_bg(year_input: str):
     """
     Arka planda veri çekme scriptini çalıştırır.
+    subprocess.communicate() bloklayıcı olduğu için threadpool'a alınır.
     """
     script_path = CURRENT_DIR / "Hazine_Maliye_Bakanlığı_Sitesinden_Excel_Dosyalarını_Çekme.py"
     try:
@@ -46,7 +52,10 @@ def run_scraper_bg(year_input: str):
             text=True,
             encoding="utf-8"
         )
-        stdout, stderr = process.communicate(input=year_input + "\n")
+        # Bloklayıcı communicate() çağrısını threadpool'a taşı
+        stdout, stderr = await run_in_threadpool(
+            process.communicate, input=year_input + "\n"
+        )
         print(f"✅ Arka plan veri çekici tamamlandı. Çıktı: {stdout[:200]}...")
         # Önbelleği temizle ki yeni veriler yüklensin
         lib.clear_cache()
@@ -70,14 +79,16 @@ def read_root():
     }
 
 @app.get("/api/years")
-def get_years():
+async def get_years():
     """
     Klasörde mevcut yılları tespit edip listeler.
     """
     try:
-        alt_klasorler = sorted(
-            [f for f in os.listdir(lib.ana_klasor) if os.path.isdir(os.path.join(lib.ana_klasor, f))],
-            key=lambda x: int(re.search(r"\d{4}", x).group(0)) if re.search(r"\d{4}", x) else 0
+        alt_klasorler = await run_in_threadpool(
+            lambda: sorted(
+                [f for f in os.listdir(lib.ana_klasor) if os.path.isdir(os.path.join(lib.ana_klasor, f))],
+                key=lambda x: int(re.search(r"\d{4}", x).group(0)) if re.search(r"\d{4}", x) else 0
+            )
         )
         years = []
         for folder in alt_klasorler:
@@ -93,9 +104,10 @@ def _hesapla_config(year: int) -> dict:
     Seçilen yıla ait aylar ve kategorileri diskten okuyarak hesaplar.
     Yıl aynı kaldıkça tekrar disk okumamak için önbellekten desteklenir.
     """
-    if year in lib._config_cache:
+    cached = lib._config_cache.get(year)
+    if cached is not None:
         print(f"💾 Config önbellekten getirildi: yıl {year}")
-        return lib._config_cache[year]
+        return cached
 
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
@@ -146,39 +158,40 @@ def _hesapla_config(year: int) -> dict:
         "months": mevcut_aylar,
         "categories": cleaned_categories
     }
-    lib._config_cache[year] = result
+    lib._config_cache.set(year, result)
     return result
 
 @app.get("/api/config")
-def get_config(year: int):
+async def get_config(year: int):
     """
     Seçilen yıla ait aylar ve kategorileri TEK bir istekle döner.
     Frontend yıl değiştiğinde sadece bu endpoint'i çağırır.
     Yıl aynı kaldıkça önbellekten anında döner.
     """
     try:
-        return _hesapla_config(year)
+        return await run_in_threadpool(_hesapla_config, year)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Config hesaplanırken hata oluştu: {str(e)}")
 
 @app.get("/api/data")
-def get_data(year: int, category: str, month: str = ""):
+async def get_data(year: int, category: str, month: str = ""):
     """
     Belirli bir yıl, vergi kalemi ve ay için 81 ilin tahakkuk, tahsilat ve oran verilerini döner.
     Ay belirtilmezse (boş) yıllık özet veri kullanılır.
     """
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
-    
+
     if not os.path.exists(folder_path):
         raise HTTPException(status_code=404, detail=f"{year} yılına ait veri klasörü bulunamadı.")
 
     try:
-        iller_dict, _ = lib.excel_dosyalarini_oku(folder_path, month=month)
-        data_df = lib.veri_hazirla(iller_dict, category)
-        
+        # Ağır I/O ve CPU işlemlerini threadpool'a taşı
+        iller_dict, _ = await run_in_threadpool(lib.excel_dosyalarini_oku, folder_path, month=month)
+        data_df = await run_in_threadpool(lib.veri_hazirla, iller_dict, category)
+
         if data_df.empty:
             return {
                 "year": year,
@@ -186,21 +199,21 @@ def get_data(year: int, category: str, month: str = ""):
                 "summary": {"total_accrual": 0, "total_collection": 0, "overall_ratio": 0},
                 "data": []
             }
-            
+
         data_df = data_df.replace({np.nan: None})
         records = data_df.to_dict(orient="records")
-        
+
         # Türkiye geneli özet istatistikler
         accrual_sum = data_df['tahakkuk'].sum(skipna=True) if data_df['tahakkuk'].any() else 0
         collection_sum = data_df['tahsilat'].sum(skipna=True) if data_df['tahsilat'].any() else 0
         overall_ratio = (collection_sum / accrual_sum * 100) if accrual_sum else 0
-        
+
         # Frontend için standart alan isimlerine eşleştir
         mapped_records = []
         for r in records:
             accrual = r["tahakkuk"]
             collection = r["tahsilat"]
-            
+
             # Recalculate ratio dynamically to avoid excel formula errors or NaNs
             if accrual is not None and accrual > 0:
                 val_coll = collection if collection is not None else 0.0
@@ -220,7 +233,7 @@ def get_data(year: int, category: str, month: str = ""):
                 "collection": collection,
                 "ratio": ratio
             })
-            
+
         return {
             "year": year,
             "category": category,
@@ -235,7 +248,7 @@ def get_data(year: int, category: str, month: str = ""):
         raise HTTPException(status_code=500, detail=f"Veriler işlenirken hata oluştu: {str(e)}")
 
 @app.get("/api/geojson")
-def get_geojson():
+async def get_geojson():
     """
     Türkiye coğrafi sınırlarını gösteren GeoJSON verisini döner.
     """
@@ -243,14 +256,15 @@ def get_geojson():
     if not geojson_path.exists():
         raise HTTPException(status_code=404, detail="GeoJSON harita dosyası bulunamadı.")
     try:
-        with open(geojson_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data
+        def _read_geojson():
+            with open(geojson_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return await run_in_threadpool(_read_geojson)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GeoJSON okuma hatası: {str(e)}")
 
 @app.post("/api/scrape")
-def trigger_scrape(year_input: str, background_tasks: BackgroundTasks):
+async def trigger_scrape(year_input: str, background_tasks: BackgroundTasks):
     """
     Arka planda paralel veri çekme/güncelleme işlemini başlatır.
     """

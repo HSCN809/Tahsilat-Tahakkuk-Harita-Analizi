@@ -1,6 +1,14 @@
-FROM node:24-alpine
+# --- Stage 1: Build ---
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 COPY . .
-CMD ["npm", "run", "dev", "--", "--host"]
+RUN npm run build
+
+# --- Stage 2: Serve (nginx) ---
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

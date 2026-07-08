@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import threading
+from collections import OrderedDict
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -154,11 +156,54 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
     except Exception:
         return None
 
-_excel_cache = {}
-_config_cache = {}
+class LRUCache:
+    """
+    Thread-safe LRU (Least Recently Used) önbellek.
+    Eşzamanlı erişimde güvenli ve bellek kullanımı sınırlı.
+    """
+    def __init__(self, maxsize: int = 32):
+        self._data: OrderedDict = OrderedDict()
+        self._lock = threading.RLock()
+        self.maxsize = maxsize
+
+    def get(self, key):
+        with self._lock:
+            if key not in self._data:
+                return None
+            # En son kullanılanı sona taşı (LRU sıralaması)
+            self._data.move_to_end(key)
+            return self._data[key]
+
+    def set(self, key, value):
+        with self._lock:
+            if key in self._data:
+                self._data.move_to_end(key)
+            self._data[key] = value
+            # maxsize aşılırsa en eski (en az kullanılan) entry'i at
+            if len(self._data) > self.maxsize:
+                self._data.popitem(last=False)
+
+    def clear(self):
+        with self._lock:
+            self._data.clear()
+
+    def __contains__(self, key):
+        with self._lock:
+            return key in self._data
+
+    def __getitem__(self, key):
+        with self._lock:
+            return self._data[key]
+
+    def __len__(self):
+        with self._lock:
+            return len(self._data)
+
+
+_excel_cache = LRUCache(maxsize=32)
+_config_cache = LRUCache(maxsize=32)
 
 def clear_cache():
-    global _excel_cache, _config_cache
     _excel_cache.clear()
     _config_cache.clear()
     print("🧹 Excel veri ve config önbelleği temizlendi.")
@@ -169,9 +214,10 @@ def excel_dosyalarini_oku(folder_path, month=None):
     Bellek içi önbellekleme kullanır.
     """
     cache_key = (str(folder_path), month)
-    if cache_key in _excel_cache:
+    cached = _excel_cache.get(cache_key)
+    if cached is not None:
         print(f"💾 Veriler önbellekten getirildi: {cache_key}")
-        return _excel_cache[cache_key]
+        return cached
 
     match_yil = re.search(r"(\d{4})", str(folder_path))
     yil = int(match_yil.group(1)) if match_yil else 0
@@ -218,7 +264,7 @@ def excel_dosyalarini_oku(folder_path, month=None):
                     iller_dict[il_adi] = df
                     yillar.append(yil_res)
                     
-    _excel_cache[cache_key] = (iller_dict, yillar)
+    _excel_cache.set(cache_key, (iller_dict, yillar))
     return iller_dict, yillar
 
 def temizle_metin(text):

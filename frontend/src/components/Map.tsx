@@ -86,7 +86,7 @@ const interpolateColor = (color1: [number, number, number], color2: [number, num
 };
 
 export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; alignLeft: boolean } | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string; record: ProvinceData | undefined; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Automatically calculate projection center, scale and map height to fit selected region using d3-geo
@@ -219,8 +219,29 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
               top: tooltip.y - 15,
               transform: tooltip.alignLeft ? 'translateX(-100%)' : 'none'
             }}
-            dangerouslySetInnerHTML={{ __html: tooltip.content }}
-          />
+          >
+            <span className="font-bold text-sm text-slate-200 border-b border-slate-800 pb-1 mb-1 block">
+              {tooltip.name.toUpperCase()}
+            </span>
+            {tooltip.record ? (
+              <>
+                <div className="flex justify-between gap-4 mt-1">
+                  <span>Tahakkuk:</span>
+                  <span className="font-mono">{formatTooltipValue(tooltip.record.accrual)}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span>Tahsilat:</span>
+                  <span className="font-mono">{formatTooltipValue(tooltip.record.collection)}</span>
+                </div>
+                <div className="flex justify-between gap-4 text-purple-400 font-bold border-t border-slate-800/50 mt-1 pt-1">
+                  <span>Oran:</span>
+                  <span>%{tooltip.record.ratio?.toFixed(2) || '0.00'}</span>
+                </div>
+              </>
+            ) : (
+              <span className="text-slate-500">Veri bulunamadı</span>
+            )}
+          </div>
         )}
 
         {!geoJsonData ? (
@@ -257,18 +278,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
                           const containerWidth = bounds?.width || 0;
                           const alignLeft = x > containerWidth / 2;
 
-                          let content = `<span class="font-bold text-sm text-slate-200 border-b border-slate-800 pb-1 mb-1 block">${name.toUpperCase()}</span>`;
-                          if (record) {
-                            content += `
-                              <div class="flex justify-between gap-4 mt-1"><span>Tahakkuk:</span><span class="font-mono">${formatTooltipValue(record.accrual)}</span></div>
-                              <div class="flex justify-between gap-4"><span>Tahsilat:</span><span class="font-mono">${formatTooltipValue(record.collection)}</span></div>
-                              <div class="flex justify-between gap-4 text-purple-400 font-bold border-t border-slate-800/50 mt-1 pt-1"><span>Oran:</span><span>%${record.ratio?.toFixed(2) || '0.00'}</span></div>
-                            `;
-                          } else {
-                            content += `<span class="text-slate-500">Veri bulunamadı</span>`;
-                          }
-
-                          setTooltip({ x, y, content, alignLeft });
+                          setTooltip({ x, y, name, record, alignLeft });
                         }}
                         onMouseLeave={() => setTooltip(null)}
                         style={{
