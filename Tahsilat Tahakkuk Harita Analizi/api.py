@@ -88,17 +88,20 @@ def get_years():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Yıllar listelenirken hata oluştu: {str(e)}")
 
-@app.get("/api/config")
-def get_config(year: int):
+def _hesapla_config(year: int) -> dict:
     """
-    Seçilen yıla ait aylar ve kategorileri TEK bir istekle döner.
-    Frontend yıl değiştiğinde sadece bu endpoint'i çağırır.
+    Seçilen yıla ait aylar ve kategorileri diskten okuyarak hesaplar.
+    Yıl aynı kaldıkça tekrar disk okumamak için önbellekten desteklenir.
     """
+    if year in lib._config_cache:
+        print(f"💾 Config önbellekten getirildi: yıl {year}")
+        return lib._config_cache[year]
+
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
 
     if not os.path.exists(folder_path):
-        raise HTTPException(status_code=404, detail=f"{year} yılına ait veri klasörü bulunamadı.")
+        raise FileNotFoundError(f"{year} yılına ait veri klasörü bulunamadı.")
 
     # --- Ayları hesapla ---
     il_dirs = [
@@ -138,11 +141,27 @@ def get_config(year: int):
         except Exception:
             pass  # Kategoriler okunamazsa boş döner
 
-    return {
+    result = {
         "year": year,
         "months": mevcut_aylar,
         "categories": cleaned_categories
     }
+    lib._config_cache[year] = result
+    return result
+
+@app.get("/api/config")
+def get_config(year: int):
+    """
+    Seçilen yıla ait aylar ve kategorileri TEK bir istekle döner.
+    Frontend yıl değiştiğinde sadece bu endpoint'i çağırır.
+    Yıl aynı kaldıkça önbellekten anında döner.
+    """
+    try:
+        return _hesapla_config(year)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Config hesaplanırken hata oluştu: {str(e)}")
 
 @app.get("/api/months")
 def get_months(year: int):

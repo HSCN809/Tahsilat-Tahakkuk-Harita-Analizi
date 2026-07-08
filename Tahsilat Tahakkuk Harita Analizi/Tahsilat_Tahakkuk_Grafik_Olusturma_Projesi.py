@@ -155,11 +155,13 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
         return None
 
 _excel_cache = {}
+_config_cache = {}
 
 def clear_cache():
-    global _excel_cache
+    global _excel_cache, _config_cache
     _excel_cache.clear()
-    print("🧹 Excel veri önbelleği temizlendi.")
+    _config_cache.clear()
+    print("🧹 Excel veri ve config önbelleği temizlendi.")
 
 def excel_dosyalarini_oku(folder_path, month=None):
     """
