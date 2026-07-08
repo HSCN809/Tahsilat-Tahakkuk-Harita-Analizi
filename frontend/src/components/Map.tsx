@@ -114,7 +114,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
 
       {/* Harita Renk Lejantı */}
       {geoJsonData && records.length > 0 && (
-        <div className="absolute bottom-4 left-4 z-20 bg-slate-950/85 backdrop-blur-md border border-slate-800/80 rounded-xl p-3 shadow-xl flex flex-col gap-2 min-w-[200px]">
+        <div className="absolute bottom-4 right-4 z-20 bg-slate-950/85 backdrop-blur-md border border-slate-800/80 rounded-xl p-3 shadow-xl flex flex-col gap-2 min-w-[200px]">
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
             {mapType === 'ratio'
               ? 'Tahsilat Oranı'
