@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Calendar, MapPin, X, Search } from 'lucide-react';
+import { Layers, Calendar, MapPin, X, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
@@ -34,6 +34,24 @@ function App() {
 
   const [activeModalMetric, setActiveModalMetric] = useState<'accrual' | 'collection' | 'ratio' | null>(null);
   const [modalSearchQuery, setModalSearchQuery] = useState('');
+  const [modalSortColumn, setModalSortColumn] = useState<'province' | 'accrual' | 'collection' | 'ratio'>('accrual');
+  const [modalSortDirection, setModalSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (column: 'province' | 'accrual' | 'collection' | 'ratio') => {
+    if (modalSortColumn === column) {
+      setModalSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setModalSortColumn(column);
+      setModalSortDirection(column === 'province' ? 'asc' : 'desc');
+    }
+  };
+
+  const renderSortIcon = (column: 'province' | 'accrual' | 'collection' | 'ratio') => {
+    if (modalSortColumn !== column) return null;
+    return modalSortDirection === 'asc' 
+      ? <ChevronUp className="w-3.5 h-3.5 ml-1 inline-block" /> 
+      : <ChevronDown className="w-3.5 h-3.5 ml-1 inline-block" />;
+  };
 
   const [loadingYears, setLoadingYears] = useState(true);
   const [loadingMonths, setLoadingMonths] = useState(false);
@@ -191,7 +209,7 @@ function App() {
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
 
-  // Sort records for the modal dynamically based on selected metric and search query
+  // Sort records for the modal dynamically based on search query, active column, and sort direction
   const sortedModalRecords = useMemo(() => {
     if (!activeModalMetric) return [];
     
@@ -200,11 +218,19 @@ function App() {
     );
 
     return [...filtered].sort((a, b) => {
-      const valA = activeModalMetric === 'accrual' ? (a.accrual ?? 0) : activeModalMetric === 'collection' ? (a.collection ?? 0) : (a.ratio ?? 0);
-      const valB = activeModalMetric === 'accrual' ? (b.accrual ?? 0) : activeModalMetric === 'collection' ? (b.collection ?? 0) : (b.ratio ?? 0);
-      return valB - valA;
+      if (modalSortColumn === 'province') {
+        const valA = a.province.toLowerCase();
+        const valB = b.province.toLowerCase();
+        return modalSortDirection === 'asc' 
+          ? valA.localeCompare(valB, 'tr') 
+          : valB.localeCompare(valA, 'tr');
+      } else {
+        const valA = a[modalSortColumn] ?? 0;
+        const valB = b[modalSortColumn] ?? 0;
+        return modalSortDirection === 'desc' ? valB - valA : valA - valB;
+      }
     });
-  }, [records, activeModalMetric, modalSearchQuery]);
+  }, [records, activeModalMetric, modalSearchQuery, modalSortColumn, modalSortDirection]);
 
   // Veri gösterimi için gerekli seçimler hazır mı?
   const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
@@ -384,8 +410,11 @@ function App() {
           {/* Middle Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-6 flex flex-col gap-6">
 
-            {/* KPI Cards */}
-            <StatsCards stats={summary} loading={isDataLoading} onCardClick={setActiveModalMetric} />
+            <StatsCards stats={summary} loading={isDataLoading} onCardClick={(metric) => {
+              setActiveModalMetric(metric);
+              setModalSortColumn(metric === 'accrual' ? 'accrual' : metric === 'collection' ? 'collection' : 'ratio');
+              setModalSortDirection('desc');
+            }} />
 
             {/* Map Visualizer Container */}
             <div className="relative">
@@ -460,11 +489,31 @@ function App() {
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="sticky top-0 bg-slate-950 text-slate-400 z-10">
                   <tr className="border-b border-slate-850">
-                    <th className="py-3 px-4 font-semibold text-center w-16">Sıra</th>
-                    <th className="py-3 px-4 font-semibold">İl</th>
-                    <th className={`py-3 px-4 font-semibold text-right ${activeModalMetric === 'accrual' ? 'text-blue-400 bg-blue-500/5' : ''}`}>Tahakkuk</th>
-                    <th className={`py-3 px-4 font-semibold text-right ${activeModalMetric === 'collection' ? 'text-emerald-400 bg-emerald-500/5' : ''}`}>Tahsilat</th>
-                    <th className={`py-3 px-4 font-semibold text-right ${activeModalMetric === 'ratio' ? 'text-purple-400 bg-purple-500/5' : ''}`}>Oran</th>
+                    <th className="py-3 px-4 font-semibold text-center w-16 select-none">Sıra</th>
+                    <th 
+                      onClick={() => handleSort('province')}
+                      className="py-3 px-4 font-semibold cursor-pointer select-none hover:text-slate-200 transition-colors"
+                    >
+                      İl {renderSortIcon('province')}
+                    </th>
+                    <th 
+                      onClick={() => handleSort('accrual')}
+                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'accrual' ? 'text-blue-400 bg-blue-500/5' : ''}`}
+                    >
+                      Tahakkuk {renderSortIcon('accrual')}
+                    </th>
+                    <th 
+                      onClick={() => handleSort('collection')}
+                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'collection' ? 'text-emerald-400 bg-emerald-500/5' : ''}`}
+                    >
+                      Tahsilat {renderSortIcon('collection')}
+                    </th>
+                    <th 
+                      onClick={() => handleSort('ratio')}
+                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-purple-500/5' : ''}`}
+                    >
+                      Oran {renderSortIcon('ratio')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-850">
@@ -478,13 +527,13 @@ function App() {
                         <tr key={record.province} className="hover:bg-slate-800/20 transition-all">
                           <td className="py-2.5 px-4 text-center font-mono text-xs text-slate-500">{index + 1}</td>
                           <td className="py-2.5 px-4 font-semibold text-slate-200">{record.province.toUpperCase()}</td>
-                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${activeModalMetric === 'accrual' ? 'text-blue-400 font-bold bg-blue-500/5' : ''}`}>
+                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'accrual' ? 'text-blue-400 font-bold bg-blue-500/5' : ''}`}>
                             {formatCurrency(record.accrual)}
                           </td>
-                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${activeModalMetric === 'collection' ? 'text-emerald-400 font-bold bg-emerald-500/5' : ''}`}>
+                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'collection' ? 'text-emerald-400 font-bold bg-emerald-500/5' : ''}`}>
                             {formatCurrency(record.collection)}
                           </td>
-                          <td className={`py-2.5 px-4 text-right font-mono font-bold ${activeModalMetric === 'ratio' ? 'text-purple-400 bg-purple-500/5' : record.ratio >= 75 ? 'text-emerald-400' : record.ratio >= 50 ? 'text-yellow-400' : 'text-rose-400'}`}>
+                          <td className={`py-2.5 px-4 text-right font-mono font-bold ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-purple-500/5' : record.ratio >= 75 ? 'text-emerald-400' : record.ratio >= 50 ? 'text-yellow-400' : 'text-rose-400'}`}>
                             %{record.ratio?.toFixed(2)}
                           </td>
                         </tr>
