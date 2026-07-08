@@ -489,28 +489,28 @@ function App() {
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="sticky top-0 bg-slate-950 text-slate-400 z-10">
                   <tr className="border-b border-slate-850">
-                    <th className="py-3 px-4 font-semibold text-center w-16 select-none">Sıra</th>
+                    <th className="py-3 px-4 font-semibold text-center w-16 select-none bg-slate-950">Sıra</th>
                     <th 
                       onClick={() => handleSort('province')}
-                      className="py-3 px-4 font-semibold cursor-pointer select-none hover:text-slate-200 transition-colors"
+                      className="py-3 px-4 font-semibold cursor-pointer select-none hover:text-slate-200 transition-colors bg-slate-950"
                     >
                       İl {renderSortIcon('province')}
                     </th>
                     <th 
                       onClick={() => handleSort('accrual')}
-                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'accrual' ? 'text-blue-400 bg-blue-500/5' : ''}`}
+                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'accrual' ? 'text-blue-400 bg-[#0f1626]' : 'bg-slate-950'}`}
                     >
                       Tahakkuk {renderSortIcon('accrual')}
                     </th>
                     <th 
                       onClick={() => handleSort('collection')}
-                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'collection' ? 'text-emerald-400 bg-emerald-500/5' : ''}`}
+                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'collection' ? 'text-emerald-400 bg-[#0b1b15]' : 'bg-slate-950'}`}
                     >
                       Tahsilat {renderSortIcon('collection')}
                     </th>
                     <th 
                       onClick={() => handleSort('ratio')}
-                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-purple-500/5' : ''}`}
+                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-[#161224]' : 'bg-slate-950'}`}
                     >
                       Oran {renderSortIcon('ratio')}
                     </th>
@@ -525,15 +525,15 @@ function App() {
                     sortedModalRecords.map((record, index) => {
                       return (
                         <tr key={record.province} className="hover:bg-slate-800/20 transition-all">
-                          <td className="py-2.5 px-4 text-center font-mono text-xs text-slate-500">{index + 1}</td>
+                          <td className="py-2.5 px-4 text-center font-mono text-xs text-slate-500 bg-slate-900/10">{index + 1}</td>
                           <td className="py-2.5 px-4 font-semibold text-slate-200">{record.province.toUpperCase()}</td>
-                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'accrual' ? 'text-blue-400 font-bold bg-blue-500/5' : ''}`}>
+                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'accrual' ? 'text-blue-400 font-bold bg-[#0f1626]' : ''}`}>
                             {formatCurrency(record.accrual)}
                           </td>
-                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'collection' ? 'text-emerald-400 font-bold bg-emerald-500/5' : ''}`}>
+                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'collection' ? 'text-emerald-400 font-bold bg-[#0b1b15]' : ''}`}>
                             {formatCurrency(record.collection)}
                           </td>
-                          <td className={`py-2.5 px-4 text-right font-mono font-bold ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-purple-500/5' : record.ratio >= 75 ? 'text-emerald-400' : record.ratio >= 50 ? 'text-yellow-400' : 'text-rose-400'}`}>
+                          <td className={`py-2.5 px-4 text-right font-mono font-bold ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-[#161224]' : record.ratio >= 75 ? 'text-emerald-400' : record.ratio >= 50 ? 'text-yellow-400' : 'text-rose-400'}`}>
                             %{record.ratio?.toFixed(2)}
                           </td>
                         </tr>
