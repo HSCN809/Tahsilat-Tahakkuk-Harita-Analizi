@@ -19,11 +19,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
       {/* Card 1: Accrual */}
-      <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between group transition-all duration-300 hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+      <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 flex items-center justify-between group transition-all duration-300 hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]">
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all duration-500"></div>
         <div>
-          <p className="text-sm font-medium text-slate-400">Toplam Tahakkuk</p>
-          <h3 className="text-2xl font-bold mt-2 text-slate-100 tracking-tight">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahakkuk</p>
+          <h3 className="text-xl font-bold mt-1 text-slate-100 tracking-tight">
             {loading ? (
               <span className="inline-block w-24 h-7 bg-slate-850 rounded animate-pulse"></span>
             ) : (
@@ -37,11 +37,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading }) => {
       </div>
 
       {/* Card 2: Collection */}
-      <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between group transition-all duration-300 hover:border-emerald-500/50 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+      <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 flex items-center justify-between group transition-all duration-300 hover:border-emerald-500/50 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]">
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-500"></div>
         <div>
-          <p className="text-sm font-medium text-slate-400">Toplam Tahsilat</p>
-          <h3 className="text-2xl font-bold mt-2 text-slate-100 tracking-tight">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahsilat</p>
+          <h3 className="text-xl font-bold mt-1 text-slate-100 tracking-tight">
             {loading ? (
               <span className="inline-block w-24 h-7 bg-slate-850 rounded animate-pulse"></span>
             ) : (
@@ -55,11 +55,11 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading }) => {
       </div>
 
       {/* Card 3: Ratio */}
-      <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between group transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)]">
+      <div className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 flex items-center justify-between group transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)]">
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all duration-500"></div>
         <div>
-          <p className="text-sm font-medium text-slate-400">Genel Tahsilat Oranı</p>
-          <h3 className="text-2xl font-bold mt-2 text-purple-400 tracking-tight">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tahsilat Oranı</p>
+          <h3 className="text-xl font-bold mt-1 text-purple-400 tracking-tight">
             {loading ? (
               <span className="inline-block w-24 h-7 bg-slate-850 rounded animate-pulse"></span>
             ) : stats ? (
