@@ -101,10 +101,10 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     const filteredFeatures = selectedRegion === 'Tüm Ülke'
       ? features
       : features.filter((f: any) => {
-          const name = f.properties?.name;
-          const normalized = normalizeProvinceName(name);
-          return REGIONS[selectedRegion]?.includes(normalized);
-        });
+        const name = f.properties?.name;
+        const normalized = normalizeProvinceName(name);
+        return REGIONS[selectedRegion]?.includes(normalized);
+      });
 
     if (filteredFeatures.length === 0) return null;
 
@@ -122,6 +122,34 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
       [[padding, padding], [width - padding, height - padding]],
       featureCollection as any
     );
+
+    // Otomatik hesaplanan projeksiyon ölçeğini çarpan (multiplier) kullanarak doğrudan büyütüp küçültüyoruz
+    // 1.0'dan büyük değerler büyütür (zoom-in), küçük değerler küçültür (zoom-out)
+    const scaleMultipliers: { [key: string]: number } = {
+      "Tüm Ülke": 1.05,
+      "Marmara": 1.15,            // Marmara: %15 büyütüldü
+      "Ege": 1.2,                 // Ege: %20 büyütüldü
+      "Akdeniz": 1.0,             // Akdeniz: Dokunulmadı
+      "İç Anadolu": 1.15,         // İç Anadolu: %15 büyütüldü
+      "Karadeniz": 1.0,           // Karadeniz: Dokunulmadı
+      "Doğu Anadolu": 1.3,        // Doğu Anadolu: %30 büyütüldü
+      "Güneydoğu Anadolu": 0.90   // Güneydoğu Anadolu: %5 küçültüldü
+    };
+    const multiplier = scaleMultipliers[selectedRegion] ?? 1.0;
+
+    if (multiplier !== 1.0) {
+      const currentScale = proj.scale();
+      const [tx, ty] = proj.translate();
+      proj.scale(currentScale * multiplier);
+
+      // Haritanın merkez noktasını (400, 190) koruyarak kaymayı engellemek için koordinat farkını ölçekle çarpıyoruz
+      const cx = width / 2;
+      const cy = height / 2;
+      proj.translate([
+        cx + (tx - cx) * multiplier,
+        cy + (ty - cy) * multiplier
+      ]);
+    }
 
     return proj;
   }, [geoJsonData, selectedRegion]);
