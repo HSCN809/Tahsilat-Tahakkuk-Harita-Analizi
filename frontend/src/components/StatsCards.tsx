@@ -26,10 +26,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, onCardCl
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all duration-500"></div>
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahakkuk</p>
-          <h3 className="text-xl font-bold mt-1 text-slate-100 tracking-tight">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahakkuk</p>
+          <h3 className="text-[18px] font-bold mt-0.5 text-slate-100 tracking-tight">
             {loading ? (
-              <span className="inline-block w-24 h-7 bg-slate-850 rounded animate-pulse"></span>
+              <span className="inline-block w-24 h-6 bg-slate-850 rounded animate-pulse"></span>
             ) : (
               formatCurrency(stats?.total_accrual)
             )}
@@ -47,10 +47,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, onCardCl
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-500"></div>
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahsilat</p>
-          <h3 className="text-xl font-bold mt-1 text-slate-100 tracking-tight">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahsilat</p>
+          <h3 className="text-[18px] font-bold mt-0.5 text-slate-100 tracking-tight">
             {loading ? (
-              <span className="inline-block w-24 h-7 bg-slate-850 rounded animate-pulse"></span>
+              <span className="inline-block w-24 h-6 bg-slate-850 rounded animate-pulse"></span>
             ) : (
               formatCurrency(stats?.total_collection)
             )}
@@ -68,10 +68,10 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, onCardCl
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all duration-500"></div>
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tahsilat Oranı</p>
-          <h3 className="text-xl font-bold mt-1 text-purple-400 tracking-tight">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tahsilat Oranı</p>
+          <h3 className="text-[18px] font-bold mt-0.5 text-purple-400 tracking-tight">
             {loading ? (
-              <span className="inline-block w-24 h-7 bg-slate-850 rounded animate-pulse"></span>
+              <span className="inline-block w-24 h-6 bg-slate-850 rounded animate-pulse"></span>
             ) : stats ? (
               `%${stats.overall_ratio.toFixed(2)}`
             ) : (
