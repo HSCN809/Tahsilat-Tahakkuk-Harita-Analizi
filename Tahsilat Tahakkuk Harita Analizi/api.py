@@ -48,6 +48,8 @@ def run_scraper_bg(year_input: str):
         )
         stdout, stderr = process.communicate(input=year_input + "\n")
         print(f"✅ Arka plan veri çekici tamamlandı. Çıktı: {stdout[:200]}...")
+        # Önbelleği temizle ki yeni veriler yüklensin
+        lib.clear_cache()
         if stderr:
             print(f"⚠️ Hata Çıktısı: {stderr[:200]}...")
     except Exception as e:

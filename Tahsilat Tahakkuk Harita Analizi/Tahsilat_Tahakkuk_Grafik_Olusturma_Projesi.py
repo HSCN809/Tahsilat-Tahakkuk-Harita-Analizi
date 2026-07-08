@@ -154,11 +154,24 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
     except Exception:
         return None
 
+_excel_cache = {}
+
+def clear_cache():
+    global _excel_cache
+    _excel_cache.clear()
+    print("🧹 Excel veri önbelleği temizlendi.")
+
 def excel_dosyalarini_oku(folder_path, month=None):
     """
     Klasördeki tüm il Excel dosyalarını (yıllık veya belirli bir aya ait) paralel olarak okur.
+    Bellek içi önbellekleme kullanır.
     """
-    match_yil = re.search(r"(\d{4})", folder_path)
+    cache_key = (str(folder_path), month)
+    if cache_key in _excel_cache:
+        print(f"💾 Veriler önbellekten getirildi: {cache_key}")
+        return _excel_cache[cache_key]
+
+    match_yil = re.search(r"(\d{4})", str(folder_path))
     yil = int(match_yil.group(1)) if match_yil else 0
 
     iller_dict = {}
@@ -203,6 +216,7 @@ def excel_dosyalarini_oku(folder_path, month=None):
                     iller_dict[il_adi] = df
                     yillar.append(yil_res)
                     
+    _excel_cache[cache_key] = (iller_dict, yillar)
     return iller_dict, yillar
 
 def temizle_metin(text):

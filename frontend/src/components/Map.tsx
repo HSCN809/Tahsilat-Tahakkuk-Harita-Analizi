@@ -112,6 +112,36 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
         />
       )}
 
+      {/* Harita Renk Lejantı */}
+      {geoJsonData && records.length > 0 && (
+        <div className="absolute bottom-4 left-4 z-20 bg-slate-950/85 backdrop-blur-md border border-slate-800/80 rounded-xl p-3 shadow-xl flex flex-col gap-2 min-w-[200px]">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            {mapType === 'ratio'
+              ? 'Tahsilat Oranı'
+              : mapType === 'tahsilat'
+              ? 'Tahsilat Miktarı'
+              : 'Tahakkuk Miktarı'}
+          </span>
+          <div className="h-2.5 w-full rounded-full bg-gradient-to-r from-[#f43f5e] via-[#eab308] to-[#10b981]"></div>
+          <div className="flex justify-between items-center text-[10px] font-mono text-slate-300">
+            {mapType === 'ratio' ? (
+              <>
+                <span>%0</span>
+                <span>%50</span>
+                <span>%100</span>
+              </>
+            ) : (
+              <>
+                <span>Min (0 ₺)</span>
+                <span className="max-w-[120px] truncate" title={formatCurrency(maxVal)}>
+                  {formatCurrency(maxVal)}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {!geoJsonData ? (
         <div className="text-slate-500 text-sm font-medium">Harita verisi bekleniyor...</div>
       ) : (
