@@ -155,11 +155,11 @@ function App() {
     fetchGeoJson();
   }, []);
 
-  // Fetch months when year changes
+  // Yıl değiştiğinde aylar + kategorileri TEK istekle çek
   useEffect(() => {
     if (selectedYear === null) return;
 
-    // Yıl geçişinde bağımlı state'leri anında temizle ki eski yıl render edilmesin
+    // Yıl geçişinde bağımlı state'leri anında temizle
     setMonths([]);
     setSelectedMonth('');
     setCategories([]);
@@ -168,48 +168,23 @@ function App() {
     setSummary(null);
 
     const controller = new AbortController();
-    // cancelled flag: AbortController tamamlanmış fetch'leri durduramayabilir,
-    // bu yüzden await sonrası state güncellemelerini de guard'lamamız gerek.
     let cancelled = false;
 
-    const fetchMonths = async () => {
+    const fetchConfig = async () => {
       try {
         setLoadingMonths(true);
-        const response = await fetch(`/api/months?year=${selectedYear}`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Aylar yüklenemedi.');
+        setLoadingCategories(true);
+        const response = await fetch(`/api/config?year=${selectedYear}`, { signal: controller.signal });
+        if (!response.ok) throw new Error('Yıl yapılandırması yüklenemedi.');
         const data = await response.json();
         if (cancelled) return;
+
+        // Aylar
         setMonths(data.months);
-        // Yıl içindeki sonuncu ayı varsayılan olarak seç (Ocak→Aralık sıralı geldiği için)
         const mevcutAy = data.months && data.months.length > 0 ? data.months[data.months.length - 1] : '';
         setSelectedMonth(mevcutAy);
-      } catch (err: any) {
-        if (cancelled || err.name === 'AbortError') return;
-        setError(err.message || 'Aylar alınırken bir sorun oluştu.');
-      } finally {
-        if (!cancelled) setLoadingMonths(false);
-      }
-    };
 
-    fetchMonths();
-
-    return () => { cancelled = true; controller.abort(); };
-  }, [selectedYear]);
-
-  // Fetch categories when year changes
-  useEffect(() => {
-    if (selectedYear === null) return;
-
-    const controller = new AbortController();
-    let cancelled = false;
-
-    const fetchCategories = async () => {
-      try {
-        setLoadingCategories(true);
-        const response = await fetch(`/api/categories?year=${selectedYear}`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Kategoriler yüklenemedi.');
-        const data = await response.json();
-        if (cancelled) return;
+        // Kategoriler
         setCategories(data.categories);
         if (data.categories && data.categories.length > 0) {
           setSelectedCategory(data.categories[0].id);
@@ -218,13 +193,16 @@ function App() {
         }
       } catch (err: any) {
         if (cancelled || err.name === 'AbortError') return;
-        setError(err.message || 'Kategoriler alınırken bir sorun oluştu.');
+        setError(err.message || 'Yıl yapılandırması alınırken bir sorun oluştu.');
       } finally {
-        if (!cancelled) setLoadingCategories(false);
+        if (!cancelled) {
+          setLoadingMonths(false);
+          setLoadingCategories(false);
+        }
       }
     };
 
-    fetchCategories();
+    fetchConfig();
 
     return () => { cancelled = true; controller.abort(); };
   }, [selectedYear]);
@@ -379,7 +357,11 @@ function App() {
                 ) : (
                   <select
                     value={selectedYear || ''}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    onChange={(e) => {
+                      setSelectedMonth('');
+                      setSelectedCategory('');
+                      setSelectedYear(Number(e.target.value));
+                    }}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                   >
                     {years.map((y) => (

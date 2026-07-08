@@ -88,56 +88,61 @@ def get_years():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Yıllar listelenirken hata oluştu: {str(e)}")
 
-@app.get("/api/categories")
-def get_categories(year: int):
+@app.get("/api/config")
+def get_config(year: int):
     """
-    Seçilen yıla ait mevcut vergi gelir kalemlerini (kategorileri) listeler.
+    Seçilen yıla ait aylar ve kategorileri TEK bir istekle döner.
+    Frontend yıl değiştiğinde sadece bu endpoint'i çağırır.
     """
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
-    
+
     if not os.path.exists(folder_path):
         raise HTTPException(status_code=404, detail=f"{year} yılına ait veri klasörü bulunamadı.")
 
+    # --- Ayları hesapla ---
+    il_dirs = [
+        d for d in os.listdir(folder_path)
+        if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
+    ]
+    mevcut_aylar: list[str] = []
+    if il_dirs:
+        ilk_il_klasoru = os.path.join(folder_path, il_dirs[0])
+        aylik_dosyalar = [f for f in os.listdir(ilk_il_klasoru) if f.endswith('.xlsx')]
+        aylar = [os.path.splitext(f)[0] for f in aylik_dosyalar]
+        AY_SIRALAMASI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+        aylar_lower = [a.lower() for a in aylar]
+        mevcut_aylar = [ay for ay in AY_SIRALAMASI if ay.lower() in aylar_lower]
+
+    # --- Kategorileri hesapla ---
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
-    if not excel_files:
-        raise HTTPException(status_code=404, detail=f"{year} yılına ait veri dosyaları bulunamadı.")
+    cleaned_categories: list[dict] = []
+    if excel_files:
+        dosya_yolu = os.path.join(folder_path, excel_files[0])
+        try:
+            df_raw = pd.read_excel(dosya_yolu)
+            header_row_idx = None
+            for idx in range(len(df_raw)):
+                row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
+                if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
+                    header_row_idx = idx
+                    break
 
-    dosya_yolu = os.path.join(folder_path, excel_files[0])
-    try:
-        # 2005 öncesi ve sonrası Excel formatları farklı olduğundan,
-        # sabit skiprows yerine başlık satırını dinamik tespit et
-        # (Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi.oku_ve_temizle_tek_dosya ile aynı mantık).
-        df_raw = pd.read_excel(dosya_yolu)
-        header_row_idx = None
-        for idx in range(len(df_raw)):
-            row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
-            if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
-                header_row_idx = idx
-                break
+            if header_row_idx is not None:
+                df = lib.kolonlari_ayarla(df_raw, header_row_idx)
+                if df is not None:
+                    raw_categories = [i for i in df['index'] if isinstance(i, str)]
+                    for cat in raw_categories:
+                        clean_name = re.sub(r"^\d+\.\s*", "", cat.strip()).title()
+                        cleaned_categories.append({"id": cat, "name": clean_name})
+        except Exception:
+            pass  # Kategoriler okunamazsa boş döner
 
-        if header_row_idx is None:
-            raise HTTPException(status_code=500, detail=f"{year} yılına ait dosyada başlık satırı bulunamadı.")
-
-        df = lib.kolonlari_ayarla(df_raw, header_row_idx)
-        if df is None:
-            raise HTTPException(status_code=500, detail=f"{year} yılına ait dosyada kolonlar tespit edilemedi.")
-        # 2005 öncesi dosyalarda hiyerarşik kategoriler girintiyle ayrılır:
-        # "    Dahilde Alınan KDV" (üst) ve "      Dahilde Alınan KDV" (alt)
-        # aynı isme sahip olduğundan id'yi orijinal (girintili) string yap.
-        # Aksi halde duplicate React key'ler sıralama kaymasına yol açar.
-        # veri_hazirla zaten temizle_metin ile normalize edip eşleştirdiği için
-        # girintili id backend'de doğru satırla eşleşir.
-        raw_categories = [i for i in df['index'] if isinstance(i, str)]
-
-        cleaned_categories = []
-        for cat in raw_categories:
-            clean_name = re.sub(r"^\d+\.\s*", "", cat.strip()).title()
-            cleaned_categories.append({"id": cat, "name": clean_name})
-            
-        return {"year": year, "categories": cleaned_categories}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Kategoriler okunurken hata oluştu: {str(e)}")
+    return {
+        "year": year,
+        "months": mevcut_aylar,
+        "categories": cleaned_categories
+    }
 
 @app.get("/api/months")
 def get_months(year: int):
