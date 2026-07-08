@@ -345,6 +345,7 @@ function App() {
                         <button
                            key={cat.id}
                            onClick={() => setSelectedCategory(cat.id)}
+                           title={cat.name}
                            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
                              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
                              : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
