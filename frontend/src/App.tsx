@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Layers, Calendar, MapPin } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Layers, Calendar, MapPin, X, Search } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
+import { formatCurrency } from './utils/format';
 
 interface Category {
   id: string;
@@ -30,6 +31,9 @@ function App() {
   const [records, setRecords] = useState<any[]>([]);
   const [months, setMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+
+  const [activeModalMetric, setActiveModalMetric] = useState<'accrual' | 'collection' | 'ratio' | null>(null);
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
 
   const [loadingYears, setLoadingYears] = useState(true);
   const [loadingMonths, setLoadingMonths] = useState(false);
@@ -186,6 +190,21 @@ function App() {
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
+
+  // Sort records for the modal dynamically based on selected metric and search query
+  const sortedModalRecords = useMemo(() => {
+    if (!activeModalMetric) return [];
+    
+    const filtered = records.filter(r => 
+      r.province.toLowerCase().includes(modalSearchQuery.toLowerCase())
+    );
+
+    return [...filtered].sort((a, b) => {
+      const valA = activeModalMetric === 'accrual' ? (a.accrual ?? 0) : activeModalMetric === 'collection' ? (a.collection ?? 0) : (a.ratio ?? 0);
+      const valB = activeModalMetric === 'accrual' ? (b.accrual ?? 0) : activeModalMetric === 'collection' ? (b.collection ?? 0) : (b.ratio ?? 0);
+      return valB - valA;
+    });
+  }, [records, activeModalMetric, modalSearchQuery]);
 
   // Veri gösterimi için gerekli seçimler hazır mı?
   const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
@@ -366,7 +385,7 @@ function App() {
           <div className="lg:col-span-6 flex flex-col gap-6">
 
             {/* KPI Cards */}
-            <StatsCards stats={summary} loading={isDataLoading} />
+            <StatsCards stats={summary} loading={isDataLoading} onCardClick={setActiveModalMetric} />
 
             {/* Map Visualizer Container */}
             <div className="relative">
@@ -392,6 +411,99 @@ function App() {
       <footer className="border-t border-slate-900 bg-slate-950/40 py-6 text-center text-xs text-slate-500 font-mono mt-12">
         Tahsilat Tahakkuk Harita Analizi © 2026. Tüm hakları saklıdır.
       </footer>
+
+      {/* 81 İl Detay Modalı */}
+      {activeModalMetric && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+          {/* Modal Card */}
+          <div className="relative w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-100">
+                  {activeModalMetric === 'accrual'
+                    ? 'Tüm İller - Toplam Tahakkuk Detayları'
+                    : activeModalMetric === 'collection'
+                    ? 'Tüm İller - Toplam Tahsilat Detayları'
+                    : 'Tüm İller - Tahsilat Oranı Detayları'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {selectedYear} Yılı - {selectedMonth} Dönemi | Kategori: {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveModalMetric(null);
+                  setModalSearchQuery('');
+                }}
+                className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input inside Modal */}
+            <div className="relative w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="İl adına göre filtrele..."
+                value={modalSearchQuery}
+                onChange={(e) => setModalSearchQuery(e.target.value)}
+                className="w-full bg-slate-950/60 border border-slate-805 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-all"
+              />
+            </div>
+
+            {/* Table Container */}
+            <div className="overflow-auto border border-slate-850 rounded-2xl bg-slate-950/40 scrollbar-thin">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="sticky top-0 bg-slate-950 text-slate-400 z-10">
+                  <tr className="border-b border-slate-850">
+                    <th className="py-3 px-4 font-semibold text-center w-16">Sıra</th>
+                    <th className="py-3 px-4 font-semibold">İl</th>
+                    <th className={`py-3 px-4 font-semibold text-right ${activeModalMetric === 'accrual' ? 'text-blue-400 bg-blue-500/5' : ''}`}>Tahakkuk</th>
+                    <th className={`py-3 px-4 font-semibold text-right ${activeModalMetric === 'collection' ? 'text-emerald-400 bg-emerald-500/5' : ''}`}>Tahsilat</th>
+                    <th className={`py-3 px-4 font-semibold text-right ${activeModalMetric === 'ratio' ? 'text-purple-400 bg-purple-500/5' : ''}`}>Oran</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-850">
+                  {sortedModalRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500 text-xs">Aradığınız kriterde il bulunamadı.</td>
+                    </tr>
+                  ) : (
+                    sortedModalRecords.map((record, index) => {
+                      return (
+                        <tr key={record.province} className="hover:bg-slate-800/20 transition-all">
+                          <td className="py-2.5 px-4 text-center font-mono text-xs text-slate-500">{index + 1}</td>
+                          <td className="py-2.5 px-4 font-semibold text-slate-200">{record.province.toUpperCase()}</td>
+                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${activeModalMetric === 'accrual' ? 'text-blue-400 font-bold bg-blue-500/5' : ''}`}>
+                            {formatCurrency(record.accrual)}
+                          </td>
+                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${activeModalMetric === 'collection' ? 'text-emerald-400 font-bold bg-emerald-500/5' : ''}`}>
+                            {formatCurrency(record.collection)}
+                          </td>
+                          <td className={`py-2.5 px-4 text-right font-mono font-bold ${activeModalMetric === 'ratio' ? 'text-purple-400 bg-purple-500/5' : record.ratio >= 75 ? 'text-emerald-400' : record.ratio >= 50 ? 'text-yellow-400' : 'text-rose-400'}`}>
+                            %{record.ratio?.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer Summary / Info */}
+            <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-800 pt-3">
+              <span>Toplam: {sortedModalRecords.length} il gösteriliyor</span>
+              <span>Kapatmak için sağ üstteki butona tıklayabilirsiniz.</span>
+            </div>
+            
+          </div>
+        </div>
+      )}
     </div>
   );
 }
