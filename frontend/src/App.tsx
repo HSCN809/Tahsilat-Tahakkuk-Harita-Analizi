@@ -5,6 +5,63 @@ import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
 import { formatCurrency } from './utils/format';
 
+const REGIONS: { [key: string]: string[] } = {
+  "Marmara": [
+    "balikesir", "bilecik", "bursa", "canakkale", "edirne", "istanbul", 
+    "kirklareli", "kocaeli", "sakarya", "tekirdag", "yalova"
+  ],
+  "Ege": [
+    "afyonkarahisar", "aydin", "denizli", "izmir", "kutahya", "manisa", 
+    "mugla", "usak"
+  ],
+  "Akdeniz": [
+    "adana", "antalya", "burdur", "hatay", "isparta", "mersin", 
+    "kahramanmaras", "osmaniye"
+  ],
+  "İç Anadolu": [
+    "ankara", "cankiri", "eskisehir", "kayseri", "kirsehir", "konya", 
+    "nevsehir", "nigde", "sivas", "yozgat", "aksaray", "karaman", "kirikkale"
+  ],
+  "Karadeniz": [
+    "amasya", "artvin", "bolu", "corum", "giresun", "gumushane", "ordu", 
+    "rize", "samsun", "sinop", "tokat", "trabzon", "bayburt", "bartin", 
+    "karabuk", "zonguldak", "duzce", "kastamonu"
+  ],
+  "Doğu Anadolu": [
+    "agri", "bingol", "bitlis", "elazig", "erzincan", "erzurum", "hakkari", 
+    "kars", "malatya", "mus", "tunceli", "van", "ardahan", "igdir"
+  ],
+  "Güneydoğu Anadolu": [
+    "adiyaman", "diyarbakir", "gaziantep", "mardin", "siirt", "sanliurfa", 
+    "batman", "sirnak", "kilis"
+  ]
+};
+
+const normalizeProvinceName = (name: string): string => {
+  if (!name) return '';
+  const normalized = name
+    .toLowerCase()
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+
+  if (normalized === 'urfa' || normalized === 'urdfa') return 'sanliurfa';
+  if (normalized === 'kmaras' || normalized === 'maras') return 'kahramanmaras';
+  if (normalized === 'elazi') return 'elazig';
+  if (normalized === 'aksarat') return 'aksaray';
+  if (normalized === 'izmit') return 'izmir';
+  if (normalized === 'kirikkalae') return 'kirikkale';
+  if (normalized === 'mardin' || normalized === 'mardim') return 'mardin';
+  if (normalized === 'afyon') return 'afyonkarahisar';
+
+  return normalized;
+};
+
 interface Category {
   id: string;
   name: string;
@@ -31,6 +88,7 @@ function App() {
   const [records, setRecords] = useState<any[]>([]);
   const [months, setMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('Tüm Ülke');
 
   const [activeModalMetric, setActiveModalMetric] = useState<'accrual' | 'collection' | 'ratio' | null>(null);
   const [modalSearchQuery, setModalSearchQuery] = useState('');
@@ -209,11 +267,40 @@ function App() {
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
 
+  // Filter records based on selected coğrafi bölge
+  const filteredRecords = useMemo(() => {
+    if (selectedRegion === 'Tüm Ülke') return records;
+    const allowed = REGIONS[selectedRegion] || [];
+    return records.filter(r => allowed.includes(normalizeProvinceName(r.province)));
+  }, [records, selectedRegion]);
+
+  // Recalculate summary KPIs based on the filtered regional records
+  const calculatedSummary = useMemo(() => {
+    if (!summary) return null;
+    if (selectedRegion === 'Tüm Ülke') return summary;
+
+    let totalAccrual = 0;
+    let totalCollection = 0;
+
+    filteredRecords.forEach(r => {
+      totalAccrual += r.accrual ?? 0;
+      totalCollection += r.collection ?? 0;
+    });
+
+    const ratio = totalAccrual > 0 ? (totalCollection / totalAccrual) * 100 : 0;
+
+    return {
+      total_accrual: totalAccrual,
+      total_collection: totalCollection,
+      overall_ratio: ratio
+    };
+  }, [summary, selectedRegion, filteredRecords]);
+
   // Sort records for the modal dynamically based on search query, active column, and sort direction
   const sortedModalRecords = useMemo(() => {
     if (!activeModalMetric) return [];
     
-    const filtered = records.filter(r => 
+    const filtered = filteredRecords.filter(r => 
       r.province.toLowerCase().includes(modalSearchQuery.toLowerCase())
     );
 
@@ -230,7 +317,7 @@ function App() {
         return modalSortDirection === 'desc' ? valB - valA : valA - valB;
       }
     });
-  }, [records, activeModalMetric, modalSearchQuery, modalSortColumn, modalSortDirection]);
+  }, [filteredRecords, activeModalMetric, modalSearchQuery, modalSortColumn, modalSortDirection]);
 
   // Veri gösterimi için gerekli seçimler hazır mı?
   const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
@@ -324,6 +411,23 @@ function App() {
                 )}
               </div>
 
+              {/* Region Select */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Bölgesi</label>
+                <select
+                  value={selectedRegion}
+                  onChange={(e) => setSelectedRegion(e.target.value)}
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
+                >
+                  <option value="Tüm Ülke" className="bg-slate-950 text-slate-100">Tüm Ülke</option>
+                  {Object.keys(REGIONS).map((reg) => (
+                    <option key={reg} value={reg} className="bg-slate-950 text-slate-100">
+                      {reg} Bölgesi
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Map Type toggle */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Harita Gösterim Tipi</label>
@@ -410,7 +514,7 @@ function App() {
           {/* Middle Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-6 flex flex-col gap-6">
 
-            <StatsCards stats={summary} loading={isDataLoading} onCardClick={(metric) => {
+            <StatsCards stats={calculatedSummary} loading={isDataLoading} onCardClick={(metric) => {
               setActiveModalMetric(metric);
               setModalSortColumn(metric === 'accrual' ? 'accrual' : metric === 'collection' ? 'collection' : 'ratio');
               setModalSortDirection('desc');
@@ -425,13 +529,13 @@ function App() {
                 </div>
               )}
 
-              <TurkeyMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
+              <TurkeyMap geoJsonData={geoJsonData} records={filteredRecords} mapType={mapType} selectedRegion={selectedRegion} />
             </div>
           </div>
 
           {/* Right Panel: Leaderboards */}
           <div className="lg:col-span-3 flex flex-col gap-6">
-            <Leaderboard data={records} loading={isDataLoading} />
+            <Leaderboard data={filteredRecords} loading={isDataLoading} />
           </div>
 
         </div>

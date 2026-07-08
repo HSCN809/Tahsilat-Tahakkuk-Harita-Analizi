@@ -10,10 +10,54 @@ interface ProvinceData {
   ratio: number;
 }
 
+const REGIONS: { [key: string]: string[] } = {
+  "Marmara": [
+    "balikesir", "bilecik", "bursa", "canakkale", "edirne", "istanbul", 
+    "kirklareli", "kocaeli", "sakarya", "tekirdag", "yalova"
+  ],
+  "Ege": [
+    "afyonkarahisar", "aydin", "denizli", "izmir", "kutahya", "manisa", 
+    "mugla", "usak"
+  ],
+  "Akdeniz": [
+    "adana", "antalya", "burdur", "hatay", "isparta", "mersin", 
+    "kahramanmaras", "osmaniye"
+  ],
+  "İç Anadolu": [
+    "ankara", "cankiri", "eskisehir", "kayseri", "kirsehir", "konya", 
+    "nevsehir", "nigde", "sivas", "yozgat", "aksaray", "karaman", "kirikkale"
+  ],
+  "Karadeniz": [
+    "amasya", "artvin", "bolu", "corum", "giresun", "gumushane", "ordu", 
+    "rize", "samsun", "sinop", "tokat", "trabzon", "bayburt", "bartin", 
+    "karabuk", "zonguldak", "duzce", "kastamonu"
+  ],
+  "Doğu Anadolu": [
+    "agri", "bingol", "bitlis", "elazig", "erzincan", "erzurum", "hakkari", 
+    "kars", "malatya", "mus", "tunceli", "van", "ardahan", "igdir"
+  ],
+  "Güneydoğu Anadolu": [
+    "adiyaman", "diyarbakir", "gaziantep", "mardin", "siirt", "sanliurfa", 
+    "batman", "sirnak", "kilis"
+  ]
+};
+
+const REGION_VIEWPORTS: { [key: string]: { scale: number; center: [number, number] } } = {
+  "Tüm Ülke": { scale: 3000, center: [35.2433, 38.9637] },
+  "Marmara": { scale: 6500, center: [28.3, 40.8] },
+  "Ege": { scale: 6000, center: [28.2, 38.3] },
+  "Akdeniz": { scale: 5000, center: [33.5, 36.8] },
+  "İç Anadolu": { scale: 5500, center: [33.2, 39.0] },
+  "Karadeniz": { scale: 4500, center: [36.5, 41.1] },
+  "Doğu Anadolu": { scale: 5000, center: [41.8, 39.3] },
+  "Güneydoğu Anadolu": { scale: 6000, center: [40.0, 37.6] }
+};
+
 interface TurkeyMapProps {
   geoJsonData: any;
   records: ProvinceData[];
   mapType: 'tahsilat' | 'tahakkuk' | 'ratio';
+  selectedRegion: string;
 }
 
 const normalizeProvinceName = (name: string): string => {
@@ -50,7 +94,7 @@ const interpolateColor = (color1: [number, number, number], color2: [number, num
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType }) => {
+export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -149,14 +193,22 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{
-              scale: 3000,
-              center: [35.2433, 38.9637],
+              scale: REGION_VIEWPORTS[selectedRegion]?.scale || 3000,
+              center: REGION_VIEWPORTS[selectedRegion]?.center || [35.2433, 38.9637],
             }}
             style={{ width: '100%', height: '100%' }}
           >
             <Geographies geography={geoJsonData}>
-              {({ geographies }: { geographies: any[] }) =>
-                geographies.map((geo) => {
+              {({ geographies }: { geographies: any[] }) => {
+                const filteredGeos = selectedRegion === 'Tüm Ülke' 
+                  ? geographies 
+                  : geographies.filter(geo => {
+                      const name = geo.properties.name;
+                      const normalized = normalizeProvinceName(name);
+                      return REGIONS[selectedRegion]?.includes(normalized);
+                    });
+
+                return filteredGeos.map((geo) => {
                   const name = geo.properties.name;
                   const record = recordsMap.get(normalizeProvinceName(name));
                   return (
@@ -208,8 +260,8 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
                       }}
                     />
                   );
-                })
-              }
+                });
+              }}
             </Geographies>
           </ComposableMap>
         </div>
