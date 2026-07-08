@@ -284,15 +284,6 @@ function App() {
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Harita Gösterim Tipi</label>
                 <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-slate-800 rounded-xl">
                   <button
-                    onClick={() => setMapType('tahsilat')}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahsilat'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    Tahsilat
-                  </button>
-                  <button
                     onClick={() => setMapType('tahakkuk')}
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahakkuk'
                       ? 'bg-blue-600 text-white shadow-md'
@@ -300,6 +291,15 @@ function App() {
                       }`}
                   >
                     Tahakkuk
+                  </button>
+                  <button
+                    onClick={() => setMapType('tahsilat')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahsilat'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                  >
+                    Tahsilat
                   </button>
                   <button
                     onClick={() => setMapType('ratio')}
