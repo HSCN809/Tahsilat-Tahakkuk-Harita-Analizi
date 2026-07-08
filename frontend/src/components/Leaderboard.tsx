@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface ProvinceRecord {
@@ -16,19 +16,16 @@ interface LeaderboardProps {
 import { formatCurrency } from '../utils/format';
 
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ data, loading }) => {
-  // Filter records with valid ratios
-  const validData = data.filter((item) => item.ratio !== null && item.ratio !== undefined) as (ProvinceRecord & { ratio: number })[];
+const LeaderboardComponent: React.FC<LeaderboardProps> = ({ data, loading }) => {
+  // Filter ve sort işlemlerini sadece data değiştiğinde hesapla
+  const { topProvinces, bottomProvinces } = useMemo(() => {
+    const validData = data.filter((item) => item.ratio !== null && item.ratio !== undefined) as (ProvinceRecord & { ratio: number })[];
 
-  // Sort descending for Top 5
-  const topProvinces = [...validData]
-    .sort((a, b) => b.ratio - a.ratio)
-    .slice(0, 5);
-
-  // Sort ascending for Bottom 5
-  const bottomProvinces = [...validData]
-    .sort((a, b) => a.ratio - b.ratio)
-    .slice(0, 5);
+    return {
+      topProvinces: [...validData].sort((a, b) => b.ratio - a.ratio).slice(0, 5),
+      bottomProvinces: [...validData].sort((a, b) => a.ratio - b.ratio).slice(0, 5),
+    };
+  }, [data]);
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -122,3 +119,5 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data, loading }) => {
     </div>
   );
 };
+
+export const Leaderboard = React.memo(LeaderboardComponent);

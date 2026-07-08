@@ -16,7 +16,7 @@ interface StatsCardsProps {
 import { formatCurrency } from '../utils/format';
 
 
-export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, onCardClick }) => {
+const StatsCardsComponent: React.FC<StatsCardsProps> = ({ stats, loading, onCardClick }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
       {/* Card 1: Accrual */}
@@ -86,3 +86,5 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading, onCardCl
     </div>
   );
 };
+
+export const StatsCards = React.memo(StatsCardsComponent);

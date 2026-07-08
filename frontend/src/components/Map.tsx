@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 // @ts-ignore
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import { formatCurrency } from '../utils/format';
@@ -85,9 +85,32 @@ const interpolateColor = (color1: [number, number, number], color2: [number, num
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
+const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string; record: ProvinceData | undefined; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Bounds cache — getBoundingClientRect her fare hareketinde değil, sadece gerektiğinde çağrılır
+  const cachedBoundsRef = useRef<DOMRect | null>(null);
+
+  const getCachedBounds = useCallback((): DOMRect | null => {
+    if (!cachedBoundsRef.current) {
+      cachedBoundsRef.current = containerRef.current?.getBoundingClientRect() ?? null;
+    }
+    return cachedBoundsRef.current;
+  }, []);
+
+  const invalidateBounds = useCallback(() => {
+    cachedBoundsRef.current = null;
+  }, []);
+
+  // Pencere resize'ında bounds cache'i invalidate et
+  useEffect(() => {
+    window.addEventListener('resize', invalidateBounds);
+    window.addEventListener('scroll', invalidateBounds, true);
+    return () => {
+      window.removeEventListener('resize', invalidateBounds);
+      window.removeEventListener('scroll', invalidateBounds, true);
+    };
+  }, [invalidateBounds]);
 
   // Automatically calculate projection center, scale and map height to fit selected region using d3-geo
   const { projection, calculatedHeight } = useMemo(() => {
@@ -181,7 +204,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     return max || 1;
   }, [records, mapType]);
 
-  const getColor = (name: string) => {
+  const getColor = useCallback((name: string) => {
     const record = recordsMap.get(normalizeProvinceName(name));
     if (!record) return '#1e293b';
 
@@ -201,7 +224,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     } else {
       return interpolateColor([234, 179, 8], [16, 185, 129], (factor - 0.5) * 2);
     }
-  };
+  }, [recordsMap, mapType, maxVal]);
 
   const formatTooltipValue = (val: number | null | undefined) => {
     return formatCurrency(val);
@@ -210,7 +233,13 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
   return (
     <div className="w-full flex flex-col gap-4">
       {/* Harita Kartı */}
-      <div ref={containerRef} style={{ height: `${calculatedHeight}px` }} className="relative w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 overflow-hidden flex items-center justify-center transition-all duration-300">
+      <div
+        ref={containerRef}
+        style={{ height: `${calculatedHeight}px` }}
+        className="relative w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 overflow-hidden flex items-center justify-center transition-all duration-300"
+        onMouseEnter={invalidateBounds}
+        onScroll={invalidateBounds}
+      >
         {tooltip && (
           <div
             className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px] whitespace-nowrap"
@@ -272,7 +301,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
                         key={geo.rsmKey}
                         geography={geo}
                         onMouseMove={(e: React.MouseEvent) => {
-                          const bounds = containerRef.current?.getBoundingClientRect();
+                          const bounds = getCachedBounds();
                           const x = e.clientX - (bounds?.left || 0);
                           const y = e.clientY - (bounds?.top || 0);
                           const containerWidth = bounds?.width || 0;
@@ -280,7 +309,10 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
 
                           setTooltip({ x, y, name, record, alignLeft });
                         }}
-                        onMouseLeave={() => setTooltip(null)}
+                        onMouseLeave={() => {
+                          invalidateBounds();
+                          setTooltip(null);
+                        }}
                         style={{
                           default: {
                             fill: getColor(name),
@@ -347,3 +379,5 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     </div>
   );
 };
+
+export const TurkeyMap = React.memo(TurkeyMapComponent);

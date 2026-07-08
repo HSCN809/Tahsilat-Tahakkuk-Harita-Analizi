@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import logging
 import threading
 from collections import OrderedDict
 import pandas as pd
@@ -8,11 +9,26 @@ import numpy as np
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+logger = logging.getLogger(__name__)
+
 # xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için yamala (monkey patch)
 import xlrd
-xlrd.biffh.unicode = lambda b, enc: b.decode(enc, 'replace')
-xlrd.book.unicode = lambda b, enc: b.decode(enc, 'replace')
-xlrd.formatting.unicode = lambda b, enc: b.decode(enc, 'replace')
+
+
+def safe_decode(b, enc):
+    """Çok katmanlı güvenli byte decode: önce istenen encoding, sonra utf-8, en son latin1."""
+    try:
+        return b.decode(enc, 'replace')
+    except Exception:
+        try:
+            return b.decode('utf-8', 'replace')
+        except Exception:
+            return b.decode('latin1', 'replace')
+
+
+xlrd.biffh.unicode = safe_decode
+xlrd.book.unicode = safe_decode
+xlrd.formatting.unicode = safe_decode
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -118,6 +134,7 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
         
         return il_adi, int(yil), df
     except Exception:
+        logger.warning("Yıllık Excel dosyası okunamadı: %s", dosya_adi, exc_info=True)
         return None
 
 def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
@@ -154,6 +171,7 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
         df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
         return il_adi, int(yil), df
     except Exception:
+        logger.warning("Aylık Excel dosyası okunamadı: %s/%s", folder_name, month, exc_info=True)
         return None
 
 class LRUCache:
@@ -206,7 +224,7 @@ _config_cache = LRUCache(maxsize=32)
 def clear_cache():
     _excel_cache.clear()
     _config_cache.clear()
-    print("🧹 Excel veri ve config önbelleği temizlendi.")
+    logger.info("Excel veri ve config önbelleği temizlendi.")
 
 def excel_dosyalarini_oku(folder_path, month=None):
     """
@@ -216,7 +234,7 @@ def excel_dosyalarini_oku(folder_path, month=None):
     cache_key = (str(folder_path), month)
     cached = _excel_cache.get(cache_key)
     if cached is not None:
-        print(f"💾 Veriler önbellekten getirildi: {cache_key}")
+        logger.debug("Veriler önbellekten getirildi: %s", cache_key)
         return cached
 
     match_yil = re.search(r"(\d{4})", str(folder_path))
@@ -295,7 +313,8 @@ def veri_hazirla(iller_dict, secim):
                 "tahsilat": satir["tahsilat"],
                 "tahsilat/tahakkuk": satir["tahsilat/tahakkuk"]
             })
-        except:
+        except Exception:
+            logger.debug("İl verisi hazırlanırken hata atlandı: %s", il_adi, exc_info=True)
             continue
 
     gelir_df = pd.DataFrame(veri_listesi)

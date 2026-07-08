@@ -2,6 +2,7 @@ import os
 import re
 import json
 import sys
+import logging
 import subprocess
 import pandas as pd
 import numpy as np
@@ -16,6 +17,8 @@ sys.path.append(str(CURRENT_DIR))
 
 # Kütüphane modülünü import et
 import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Tahsilat Tahakkuk Veri API",
@@ -38,6 +41,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Input validation yardımcıları ---
+# Geçerli yıl aralığı (HMB verisi 2004+ başlıyor, geleceğe margin)
+_MIN_YEAR = 2000
+_MAX_YEAR = 2100
+
+# year_input formatı: "2024", "2024-2025", "2024-2025,2023", "hepsi"
+_YEAR_INPUT_RE = re.compile(r"^(hepsi|\d{4}(-\d{4})?(,\d{4}(-\d{4})?)*)$", re.IGNORECASE)
+
+
+def _validate_year(year: int) -> None:
+    """Year parametresini doğrular, geçersizse 400 fırlatır."""
+    if not (_MIN_YEAR <= year <= _MAX_YEAR):
+        raise HTTPException(status_code=400, detail=f"Geçersiz yıl: {year}. Yıl {_MIN_YEAR}-{_MAX_YEAR} aralığında olmalı.")
+
+
+def _validate_year_input(year_input: str) -> None:
+    """Scrape year_input parametresini regex ile doğrular, geçersizse 400 fırlatır."""
+    if not year_input or not _YEAR_INPUT_RE.match(year_input.strip()):
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz yıl formatı. Örnekler: 2024, 2024-2025, 2024-2025,2023, hepsi"
+        )
+
+
 async def run_scraper_bg(year_input: str):
     """
     Arka planda veri çekme scriptini çalıştırır.
@@ -45,7 +72,7 @@ async def run_scraper_bg(year_input: str):
     """
     script_path = CURRENT_DIR / "Hazine_Maliye_Bakanlığı_Sitesinden_Excel_Dosyalarını_Çekme.py"
     try:
-        print(f"🚀 Arka plan veri çekme işlemi başlatıldı: '{year_input}'")
+        logger.info("Arka plan veri çekme işlemi başlatıldı: %r", year_input)
         process = subprocess.Popen(
             [sys.executable, str(script_path)],
             stdin=subprocess.PIPE,
@@ -58,13 +85,13 @@ async def run_scraper_bg(year_input: str):
         stdout, stderr = await run_in_threadpool(
             process.communicate, input=year_input + "\n"
         )
-        print(f"✅ Arka plan veri çekici tamamlandı. Çıktı: {stdout[:200]}...")
+        logger.info("Arka plan veri çekici tamamlandı. Çıktı: %s...", stdout[:200])
         # Önbelleği temizle ki yeni veriler yüklensin
         lib.clear_cache()
         if stderr:
-            print(f"⚠️ Hata Çıktısı: {stderr[:200]}...")
-    except Exception as e:
-        print(f"❌ Arka plan veri çekici hatası: {e}")
+            logger.warning("Veri çekici hata çıktısı: %s...", stderr[:200])
+    except Exception:
+        logger.exception("Arka plan veri çekici hatası")
 
 @app.get("/")
 def read_root():
@@ -98,8 +125,9 @@ async def get_years():
             if match:
                 years.append(int(match.group(0)))
         return {"years": sorted(list(set(years)))}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Yıllar listelenirken hata oluştu: {str(e)}")
+    except Exception:
+        logger.exception("Yıllar listelenirken hata oluştu")
+        raise HTTPException(status_code=500, detail="Yıllar listelenirken hata oluştu.")
 
 def _hesapla_config(year: int) -> dict:
     """
@@ -108,7 +136,7 @@ def _hesapla_config(year: int) -> dict:
     """
     cached = lib._config_cache.get(year)
     if cached is not None:
-        print(f"💾 Config önbellekten getirildi: yıl {year}")
+        logger.debug("Config önbellekten getirildi: yıl %s", year)
         return cached
 
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
@@ -170,12 +198,14 @@ async def get_config(year: int):
     Frontend yıl değiştiğinde sadece bu endpoint'i çağırır.
     Yıl aynı kaldıkça önbellekten anında döner.
     """
+    _validate_year(year)
     try:
         return await run_in_threadpool(_hesapla_config, year)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Config hesaplanırken hata oluştu: {str(e)}")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"{year} yılına ait veri klasörü bulunamadı.")
+    except Exception:
+        logger.exception("Config hesaplanırken hata oluştu (year=%s)", year)
+        raise HTTPException(status_code=500, detail="Config hesaplanırken hata oluştu.")
 
 @app.get("/api/data")
 async def get_data(year: int, category: str, month: str = ""):
@@ -183,6 +213,7 @@ async def get_data(year: int, category: str, month: str = ""):
     Belirli bir yıl, vergi kalemi ve ay için 81 ilin tahakkuk, tahsilat ve oran verilerini döner.
     Ay belirtilmezse (boş) yıllık özet veri kullanılır.
     """
+    _validate_year(year)
     folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
     folder_path = os.path.join(lib.ana_klasor, folder_name)
 
@@ -246,8 +277,9 @@ async def get_data(year: int, category: str, month: str = ""):
             },
             "data": mapped_records
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Veriler işlenirken hata oluştu: {str(e)}")
+    except Exception:
+        logger.exception("Veriler işlenirken hata oluştu (year=%s, category=%r)", year, category)
+        raise HTTPException(status_code=500, detail="Veriler işlenirken hata oluştu.")
 
 @app.get("/api/geojson")
 async def get_geojson():
@@ -262,14 +294,16 @@ async def get_geojson():
             with open(geojson_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         return await run_in_threadpool(_read_geojson)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"GeoJSON okuma hatası: {str(e)}")
+    except Exception:
+        logger.exception("GeoJSON okuma hatası")
+        raise HTTPException(status_code=500, detail="GeoJSON okuma hatası.")
 
 @app.post("/api/scrape")
 async def trigger_scrape(year_input: str, background_tasks: BackgroundTasks):
     """
     Arka planda paralel veri çekme/güncelleme işlemini başlatır.
     """
+    _validate_year_input(year_input)
     background_tasks.add_task(run_scraper_bg, year_input)
     return {
         "status": "started",
