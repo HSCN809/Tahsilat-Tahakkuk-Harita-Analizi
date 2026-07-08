@@ -127,13 +127,13 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     // 1.0'dan büyük değerler büyütür (zoom-in), küçük değerler küçültür (zoom-out)
     const scaleMultipliers: { [key: string]: number } = {
       "Tüm Ülke": 1.05,
-      "Marmara": 1.15,            // Marmara: %15 büyütüldü
-      "Ege": 1.2,                 // Ege: %20 büyütüldü
-      "Akdeniz": 1.0,             // Akdeniz: Dokunulmadı
-      "İç Anadolu": 1.15,         // İç Anadolu: %15 büyütüldü
-      "Karadeniz": 1.0,           // Karadeniz: Dokunulmadı
-      "Doğu Anadolu": 1.3,        // Doğu Anadolu: %30 büyütüldü
-      "Güneydoğu Anadolu": 0.90   // Güneydoğu Anadolu: %10 küçültüldü
+      "Marmara": 1.2,
+      "Ege": 1.25,
+      "Akdeniz": 1.0,
+      "İç Anadolu": 1.3,
+      "Karadeniz": 1.25,
+      "Doğu Anadolu": 1.3,
+      "Güneydoğu Anadolu": 1.0
     };
     const multiplier = scaleMultipliers[selectedRegion] ?? 1.0;
 
@@ -154,7 +154,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     // Haritanın gerçek yüksekliğini sınır poligonlarına (bounding box) göre hesaplıyoruz
     const pathGenerator = geoPath().projection(proj);
     const [[, y0], [, y1]] = pathGenerator.bounds(featureCollection as any);
-    
+
     // Kenar boşlukları dahil dikey piksel yüksekliği
     const paddingTotal = padding * 2 + 40; // Ek padding ve kart iç boşluğu
     const rawHeight = (y1 - y0) + paddingTotal;
