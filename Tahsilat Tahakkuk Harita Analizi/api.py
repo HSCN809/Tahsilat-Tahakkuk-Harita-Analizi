@@ -62,7 +62,7 @@ def read_root():
         "message": "Tahsilat Tahakkuk Veri API aktif durumda.",
         "endpoints": {
             "GET /api/years": "Mevcut yılları listeler",
-            "GET /api/categories?year=2025": "Yıla ait gelir kalemlerini listeler",
+            "GET /api/config?year=2025": "Yıla ait ayları ve gelir kalemlerini tek istekte döner",
             "GET /api/data?year=2025&category=Özel Tüketim Vergisi": "Yıl ve kalem bazlı ham il verilerini listeler",
             "GET /api/geojson": "Türkiye sınırları GeoJSON dosyasını döner",
             "POST /api/scrape?year_input=2024-2025": "Arka planda veri indirmeyi başlatır"
@@ -162,42 +162,6 @@ def get_config(year: int):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Config hesaplanırken hata oluştu: {str(e)}")
-
-@app.get("/api/months")
-def get_months(year: int):
-    """
-    Belirli bir yıla ait veri klasöründeki mevcut ayları listeler.
-    """
-    folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
-    folder_path = os.path.join(lib.ana_klasor, folder_name)
-    
-    if not os.path.exists(folder_path):
-        return {"year": year, "months": []}
-
-    # İl klasörlerini tespit et (örn: 01_Adana)
-    il_dirs = [
-        d for d in os.listdir(folder_path)
-        if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
-    ]
-
-    if not il_dirs:
-        return {"year": year, "months": []}
-        
-    # İlk il klasörünün içindeki aylık Excel dosyalarını listele
-    ilk_il_klasoru = os.path.join(folder_path, il_dirs[0])
-    aylik_dosyalar = [f for f in os.listdir(ilk_il_klasoru) if f.endswith('.xlsx')]
-    
-    # Dosya adlarından ayları al (.xlsx kısmını at)
-    aylar = [os.path.splitext(f)[0] for f in aylik_dosyalar]
-    
-    # Türkçe ayların sıralaması
-    AY_SIRALAMASI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
-    
-    # Sadece klasörde mevcut olan ayları sıralı olarak filtrele
-    aylar_lower = [a.lower() for a in aylar]
-    mevcut_aylar = [ay for ay in AY_SIRALAMASI if ay.lower() in aylar_lower]
-
-    return {"year": year, "months": mevcut_aylar}
 
 @app.get("/api/data")
 def get_data(year: int, category: str, month: str = ""):
