@@ -42,7 +42,7 @@ const REGIONS: { [key: string]: string[] } = {
   ]
 };
 
-import { geoMercator } from 'd3-geo';
+import { geoMercator, geoPath } from 'd3-geo';
 
 interface TurkeyMapProps {
   geoJsonData: any;
@@ -89,9 +89,9 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Automatically calculate projection center and scale to fit selected region using d3-geo
-  const dynamicProjection = useMemo(() => {
-    if (!geoJsonData) return null;
+  // Automatically calculate projection center, scale and map height to fit selected region using d3-geo
+  const { projection, calculatedHeight } = useMemo(() => {
+    if (!geoJsonData) return { projection: null, calculatedHeight: 450 };
 
     let features: any[] = [];
     if (geoJsonData.type === 'FeatureCollection') {
@@ -106,7 +106,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
         return REGIONS[selectedRegion]?.includes(normalized);
       });
 
-    if (filteredFeatures.length === 0) return null;
+    if (filteredFeatures.length === 0) return { projection: null, calculatedHeight: 450 };
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -114,12 +114,12 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
     };
 
     const width = 800;
-    const height = 380;
+    const baseHeight = 380;
     const padding = 20;
 
     const proj = geoMercator();
     proj.fitExtent(
-      [[padding, padding], [width - padding, height - padding]],
+      [[padding, padding], [width - padding, baseHeight - padding]],
       featureCollection as any
     );
 
@@ -133,7 +133,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
       "İç Anadolu": 1.15,         // İç Anadolu: %15 büyütüldü
       "Karadeniz": 1.0,           // Karadeniz: Dokunulmadı
       "Doğu Anadolu": 1.3,        // Doğu Anadolu: %30 büyütüldü
-      "Güneydoğu Anadolu": 0.90   // Güneydoğu Anadolu: %5 küçültüldü
+      "Güneydoğu Anadolu": 0.90   // Güneydoğu Anadolu: %10 küçültüldü
     };
     const multiplier = scaleMultipliers[selectedRegion] ?? 1.0;
 
@@ -144,14 +144,23 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
 
       // Haritanın merkez noktasını (400, 190) koruyarak kaymayı engellemek için koordinat farkını ölçekle çarpıyoruz
       const cx = width / 2;
-      const cy = height / 2;
+      const cy = baseHeight / 2;
       proj.translate([
         cx + (tx - cx) * multiplier,
         cy + (ty - cy) * multiplier
       ]);
     }
 
-    return proj;
+    // Haritanın gerçek yüksekliğini sınır poligonlarına (bounding box) göre hesaplıyoruz
+    const pathGenerator = geoPath().projection(proj);
+    const [[, y0], [, y1]] = pathGenerator.bounds(featureCollection as any);
+    
+    // Kenar boşlukları dahil dikey piksel yüksekliği
+    const paddingTotal = padding * 2 + 40; // Ek padding ve kart iç boşluğu
+    const rawHeight = (y1 - y0) + paddingTotal;
+    const calculatedHeight = Math.max(280, Math.min(450, Math.round(rawHeight)));
+
+    return { projection: proj, calculatedHeight };
   }, [geoJsonData, selectedRegion]);
 
   const recordsMap = useMemo(() => {
@@ -201,7 +210,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
   return (
     <div className="w-full flex flex-col gap-4">
       {/* Harita Kartı */}
-      <div ref={containerRef} className="relative w-full h-[450px] bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 overflow-hidden flex items-center justify-center">
+      <div ref={containerRef} style={{ height: `${calculatedHeight}px` }} className="relative w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 overflow-hidden flex items-center justify-center transition-all duration-300">
         {tooltip && (
           <div
             className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px] whitespace-nowrap"
@@ -221,7 +230,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
             <ComposableMap
               width={800}
               height={380}
-              projection={dynamicProjection || "geoMercator"}
+              projection={projection || "geoMercator"}
               style={{ width: '100%', height: '100%' }}
             >
               <Geographies geography={geoJsonData}>
