@@ -218,7 +218,7 @@ function App() {
       </header>
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col gap-6">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-6 flex flex-col gap-6">
         {error && (
           <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-between text-sm">
             <span>⚠️ {error}</span>
@@ -230,7 +230,7 @@ function App() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
           {/* Left Panel: Sidebar (Filters) */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="lg:col-span-3 flex flex-col gap-6">
 
             {/* Filter Section */}
             <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex flex-col gap-5">
@@ -343,12 +343,12 @@ function App() {
                     ) : (
                       filteredCategories.map((cat) => (
                         <button
-                          key={cat.id}
-                          onClick={() => setSelectedCategory(cat.id)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
-                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-                            : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
-                            }`}
+                           key={cat.id}
+                           onClick={() => setSelectedCategory(cat.id)}
+                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
+                             ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
+                             : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
+                             }`}
                         >
                           <span className="truncate pr-2">{cat.name}</span>
                           <MapPin className={`w-3.5 h-3.5 flex-shrink-0 opacity-50 ${selectedCategory === cat.id ? 'opacity-100' : ''}`} />
@@ -361,8 +361,8 @@ function App() {
             </div>
           </div>
 
-          {/* Right Panel: Map & Stats Dashboard */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* Middle Panel: Map & Stats Dashboard */}
+          <div className="lg:col-span-6 flex flex-col gap-6">
 
             {/* KPI Cards */}
             <StatsCards stats={summary} loading={isDataLoading} />
@@ -378,11 +378,13 @@ function App() {
 
               <TurkeyMap geoJsonData={geoJsonData} records={records} mapType={mapType} />
             </div>
-
-            {/* Leaderboards */}
-            <Leaderboard data={records} loading={isDataLoading} />
-
           </div>
+
+          {/* Right Panel: Leaderboards */}
+          <div className="lg:col-span-3 flex flex-col gap-6">
+            <Leaderboard data={records} loading={isDataLoading} />
+          </div>
+
         </div>
       </main>
 

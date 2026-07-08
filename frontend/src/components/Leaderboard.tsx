@@ -31,7 +31,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ data, loading }) => {
     .slice(0, 5);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full mt-6">
+    <div className="flex flex-col gap-6 w-full">
       {/* Top 5 */}
       <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6">
         <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2 mb-4">

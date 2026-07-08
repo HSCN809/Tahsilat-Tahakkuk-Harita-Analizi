@@ -119,8 +119,8 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
             {mapType === 'ratio'
               ? 'Tahsilat Oranı'
               : mapType === 'tahsilat'
-              ? 'Tahsilat Miktarı'
-              : 'Tahakkuk Miktarı'}
+                ? 'Tahsilat Miktarı'
+                : 'Tahakkuk Miktarı'}
           </span>
           <div className="h-2.5 w-full rounded-full bg-gradient-to-r from-[#f43f5e] via-[#eab308] to-[#10b981]"></div>
           <div className="flex justify-between items-center text-[10px] font-mono text-slate-300">
@@ -149,7 +149,7 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{
-              scale: 3400,
+              scale: 3000,
               center: [35.2433, 38.9637],
             }}
             style={{ width: '100%', height: '100%' }}
