@@ -12,46 +12,37 @@ interface ProvinceData {
 
 const REGIONS: { [key: string]: string[] } = {
   "Marmara": [
-    "balikesir", "bilecik", "bursa", "canakkale", "edirne", "istanbul", 
+    "balikesir", "bilecik", "bursa", "canakkale", "edirne", "istanbul",
     "kirklareli", "kocaeli", "sakarya", "tekirdag", "yalova"
   ],
   "Ege": [
-    "afyonkarahisar", "aydin", "denizli", "izmir", "kutahya", "manisa", 
+    "afyonkarahisar", "aydin", "denizli", "izmir", "kutahya", "manisa",
     "mugla", "usak"
   ],
   "Akdeniz": [
-    "adana", "antalya", "burdur", "hatay", "isparta", "mersin", 
+    "adana", "antalya", "burdur", "hatay", "isparta", "mersin",
     "kahramanmaras", "osmaniye"
   ],
   "İç Anadolu": [
-    "ankara", "cankiri", "eskisehir", "kayseri", "kirsehir", "konya", 
+    "ankara", "cankiri", "eskisehir", "kayseri", "kirsehir", "konya",
     "nevsehir", "nigde", "sivas", "yozgat", "aksaray", "karaman", "kirikkale"
   ],
   "Karadeniz": [
-    "amasya", "artvin", "bolu", "corum", "giresun", "gumushane", "ordu", 
-    "rize", "samsun", "sinop", "tokat", "trabzon", "bayburt", "bartin", 
+    "amasya", "artvin", "bolu", "corum", "giresun", "gumushane", "ordu",
+    "rize", "samsun", "sinop", "tokat", "trabzon", "bayburt", "bartin",
     "karabuk", "zonguldak", "duzce", "kastamonu"
   ],
   "Doğu Anadolu": [
-    "agri", "bingol", "bitlis", "elazig", "erzincan", "erzurum", "hakkari", 
+    "agri", "bingol", "bitlis", "elazig", "erzincan", "erzurum", "hakkari",
     "kars", "malatya", "mus", "tunceli", "van", "ardahan", "igdir"
   ],
   "Güneydoğu Anadolu": [
-    "adiyaman", "diyarbakir", "gaziantep", "mardin", "siirt", "sanliurfa", 
+    "adiyaman", "diyarbakir", "gaziantep", "mardin", "siirt", "sanliurfa",
     "batman", "sirnak", "kilis"
   ]
 };
 
-const REGION_VIEWPORTS: { [key: string]: { scale: number; center: [number, number] } } = {
-  "Tüm Ülke": { scale: 3300, center: [35.2433, 38.9637] },
-  "Marmara": { scale: 8000, center: [28.2, 40.9] },
-  "Ege": { scale: 7500, center: [28.0, 38.5] },
-  "Akdeniz": { scale: 6200, center: [33.2, 37.2] },
-  "İç Anadolu": { scale: 7000, center: [33.0, 39.0] },
-  "Karadeniz": { scale: 5500, center: [36.5, 41.2] },
-  "Doğu Anadolu": { scale: 6500, center: [41.8, 39.5] },
-  "Güneydoğu Anadolu": { scale: 8000, center: [40.0, 37.6] }
-};
+import { geoMercator } from 'd3-geo';
 
 interface TurkeyMapProps {
   geoJsonData: any;
@@ -97,6 +88,43 @@ const interpolateColor = (color1: [number, number, number], color2: [number, num
 export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Automatically calculate projection center and scale to fit selected region using d3-geo
+  const dynamicProjection = useMemo(() => {
+    if (!geoJsonData) return null;
+
+    let features: any[] = [];
+    if (geoJsonData.type === 'FeatureCollection') {
+      features = geoJsonData.features || [];
+    }
+
+    const filteredFeatures = selectedRegion === 'Tüm Ülke'
+      ? features
+      : features.filter((f: any) => {
+          const name = f.properties?.name;
+          const normalized = normalizeProvinceName(name);
+          return REGIONS[selectedRegion]?.includes(normalized);
+        });
+
+    if (filteredFeatures.length === 0) return null;
+
+    const featureCollection = {
+      type: 'FeatureCollection',
+      features: filteredFeatures
+    };
+
+    const width = 800;
+    const height = 380;
+    const padding = 20;
+
+    const proj = geoMercator();
+    proj.fitExtent(
+      [[padding, padding], [width - padding, height - padding]],
+      featureCollection as any
+    );
+
+    return proj;
+  }, [geoJsonData, selectedRegion]);
 
   const recordsMap = useMemo(() => {
     const map = new Map<string, ProvinceData>();
@@ -163,22 +191,20 @@ export const TurkeyMap: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapT
         ) : (
           <div className="w-full h-full flex items-center justify-center overflow-hidden">
             <ComposableMap
-              projection="geoMercator"
-              projectionConfig={{
-                scale: REGION_VIEWPORTS[selectedRegion]?.scale || 3000,
-                center: REGION_VIEWPORTS[selectedRegion]?.center || [35.2433, 38.9637],
-              }}
+              width={800}
+              height={380}
+              projection={dynamicProjection || "geoMercator"}
               style={{ width: '100%', height: '100%' }}
             >
               <Geographies geography={geoJsonData}>
                 {({ geographies }: { geographies: any[] }) => {
-                  const filteredGeos = selectedRegion === 'Tüm Ülke' 
-                    ? geographies 
+                  const filteredGeos = selectedRegion === 'Tüm Ülke'
+                    ? geographies
                     : geographies.filter(geo => {
-                        const name = geo.properties.name;
-                        const normalized = normalizeProvinceName(name);
-                        return REGIONS[selectedRegion]?.includes(normalized);
-                      });
+                      const name = geo.properties.name;
+                      const normalized = normalizeProvinceName(name);
+                      return REGIONS[selectedRegion]?.includes(normalized);
+                    });
 
                   return filteredGeos.map((geo) => {
                     const name = geo.properties.name;
