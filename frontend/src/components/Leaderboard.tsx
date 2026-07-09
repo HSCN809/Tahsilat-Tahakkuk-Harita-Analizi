@@ -1,19 +1,12 @@
 import React, { useMemo } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
-
-interface ProvinceRecord {
-  province: string;
-  accrual: number | null;
-  collection: number | null;
-  ratio: number | null;
-}
+import { formatCurrency } from '../utils/format';
+import type { ProvinceRecord } from '../types';
 
 interface LeaderboardProps {
   data: ProvinceRecord[];
   loading: boolean;
 }
-
-import { formatCurrency } from '../utils/format';
 
 
 const LeaderboardComponent: React.FC<LeaderboardProps> = ({ data, loading }) => {

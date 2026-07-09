@@ -1,77 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Calendar, MapPin, X, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import { Layers, Calendar, MapPin } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
-import { formatCurrency } from './utils/format';
-
-const REGIONS: { [key: string]: string[] } = {
-  "Marmara": [
-    "balikesir", "bilecik", "bursa", "canakkale", "edirne", "istanbul", 
-    "kirklareli", "kocaeli", "sakarya", "tekirdag", "yalova"
-  ],
-  "Ege": [
-    "afyonkarahisar", "aydin", "denizli", "izmir", "kutahya", "manisa", 
-    "mugla", "usak"
-  ],
-  "Akdeniz": [
-    "adana", "antalya", "burdur", "hatay", "isparta", "mersin", 
-    "kahramanmaras", "osmaniye"
-  ],
-  "İç Anadolu": [
-    "ankara", "cankiri", "eskisehir", "kayseri", "kirsehir", "konya", 
-    "nevsehir", "nigde", "sivas", "yozgat", "aksaray", "karaman", "kirikkale"
-  ],
-  "Karadeniz": [
-    "amasya", "artvin", "bolu", "corum", "giresun", "gumushane", "ordu", 
-    "rize", "samsun", "sinop", "tokat", "trabzon", "bayburt", "bartin", 
-    "karabuk", "zonguldak", "duzce", "kastamonu"
-  ],
-  "Doğu Anadolu": [
-    "agri", "bingol", "bitlis", "elazig", "erzincan", "erzurum", "hakkari", 
-    "kars", "malatya", "mus", "tunceli", "van", "ardahan", "igdir"
-  ],
-  "Güneydoğu Anadolu": [
-    "adiyaman", "diyarbakir", "gaziantep", "mardin", "siirt", "sanliurfa", 
-    "batman", "sirnak", "kilis"
-  ]
-};
-
-const normalizeProvinceName = (name: string): string => {
-  if (!name) return '';
-  const normalized = name
-    .toLowerCase()
-    .replace(/ı/g, 'i')
-    .replace(/ğ/g, 'g')
-    .replace(/ü/g, 'u')
-    .replace(/ş/g, 's')
-    .replace(/ö/g, 'o')
-    .replace(/ç/g, 'c')
-    .replace(/[^a-z0-9]/g, '')
-    .trim();
-
-  if (normalized === 'urfa' || normalized === 'urdfa') return 'sanliurfa';
-  if (normalized === 'kmaras' || normalized === 'maras') return 'kahramanmaras';
-  if (normalized === 'elazi') return 'elazig';
-  if (normalized === 'aksarat') return 'aksaray';
-  if (normalized === 'izmit') return 'izmir';
-  if (normalized === 'kirikkalae') return 'kirikkale';
-  if (normalized === 'mardin' || normalized === 'mardim') return 'mardin';
-  if (normalized === 'afyon') return 'afyonkarahisar';
-
-  return normalized;
-};
-
-interface Category {
-  id: string;
-  name: string;
-}
-
-interface Summary {
-  total_accrual: number;
-  total_collection: number;
-  overall_ratio: number;
-}
+import { ProvinceModal } from './components/ProvinceModal';
+import { fetchYears, fetchConfig, fetchData, fetchGeoJson } from './services/api';
+import { REGIONS, normalizeProvinceName } from './utils/provinces';
+import type { Category, Summary, ProvinceRecord, TurkeyGeoJSON, MapType, ModalMetric } from './types';
 
 function App() {
   const [years, setYears] = useState<number[]>([]);
@@ -81,35 +16,16 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [searchCategory, setSearchCategory] = useState<string>('');
 
-  const [mapType, setMapType] = useState<'tahsilat' | 'tahakkuk' | 'ratio'>('ratio');
+  const [mapType, setMapType] = useState<MapType>('ratio');
 
-  const [geoJsonData, setGeoJsonData] = useState<any>(null);
+  const [geoJsonData, setGeoJsonData] = useState<TurkeyGeoJSON | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<ProvinceRecord[]>([]);
   const [months, setMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [selectedRegion, setSelectedRegion] = useState<string>('Tüm Ülke');
 
-  const [activeModalMetric, setActiveModalMetric] = useState<'accrual' | 'collection' | 'ratio' | null>(null);
-  const [modalSearchQuery, setModalSearchQuery] = useState('');
-  const [modalSortColumn, setModalSortColumn] = useState<'province' | 'accrual' | 'collection' | 'ratio'>('accrual');
-  const [modalSortDirection, setModalSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  const handleSort = (column: 'province' | 'accrual' | 'collection' | 'ratio') => {
-    if (modalSortColumn === column) {
-      setModalSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setModalSortColumn(column);
-      setModalSortDirection(column === 'province' ? 'asc' : 'desc');
-    }
-  };
-
-  const renderSortIcon = (column: 'province' | 'accrual' | 'collection' | 'ratio') => {
-    if (modalSortColumn !== column) return null;
-    return modalSortDirection === 'asc' 
-      ? <ChevronUp className="w-3.5 h-3.5 ml-1 inline-block" /> 
-      : <ChevronDown className="w-3.5 h-3.5 ml-1 inline-block" />;
-  };
+  const [activeModalMetric, setActiveModalMetric] = useState<ModalMetric | null>(null);
 
   const [loadingYears, setLoadingYears] = useState(true);
   const [loadingMonths, setLoadingMonths] = useState(false);
@@ -120,46 +36,41 @@ function App() {
 
   // Fetch years and GeoJSON on mount
   useEffect(() => {
-    const fetchYears = async () => {
+    const fetchYearsData = async () => {
       try {
         setLoadingYears(true);
-        const response = await fetch('/api/years');
-        if (!response.ok) throw new Error('Yıllar yüklenemedi.');
-        const data = await response.json();
+        const data = await fetchYears();
         setYears(data.years);
         if (data.years && data.years.length > 0) {
           setSelectedYear(data.years[data.years.length - 1]);
         }
-      } catch (err: any) {
-        setError(err.message || 'Yıllar alınırken bir sorun oluştu.');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Yıllar alınırken bir sorun oluştu.');
       } finally {
         setLoadingYears(false);
       }
     };
 
-    const fetchGeoJson = async () => {
+    const fetchGeoJsonData = async () => {
       try {
         setLoadingGeoJson(true);
-        const response = await fetch('/api/geojson');
-        if (!response.ok) throw new Error('Harita sınır verisi yüklenemedi.');
-        const data = await response.json();
+        const data = await fetchGeoJson();
         setGeoJsonData(data);
-      } catch (err: any) {
-        setError(err.message || 'Harita verisi alınırken bir sorun oluştu.');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Harita verisi alınırken bir sorun oluştu.');
       } finally {
         setLoadingGeoJson(false);
       }
     };
 
-    fetchYears();
-    fetchGeoJson();
+    fetchYearsData();
+    fetchGeoJsonData();
   }, []);
 
   // Yıl değiştiğinde aylar + kategorileri TEK istekle çek
   useEffect(() => {
     if (selectedYear === null) return;
 
-    // Yıl geçişinde bağımlı state'leri anında temizle
     setMonths([]);
     setSelectedMonth('');
     setCategories([]);
@@ -170,30 +81,26 @@ function App() {
     const controller = new AbortController();
     let cancelled = false;
 
-    const fetchConfig = async () => {
+    const fetchConfigData = async () => {
       try {
         setLoadingMonths(true);
         setLoadingCategories(true);
-        const response = await fetch(`/api/config?year=${selectedYear}`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Yıl yapılandırması yüklenemedi.');
-        const data = await response.json();
+        const data = await fetchConfig(selectedYear, controller.signal);
         if (cancelled) return;
 
-        // Aylar
         setMonths(data.months);
         const mevcutAy = data.months && data.months.length > 0 ? data.months[data.months.length - 1] : '';
         setSelectedMonth(mevcutAy);
 
-        // Kategoriler
         setCategories(data.categories);
         if (data.categories && data.categories.length > 0) {
           setSelectedCategory(data.categories[0].id);
         } else {
           setSelectedCategory('');
         }
-      } catch (err: any) {
-        if (cancelled || err.name === 'AbortError') return;
-        setError(err.message || 'Yıl yapılandırması alınırken bir sorun oluştu.');
+      } catch (err) {
+        if (cancelled || err instanceof DOMException) return;
+        setError(err instanceof Error ? err.message : 'Yıl yapılandırması alınırken bir sorun oluştu.');
       } finally {
         if (!cancelled) {
           setLoadingMonths(false);
@@ -202,14 +109,13 @@ function App() {
       }
     };
 
-    fetchConfig();
+    fetchConfigData();
 
     return () => { cancelled = true; controller.abort(); };
   }, [selectedYear]);
 
   // Fetch summary and records when year/category/month changes
   useEffect(() => {
-    // Bağımlı seçimler hazır değilse fetch başlatma; takılı kalan loading'i de temizle
     if (selectedYear === null || !selectedCategory || !selectedMonth) {
       setLoadingData(false);
       return;
@@ -222,15 +128,13 @@ function App() {
       try {
         setLoadingData(true);
         setError(null);
-        const response = await fetch(`/api/data?year=${selectedYear}&category=${encodeURIComponent(selectedCategory)}&month=${encodeURIComponent(selectedMonth)}`, { signal: controller.signal });
-        if (!response.ok) throw new Error('İl verileri yüklenemedi.');
-        const data = await response.json();
+        const data = await fetchData(selectedYear, selectedCategory, selectedMonth, controller.signal);
         if (cancelled) return;
         setSummary(data.summary);
         setRecords(data.data);
-      } catch (err: any) {
-        if (cancelled || err.name === 'AbortError') return;
-        setError(err.message || 'Veriler alınırken bir sorun oluştu.');
+      } catch (err) {
+        if (cancelled || err instanceof DOMException) return;
+        setError(err instanceof Error ? err.message : 'Veriler alınırken bir sorun oluştu.');
       } finally {
         if (!cancelled) setLoadingData(false);
       }
@@ -245,14 +149,12 @@ function App() {
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
   );
 
-  // Filter records based on selected coğrafi bölge
   const filteredRecords = useMemo(() => {
     if (selectedRegion === 'Tüm Ülke') return records;
     const allowed = REGIONS[selectedRegion] || [];
     return records.filter(r => allowed.includes(normalizeProvinceName(r.province)));
   }, [records, selectedRegion]);
 
-  // Recalculate summary KPIs based on the filtered regional records
   const calculatedSummary = useMemo(() => {
     if (!summary) return null;
     if (selectedRegion === 'Tüm Ülke') return summary;
@@ -274,36 +176,8 @@ function App() {
     };
   }, [summary, selectedRegion, filteredRecords]);
 
-  // Sort records for the modal dynamically based on search query, active column, and sort direction
-  const sortedModalRecords = useMemo(() => {
-    if (!activeModalMetric) return [];
-    
-    const filtered = filteredRecords.filter(r => 
-      r.province.toLowerCase().includes(modalSearchQuery.toLowerCase())
-    );
-
-    return [...filtered].sort((a, b) => {
-      if (modalSortColumn === 'province') {
-        const valA = a.province.toLowerCase();
-        const valB = b.province.toLowerCase();
-        return modalSortDirection === 'asc' 
-          ? valA.localeCompare(valB, 'tr') 
-          : valB.localeCompare(valA, 'tr');
-      } else {
-        const valA = a[modalSortColumn] ?? 0;
-        const valB = b[modalSortColumn] ?? 0;
-        return modalSortDirection === 'desc' ? valB - valA : valA - valB;
-      }
-    });
-  }, [filteredRecords, activeModalMetric, modalSearchQuery, modalSortColumn, modalSortDirection]);
-
-  // Veri gösterimi için gerekli seçimler hazır mı?
   const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
-
-  // Gerçek "veri yükleniyor" durumu: ya fetch sürüyor ya da bağımlı seçimler henüz hazır değil.
-  // loadingMonths/loadingCategories sırasında data fetch'in guard'ı erken döneceği için bunları da kapsa.
   const isDataLoading = loadingData || loadingMonths || loadingCategories || !selectionsReady;
-
   const isMapLoading = loadingGeoJson || isDataLoading;
 
   return (
@@ -458,7 +332,7 @@ function App() {
                   placeholder="Vergi türü ara..."
                   value={searchCategory}
                   onChange={(e) => setSearchCategory(e.target.value)}
-                  className="w-full bg-slate-950/40 border border-slate-850 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
+                  className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
                 />
 
                 {loadingCategories ? (
@@ -474,13 +348,13 @@ function App() {
                     ) : (
                       filteredCategories.map((cat) => (
                         <button
-                           key={cat.id}
-                           onClick={() => setSelectedCategory(cat.id)}
-                           title={cat.name}
-                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
-                             ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-                             : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
-                             }`}
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.id)}
+                          title={cat.name}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
+                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
+                            : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
+                            }`}
                         >
                           <span className="truncate pr-2">{cat.name}</span>
                           <MapPin className={`w-3.5 h-3.5 flex-shrink-0 opacity-50 ${selectedCategory === cat.id ? 'opacity-100' : ''}`} />
@@ -498,8 +372,6 @@ function App() {
 
             <StatsCards stats={calculatedSummary} loading={isDataLoading} onCardClick={(metric) => {
               setActiveModalMetric(metric);
-              setModalSortColumn(metric === 'accrual' ? 'accrual' : metric === 'collection' ? 'collection' : 'ratio');
-              setModalSortDirection('desc');
             }} />
 
             {/* Map Visualizer Container */}
@@ -529,115 +401,15 @@ function App() {
 
       {/* 81 İl Detay Modalı */}
       {activeModalMetric && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-          {/* Modal Card */}
-          <div className="relative w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh]">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 className="text-lg font-bold text-slate-100">
-                  {activeModalMetric === 'accrual'
-                    ? 'Tüm İller - Toplam Tahakkuk Detayları'
-                    : activeModalMetric === 'collection'
-                    ? 'Tüm İller - Toplam Tahsilat Detayları'
-                    : 'Tüm İller - Tahsilat Oranı Detayları'}
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  {selectedYear} Yılı - {selectedMonth} Dönemi | Kategori: {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setActiveModalMetric(null);
-                  setModalSearchQuery('');
-                }}
-                className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Search Input inside Modal */}
-            <div className="relative w-full">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="İl adına göre filtrele..."
-                value={modalSearchQuery}
-                onChange={(e) => setModalSearchQuery(e.target.value)}
-                className="w-full bg-slate-950/60 border border-slate-805 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-all"
-              />
-            </div>
-
-            {/* Table Container */}
-            <div className="overflow-auto border border-slate-850 rounded-2xl bg-slate-950/40 scrollbar-thin">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead className="sticky top-0 bg-slate-950 text-slate-400 z-10">
-                  <tr className="border-b border-slate-850">
-                    <th className="py-3 px-4 font-semibold text-center w-16 select-none bg-slate-950">Sıra</th>
-                    <th 
-                      onClick={() => handleSort('province')}
-                      className="py-3 px-4 font-semibold cursor-pointer select-none hover:text-slate-200 transition-colors bg-slate-950"
-                    >
-                      İl {renderSortIcon('province')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('accrual')}
-                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'accrual' ? 'text-blue-400 bg-[#0f1626]' : 'bg-slate-950'}`}
-                    >
-                      Tahakkuk {renderSortIcon('accrual')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('collection')}
-                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'collection' ? 'text-emerald-400 bg-[#0b1b15]' : 'bg-slate-950'}`}
-                    >
-                      Tahsilat {renderSortIcon('collection')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('ratio')}
-                      className={`py-3 px-4 font-semibold text-right cursor-pointer select-none hover:text-slate-200 transition-colors ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-[#161224]' : 'bg-slate-950'}`}
-                    >
-                      Oran {renderSortIcon('ratio')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-850">
-                  {sortedModalRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-500 text-xs">Aradığınız kriterde il bulunamadı.</td>
-                    </tr>
-                  ) : (
-                    sortedModalRecords.map((record, index) => {
-                      return (
-                        <tr key={record.province} className="hover:bg-slate-800/20 transition-all">
-                          <td className="py-2.5 px-4 text-center font-mono text-xs text-slate-500 bg-slate-900/10">{index + 1}</td>
-                          <td className="py-2.5 px-4 font-semibold text-slate-200">{record.province.toUpperCase()}</td>
-                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'accrual' ? 'text-blue-400 font-bold bg-[#0f1626]' : ''}`}>
-                            {formatCurrency(record.accrual)}
-                          </td>
-                          <td className={`py-2.5 px-4 text-right font-mono text-slate-300 ${modalSortColumn === 'collection' ? 'text-emerald-400 font-bold bg-[#0b1b15]' : ''}`}>
-                            {formatCurrency(record.collection)}
-                          </td>
-                          <td className={`py-2.5 px-4 text-right font-mono font-bold ${modalSortColumn === 'ratio' ? 'text-purple-400 bg-[#161224]' : record.ratio >= 75 ? 'text-emerald-400' : record.ratio >= 50 ? 'text-yellow-400' : 'text-rose-400'}`}>
-                            %{record.ratio?.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Footer Summary / Info */}
-            <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-800 pt-3">
-              <span>Toplam: {sortedModalRecords.length} il gösteriliyor</span>
-              <span>Kapatmak için sağ üstteki butona tıklayabilirsiniz.</span>
-            </div>
-            
-          </div>
-        </div>
+        <ProvinceModal
+          metric={activeModalMetric}
+          records={filteredRecords}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onClose={() => setActiveModalMetric(null)}
+        />
       )}
     </div>
   );

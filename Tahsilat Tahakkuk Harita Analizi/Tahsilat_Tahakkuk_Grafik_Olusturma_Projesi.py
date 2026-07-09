@@ -62,6 +62,16 @@ if ana_klasor is None:
 if ana_klasor is None:
     raise FileNotFoundError("❌ Excel klasörü bulunamadı. 'veriler' içindeki klasör adlarını kontrol edin.")
 
+# --- Paylaşılan sabitler (api.py ve scraper tarafından import edilir) ---
+FOLDER_NAME_TEMPLATE = "İllere Göre Tahsilat Tahakkuk {year}"
+AY_SIRALAMASI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+
+def get_year_folder_path(year):
+    """Verilen yıl için ana klasör altındaki veri klasörünün yolunu döner."""
+    return os.path.join(ana_klasor, FOLDER_NAME_TEMPLATE.format(year=year))
+
+
 def kolonlari_ayarla(df_raw, header_row_idx):
     header_row = [str(val).lower().strip() for val in df_raw.iloc[header_row_idx].tolist()]
     
@@ -95,20 +105,21 @@ def kolonlari_ayarla(df_raw, header_row_idx):
     df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
     return df
 
-def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
+def oku_ve_temizle_dosya(dosya_yolu, il_adi, yil, log_etiket=None):
     """
     Tek bir Excel dosyasını dinamik satır tespiti yaparak okuyup temizler.
+    Yıllık ve aylık dosyalar için ortak kullanılır.
+
+    Parametreler:
+      dosya_yolu: Okunacak .xlsx dosyasının tam yolu
+      il_adi: Dönecek sonucun il adı etiketi
+      yil: Dönecek sonucun yıl değeri
+      log_etiket: Hata loglarında görünecek dosya tanımlayıcısı (opsiyonel)
     """
-    match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
-    if not match:
-        return None
-        
-    il_kodlu, yil = match.groups()
-    il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
-    dosya_yolu = os.path.join(folder_path, dosya_adi)
+    etiket = log_etiket or il_adi
     try:
         df_raw = pd.read_excel(dosya_yolu)
-        
+
         # Başlık satırını bul (Tahakkuk ve Tahsilat içeren satır)
         header_row_idx = None
         for idx in range(len(df_raw)):
@@ -116,63 +127,47 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
             if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
                 header_row_idx = idx
                 break
-                
+
         if header_row_idx is None:
             return None
-            
+
         df = kolonlari_ayarla(df_raw, header_row_idx)
         if df is None:
             return None
-            
+
         df.set_index('index', inplace=True)
-        
+
         for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
             df[col] = pd.to_numeric(df[col], errors="coerce")
-            
+
         # Boş satırları filtrele
         df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
-        
+
         return il_adi, int(yil), df
     except Exception:
-        logger.warning("Yıllık Excel dosyası okunamadı: %s", dosya_adi, exc_info=True)
+        logger.warning("Excel dosyası okunamadı: %s", etiket, exc_info=True)
         return None
 
+
+def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
+    """Yıllık Excel dosyası için wrapper — dosya adından il+yıl çıkarır."""
+    match = re.match(r"(.+?)_(\d{4})\.xlsx", dosya_adi)
+    if not match:
+        return None
+
+    il_kodlu, yil = match.groups()
+    il_adi = "_".join(il_kodlu.split("_")[1:]) if "_" in il_kodlu else il_kodlu
+    dosya_yolu = os.path.join(folder_path, dosya_adi)
+    return oku_ve_temizle_dosya(dosya_yolu, il_adi, yil, log_etiket=dosya_adi)
+
+
 def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
-    """
-    Belirli bir il klasörü içindeki aylık Excel dosyasını okur.
-    """
+    """Aylık Excel dosyası için wrapper — il klasörü altından ay dosyasını okur."""
     il_adi = "_".join(folder_name.split("_")[1:]) if "_" in folder_name else folder_name
     dosya_yolu = os.path.join(parent_folder_path, folder_name, f"{month}.xlsx")
     if not os.path.exists(dosya_yolu):
         return None
-    try:
-        df_raw = pd.read_excel(dosya_yolu)
-        
-        # Başlık satırını bul
-        header_row_idx = None
-        for idx in range(len(df_raw)):
-            row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
-            if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
-                header_row_idx = idx
-                break
-                
-        if header_row_idx is None:
-            return None
-            
-        df = kolonlari_ayarla(df_raw, header_row_idx)
-        if df is None:
-            return None
-            
-        df.set_index('index', inplace=True)
-        
-        for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-            
-        df = df.dropna(subset=['tahakkuk', 'tahsilat'], how='all')
-        return il_adi, int(yil), df
-    except Exception:
-        logger.warning("Aylık Excel dosyası okunamadı: %s/%s", folder_name, month, exc_info=True)
-        return None
+    return oku_ve_temizle_dosya(dosya_yolu, il_adi, yil, log_etiket=f"{folder_name}/{month}")
 
 class LRUCache:
     """
@@ -221,6 +216,11 @@ class LRUCache:
 _excel_cache = LRUCache(maxsize=32)
 _config_cache = LRUCache(maxsize=32)
 
+# Modül seviyesi tek thread havuzu — her çağrıda yeniden yaratma maliyetinden kaçınır
+import atexit
+_executor = ThreadPoolExecutor(max_workers=16)
+atexit.register(_executor.shutdown)
+
 def clear_cache():
     _excel_cache.clear()
     _config_cache.clear()
@@ -246,42 +246,40 @@ def excel_dosyalarini_oku(folder_path, month=None):
     if month and month != "Yıl Geneli":
         # Aylık veriyi oku
         il_klasorleri = sorted([
-            d for d in os.listdir(folder_path) 
+            d for d in os.listdir(folder_path)
             if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
         ])
-        
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            futures = [
-                executor.submit(oku_ve_temizle_aylik_dosya, klasor_adi, month, folder_path, yil)
-                for klasor_adi in il_klasorleri
-            ]
-            
-            for future in as_completed(futures):
-                res = future.result()
-                if res:
-                    il_adi, _, df = res
-                    iller_dict[il_adi] = df
-                    yillar.append(yil)
+
+        futures = [
+            _executor.submit(oku_ve_temizle_aylik_dosya, klasor_adi, month, folder_path, yil)
+            for klasor_adi in il_klasorleri
+        ]
+
+        for future in as_completed(futures):
+            res = future.result()
+            if res:
+                il_adi, _, df = res
+                iller_dict[il_adi] = df
+                yillar.append(yil)
     else:
         # Yıllık veriyi oku
         excel_dosyalari = sorted(
             [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
             key=lambda x: int(re.search(r"(\d{4})", x).group(1)) if re.search(r"(\d{4})", x) else 0
         )
-        
-        with ThreadPoolExecutor(max_workers=16) as executor:
-            futures = [
-                executor.submit(oku_ve_temizle_tek_dosya, dosya_adi, folder_path)
-                for dosya_adi in excel_dosyalari
-            ]
-            
-            for future in as_completed(futures):
-                res = future.result()
-                if res:
-                    il_adi, yil_res, df = res
-                    iller_dict[il_adi] = df
-                    yillar.append(yil_res)
-                    
+
+        futures = [
+            _executor.submit(oku_ve_temizle_tek_dosya, dosya_adi, folder_path)
+            for dosya_adi in excel_dosyalari
+        ]
+
+        for future in as_completed(futures):
+            res = future.result()
+            if res:
+                il_adi, yil_res, df = res
+                iller_dict[il_adi] = df
+                yillar.append(yil_res)
+
     _excel_cache.set(cache_key, (iller_dict, yillar))
     return iller_dict, yillar
 

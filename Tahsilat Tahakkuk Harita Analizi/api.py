@@ -20,6 +20,20 @@ import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
 
 logger = logging.getLogger(__name__)
 
+# GeoJSON statik dosya — modül seviyesinde bir kez yüklenir, her istekte diskten okunmaz
+_geojson_cache: dict | None = None
+
+
+def _load_geojson():
+    """tr.json dosyasını bir kez belleğe yükler, sonraki çağrılarda cache'den döner."""
+    global _geojson_cache
+    if _geojson_cache is not None:
+        return _geojson_cache
+    geojson_path = lib.VERILER_DIR / "tr.json"
+    with open(geojson_path, "r", encoding="utf-8") as f:
+        _geojson_cache = json.load(f)
+    return _geojson_cache
+
 app = FastAPI(
     title="Tahsilat Tahakkuk Veri API",
     description="İl bazında vergi gelirleri tahsilat-tahakkuk ve oran analizlerini sunan backend servisi.",
@@ -68,23 +82,21 @@ def _validate_year_input(year_input: str) -> None:
 async def run_scraper_bg(year_input: str):
     """
     Arka planda veri çekme scriptini çalıştırır.
+    Artık yıl argüman olarak geçilir (argparse), stdin pipe gerekmez.
     subprocess.communicate() bloklayıcı olduğu için threadpool'a alınır.
     """
     script_path = CURRENT_DIR / "Hazine_Maliye_Bakanlığı_Sitesinden_Excel_Dosyalarını_Çekme.py"
     try:
         logger.info("Arka plan veri çekme işlemi başlatıldı: %r", year_input)
         process = subprocess.Popen(
-            [sys.executable, str(script_path)],
-            stdin=subprocess.PIPE,
+            [sys.executable, str(script_path), year_input],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8"
         )
         # Bloklayıcı communicate() çağrısını threadpool'a taşı
-        stdout, stderr = await run_in_threadpool(
-            process.communicate, input=year_input + "\n"
-        )
+        stdout, stderr = await run_in_threadpool(process.communicate)
         logger.info("Arka plan veri çekici tamamlandı. Çıktı: %s...", stdout[:200])
         # Önbelleği temizle ki yeni veriler yüklensin
         lib.clear_cache()
@@ -139,8 +151,7 @@ def _hesapla_config(year: int) -> dict:
         logger.debug("Config önbellekten getirildi: yıl %s", year)
         return cached
 
-    folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
-    folder_path = os.path.join(lib.ana_klasor, folder_name)
+    folder_path = lib.get_year_folder_path(year)
 
     if not os.path.exists(folder_path):
         raise FileNotFoundError(f"{year} yılına ait veri klasörü bulunamadı.")
@@ -155,9 +166,8 @@ def _hesapla_config(year: int) -> dict:
         ilk_il_klasoru = os.path.join(folder_path, il_dirs[0])
         aylik_dosyalar = [f for f in os.listdir(ilk_il_klasoru) if f.endswith('.xlsx')]
         aylar = [os.path.splitext(f)[0] for f in aylik_dosyalar]
-        AY_SIRALAMASI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
         aylar_lower = [a.lower() for a in aylar]
-        mevcut_aylar = [ay for ay in AY_SIRALAMASI if ay.lower() in aylar_lower]
+        mevcut_aylar = [ay for ay in lib.AY_SIRALAMASI if ay.lower() in aylar_lower]
 
     # --- Kategorileri hesapla ---
     excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
@@ -214,8 +224,7 @@ async def get_data(year: int, category: str, month: str = ""):
     Ay belirtilmezse (boş) yıllık özet veri kullanılır.
     """
     _validate_year(year)
-    folder_name = f"İllere Göre Tahsilat Tahakkuk {year}"
-    folder_path = os.path.join(lib.ana_klasor, folder_name)
+    folder_path = lib.get_year_folder_path(year)
 
     if not os.path.exists(folder_path):
         raise HTTPException(status_code=404, detail=f"{year} yılına ait veri klasörü bulunamadı.")
@@ -285,15 +294,13 @@ async def get_data(year: int, category: str, month: str = ""):
 async def get_geojson():
     """
     Türkiye coğrafi sınırlarını gösteren GeoJSON verisini döner.
+    Modül seviyesinde bir kez belleğe yüklenir, sonraki isteklerde diskten okunmaz.
     """
     geojson_path = lib.VERILER_DIR / "tr.json"
     if not geojson_path.exists():
         raise HTTPException(status_code=404, detail="GeoJSON harita dosyası bulunamadı.")
     try:
-        def _read_geojson():
-            with open(geojson_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return await run_in_threadpool(_read_geojson)
+        return await run_in_threadpool(_load_geojson)
     except Exception:
         logger.exception("GeoJSON okuma hatası")
         raise HTTPException(status_code=500, detail="GeoJSON okuma hatası.")

@@ -1,81 +1,17 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-// @ts-ignore
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
-import { formatCurrency } from '../utils/format';
-
-interface ProvinceData {
-  province: string;
-  accrual: number;
-  collection: number;
-  ratio: number;
-}
-
-const REGIONS: { [key: string]: string[] } = {
-  "Marmara": [
-    "balikesir", "bilecik", "bursa", "canakkale", "edirne", "istanbul",
-    "kirklareli", "kocaeli", "sakarya", "tekirdag", "yalova"
-  ],
-  "Ege": [
-    "afyonkarahisar", "aydin", "denizli", "izmir", "kutahya", "manisa",
-    "mugla", "usak"
-  ],
-  "Akdeniz": [
-    "adana", "antalya", "burdur", "hatay", "isparta", "mersin",
-    "kahramanmaras", "osmaniye"
-  ],
-  "İç Anadolu": [
-    "ankara", "cankiri", "eskisehir", "kayseri", "kirsehir", "konya",
-    "nevsehir", "nigde", "sivas", "yozgat", "aksaray", "karaman", "kirikkale"
-  ],
-  "Karadeniz": [
-    "amasya", "artvin", "bolu", "corum", "giresun", "gumushane", "ordu",
-    "rize", "samsun", "sinop", "tokat", "trabzon", "bayburt", "bartin",
-    "karabuk", "zonguldak", "duzce", "kastamonu"
-  ],
-  "Doğu Anadolu": [
-    "agri", "bingol", "bitlis", "elazig", "erzincan", "erzurum", "hakkari",
-    "kars", "malatya", "mus", "tunceli", "van", "ardahan", "igdir"
-  ],
-  "Güneydoğu Anadolu": [
-    "adiyaman", "diyarbakir", "gaziantep", "mardin", "siirt", "sanliurfa",
-    "batman", "sirnak", "kilis"
-  ]
-};
-
 import { geoMercator, geoPath } from 'd3-geo';
+import type { Feature, Geometry } from 'geojson';
+import { formatCurrency } from '../utils/format';
+import { REGIONS, normalizeProvinceName } from '../utils/provinces';
+import type { ProvinceRecord, TurkeyGeoJSON, MapType } from '../types';
 
 interface TurkeyMapProps {
-  geoJsonData: any;
-  records: ProvinceData[];
-  mapType: 'tahsilat' | 'tahakkuk' | 'ratio';
+  geoJsonData: TurkeyGeoJSON | null;
+  records: ProvinceRecord[];
+  mapType: MapType;
   selectedRegion: string;
 }
-
-const normalizeProvinceName = (name: string): string => {
-  if (!name) return '';
-  const normalized = name
-    .toLowerCase()
-    .replace(/ı/g, 'i')
-    .replace(/ğ/g, 'g')
-    .replace(/ü/g, 'u')
-    .replace(/ş/g, 's')
-    .replace(/ö/g, 'o')
-    .replace(/ç/g, 'c')
-    .replace(/[^a-z0-9]/g, '') // remove spaces, underscores, and special characters
-    .trim();
-
-  // Handle known variation mappings to match GeoJSON normalized names
-  if (normalized === 'urfa' || normalized === 'urdfa') return 'sanliurfa';
-  if (normalized === 'kmaras' || normalized === 'maras') return 'kahramanmaras';
-  if (normalized === 'elazi') return 'elazig';
-  if (normalized === 'aksarat') return 'aksaray';
-  if (normalized === 'izmit') return 'izmir'; // plate 35 is mapped as 'izmit' in 2008
-  if (normalized === 'kirikkalae') return 'kirikkale';
-  if (normalized === 'mardim') return 'mardin';
-  if (normalized === 'afyon') return 'afyonkarahisar'; // 2026 directory is '03_Afyon'
-
-  return normalized;
-};
 
 const interpolateColor = (color1: [number, number, number], color2: [number, number, number], factor: number): string => {
   const f = Math.max(0, Math.min(1, factor));
@@ -86,7 +22,7 @@ const interpolateColor = (color1: [number, number, number], color2: [number, num
 };
 
 const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string; record: ProvinceData | undefined; alignLeft: boolean } | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string; record: ProvinceRecord | undefined; alignLeft: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Bounds cache — getBoundingClientRect her fare hareketinde değil, sadece gerektiğinde çağrılır
   const cachedBoundsRef = useRef<DOMRect | null>(null);
@@ -116,14 +52,14 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
   const { projection, calculatedHeight } = useMemo(() => {
     if (!geoJsonData) return { projection: null, calculatedHeight: 450 };
 
-    let features: any[] = [];
+    let features: TurkeyGeoJSON['features'] = [];
     if (geoJsonData.type === 'FeatureCollection') {
       features = geoJsonData.features || [];
     }
 
     const filteredFeatures = selectedRegion === 'Tüm Ülke'
       ? features
-      : features.filter((f: any) => {
+      : features.filter((f) => {
         const name = f.properties?.name;
         const normalized = normalizeProvinceName(name);
         return REGIONS[selectedRegion]?.includes(normalized);
@@ -187,7 +123,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
   }, [geoJsonData, selectedRegion]);
 
   const recordsMap = useMemo(() => {
-    const map = new Map<string, ProvinceData>();
+    const map = new Map<string, ProvinceRecord>();
     records.forEach((r) => {
       map.set(normalizeProvinceName(r.province), r);
     });
@@ -199,7 +135,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     let max = 0;
     records.forEach((r) => {
       const val = mapType === 'tahsilat' ? r.collection : r.accrual;
-      if (val > max) max = val;
+      if (val !== null && val > max) max = val;
     });
     return max || 1;
   }, [records, mapType]);
@@ -280,11 +216,13 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
             <ComposableMap
               width={800}
               height={380}
-              projection={projection || "geoMercator"}
+              // d3-geo GeoProjection ile react-simple-maps ProjectionFunction tipleri uyumsuz,
+              // runtime'da ikisi de çalıştığı için cast gereklidir
+              projection={(projection ?? "geoMercator") as unknown as string}
               style={{ width: '100%', height: '100%' }}
             >
               <Geographies geography={geoJsonData}>
-                {({ geographies }: { geographies: any[] }) => {
+                {({ geographies }: { geographies: Feature<Geometry, { name: string }>[] }) => {
                   const filteredGeos = selectedRegion === 'Tüm Ülke'
                     ? geographies
                     : geographies.filter(geo => {
@@ -298,7 +236,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
                     const record = recordsMap.get(normalizeProvinceName(name));
                     return (
                       <Geography
-                        key={geo.rsmKey}
+                        key={name}
                         geography={geo}
                         onMouseMove={(e: React.MouseEvent) => {
                           const bounds = getCachedBounds();

@@ -1,19 +1,13 @@
 import React from 'react';
 import { Coins, TrendingUp, Percent } from 'lucide-react';
-
-interface Stats {
-  total_accrual: number;
-  total_collection: number;
-  overall_ratio: number;
-}
+import { formatCurrency } from '../utils/format';
+import type { Summary, ModalMetric } from '../types';
 
 interface StatsCardsProps {
-  stats: Stats | null;
+  stats: Summary | null;
   loading: boolean;
-  onCardClick?: (metric: 'accrual' | 'collection' | 'ratio') => void;
+  onCardClick?: (metric: ModalMetric) => void;
 }
-
-import { formatCurrency } from '../utils/format';
 
 
 const StatsCardsComponent: React.FC<StatsCardsProps> = ({ stats, loading, onCardClick }) => {
