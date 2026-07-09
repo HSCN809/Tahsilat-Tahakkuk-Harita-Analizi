@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 # xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için yamala (monkey patch)
 import xlrd
 
+# pandas >=1.5.x, xlrd için 2.0.1 minimum sürümünü zorunlu kılar; ancak xlrd 2.x
+# .xls (BIFF) desteğini kaldırdığı için eski HMB .xls dosyalarını okuyamayız.
+# xlrd 1.2.0 ile .xls okumaya devam etmek için pandas'ın sürüm kontrolünü bypass et.
+import pandas.compat._optional as _pd_opt
+_pd_opt.VERSIONS["xlrd"] = "1.2.0"
+
 
 def safe_decode(b, enc):
     """Çok katmanlı güvenli byte decode: önce istenen encoding, sonra utf-8, en son latin1."""
