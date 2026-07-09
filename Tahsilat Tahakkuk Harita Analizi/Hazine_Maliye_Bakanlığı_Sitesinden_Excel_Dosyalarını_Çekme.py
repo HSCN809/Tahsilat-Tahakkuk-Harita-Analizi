@@ -124,7 +124,7 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
 def convert_file(xls_file, year, indir_konumu):
     """
     Tek bir .xls dosyasını il alt klasörüne aylık .xlsx dosyaları olarak dönüştürür.
-    Ayrıca yıl klasörüne en güncel ayın (Aralık) tek dosyasını da kaydeder (geriye uyumluluk).
+    Orijinal .xls dosyası yıl klasörü altındaki raw_xls/ klasöründe saklanır (silinmez).
 
     Dönüş Değeri:
       (başarılı_mı, il_mi, kaydedilen_ay_sayısı, beklenen_ay_sayısı)
@@ -144,7 +144,7 @@ def convert_file(xls_file, year, indir_konumu):
     try:
         cleaned_name = clean_and_format_filename(base_name, year)
         if not cleaned_name:
-            os.remove(xls_file)
+            _archive_raw_xls(xls_file, indir_konumu)
             return True, False, 0, 0, int(year), "", []
 
         # İl klasör adını dosya adından çıkar (01_Adana_2024.xlsx -> 01_Adana)
@@ -175,12 +175,6 @@ def convert_file(xls_file, year, indir_konumu):
                 saved_months += 1
                 saved_month_names.append(display_name)
 
-        # Geriye uyumluluk: en güncel ayı (Aralık) yıl klasörüne de kaydet
-        best_sheet = get_best_sheet_name(sheet_names)
-        df_best = pd.read_excel(xls, sheet_name=best_sheet)
-        best_xlsx_path = indir_konumu / cleaned_name
-        df_best.to_excel(best_xlsx_path, index=False)
-
         # ExcelFile handle'ını kapat (Windows dosya kilidi)
         xls.close()
 
@@ -195,20 +189,33 @@ def convert_file(xls_file, year, indir_konumu):
                         continue
                     missing_months.append(m)
 
-        logger.info("Dönüştürüldü: %s -> %s/ (%d/%d ay) + %s", base_name, province_folder_name, saved_months, expected_months, cleaned_name)
+        logger.info("Dönüştürüldü: %s -> %s/ (%d/%d ay)", base_name, province_folder_name, saved_months, expected_months)
 
-        # Orijinal .xls dosyasını temizle
-        os.remove(xls_file)
+        # Orijinal .xls dosyasını yıl klasörü altındaki raw_xls/ klasörüne taşı
+        _archive_raw_xls(xls_file, indir_konumu)
         return True, True, saved_months, expected_months, int(year), province_folder_name, missing_months
     except Exception:
         logger.error("Dönüştürme hatası (%s)", base_name, exc_info=True)
+        # Hata durumunda da orijinal .xls'i raw_xls/ altında sakla (kayıp olmasın)
         if os.path.exists(xls_file):
             try:
-                os.remove(xls_file)
+                _archive_raw_xls(xls_file, indir_konumu)
             except Exception:
-                logger.debug(".xls dosyası silinemedi: %s", xls_file, exc_info=True)
+                logger.debug(".xls dosyası arşivlenemedi: %s", xls_file, exc_info=True)
         expected = 5 if int(year) == current_year else 12
         return False, True, 0, expected, int(year), os.path.basename(xls_file), []
+
+
+def _archive_raw_xls(xls_file, indir_konumu):
+    """Orijinal .xls dosyasını yıl klasörü altındaki raw_xls/ alt klasörüne taşır."""
+    raw_dir = indir_konumu / "raw_xls"
+    os.makedirs(raw_dir, exist_ok=True)
+    base_name = os.path.basename(xls_file)
+    dest = raw_dir / base_name
+    # Aynı isimde dosya varsa üzerine yaz (shutil.move mevcut dosyayı hedefler)
+    if os.path.exists(dest):
+        os.remove(dest)
+    shutil.move(str(xls_file), str(dest))
 
 
 def parse_years_input(input_str, min_year, max_year):
