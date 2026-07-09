@@ -38,15 +38,14 @@ xlrd.formatting.unicode = safe_decode
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# 'veriler' klasörünü bul
-for candidate in [BASE_DIR / "veriler", BASE_DIR.parent / "veriler", Path.cwd() / "veriler"]:
-    if candidate.exists():
-        VERILER_DIR = candidate
-        break
-else:
-    raise FileNotFoundError("❌ 'veriler' klasörü bulunamadı (repo kökünde olmalı).")
+# 'veriler' klasörünü bul; yoksa otomatik oluştur (ilk çalıştırmada).
+# Öncelik sırası: repo kökü (parent), sonra cwd, en son script dizini.
+for candidate in [BASE_DIR.parent / "veriler", Path.cwd() / "veriler", BASE_DIR / "veriler"]:
+    candidate.mkdir(parents=True, exist_ok=True)
+    VERILER_DIR = candidate
+    break
 
-# Excel ana klasörünü bul
+# Excel ana klasörünü bul; yoksa varsayılan adla oluştur (scraper buraya yazar)
 olasi_adlar = [
     "Tahsilat Tahakkuk Excel Dosyaları",
     "İllere Göre Tahsilat Tahakkuk (Yıllara Göre)",
@@ -66,7 +65,8 @@ if ana_klasor is None:
             break
 
 if ana_klasor is None:
-    raise FileNotFoundError("❌ Excel klasörü bulunamadı. 'veriler' içindeki klasör adlarını kontrol edin.")
+    ana_klasor = VERILER_DIR / olasi_adlar[0]
+    ana_klasor.mkdir(parents=True, exist_ok=True)
 
 # --- Paylaşılan sabitler (api.py ve scraper tarafından import edilir) ---
 FOLDER_NAME_TEMPLATE = "İllere Göre Tahsilat Tahakkuk {year}"
