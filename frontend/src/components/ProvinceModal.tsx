@@ -161,7 +161,6 @@ export const ProvinceModal: React.FC<ProvinceModalProps> = ({
         {/* Footer */}
         <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-800 pt-3">
           <span>Toplam: {sortedRecords.length} il gösteriliyor</span>
-          <span>Kapatmak için sağ üstteki butona tıklayabilirsiniz.</span>
         </div>
 
       </div>
