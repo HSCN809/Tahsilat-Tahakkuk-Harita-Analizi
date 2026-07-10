@@ -1,0 +1,164 @@
+# Üretim Compose yapılandırması
+# Kullanım:
+#   cp .env.prod.example .env.prod   # değerleri doldur
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Geliştirme ortamı için: docker-compose.yml (varsayılan)
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    # DİKKAT: 8000 portu host'a AÇILMIYOR. Yalnızca internal ağ üzerinden
+    # nginx (frontend) ve scraper erişebilir.
+    expose:
+      - "8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - SCRAPE_TOKEN=${SCRAPE_TOKEN}
+      - BACKUP_DIR=/backups
+      - WORKERS=${BACKEND_WORKERS:-2}
+    volumes:
+      - veriler_named:/app/veriler
+      - veriler_backup_named:/backups
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - appnet
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: frontend.Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    volumes:
+      # Üretim Nginx yapılandırması (TLS + CSP + HSTS + rate limit) host'tan bağlanır.
+      - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      # TLS sertifikaları (Let's Encrypt veya kendi sertifikanız)
+      - ./certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - appnet
+
+  scraper:
+    build:
+      context: .
+      dockerfile: scraper.Dockerfile
+    # Kalıcı servis DEĞİL. Yalnızca `docker compose -f docker-compose.prod.yml run --rm scraper 2024-2025`
+    # ile manuel tetiklenir; iş bitince container silinir.
+    profiles:
+      - manual
+    environment:
+      - SCRAPE_YEARS=${SCRAPE_YEARS:-hepsi}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - veriler_named:/app/veriler
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    networks:
+      - appnet
+
+  loki:
+    image: grafana/loki:3.1.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - appnet
+
+  promtail:
+    image: grafana/promtail:3.1.0
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - appnet
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - loki
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - appnet
+
+volumes:
+  veriler_named:
+  veriler_backup_named:
+  loki_data:
+  grafana_data:
+
+networks:
+  appnet:
+    driver: bridge

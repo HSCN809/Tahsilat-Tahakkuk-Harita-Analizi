@@ -11,6 +11,7 @@ services:
       - frontend_node_modules:/app/frontend/node_modules
     environment:
       - PYTHONUNBUFFERED=1
+      - SCRAPE_TOKEN=${SCRAPE_TOKEN:-dev-token}
       # CORS izin verilen origin'ler (virgülle ayrılmış). Üretimde domain'inizi ekleyin.
       - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173
 

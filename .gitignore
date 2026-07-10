@@ -153,3 +153,16 @@ veriler/
 
 # scratch files
 scratch/
+
+# Ortam değişkenleri (gizli anahtarlar) — KOMİTELENMEZ
+.env
+.env.prod
+.env.*
+
+# TLS sertifikaları (özel anahtarlar) — KOMİTELENMEZ
+certs/*.pem
+certs/*.key
+
+# Loki/Grafana runtime verileri
+loki_data/
+grafana_data/
