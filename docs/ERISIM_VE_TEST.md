@@ -60,9 +60,16 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/scrape?year_input
 
 ### 2.2. Sağlık ve Bağlantı Test Komutları
 
-#### SSL/TLS Bağlantı ve Nginx Sağlık Testi
+> [!WARNING]
+> **Windows PowerShell SSL Handshake Hatası:** Windows işletim sistemlerindeki güvenlik katmanı (SChannel), self-signed (kendinden imzalı) sertifikalar ve HTTP/2 protokolü bir arada kullanıldığında PowerShell `Invoke-RestMethod` isteklerinde `Temel alınan bağlantı kapatıldı / SSL/TLS connection failed` hatası verebilir.
+> *   **Tarayıcı Testi:** Tarayıcınızda (Chrome/Edge) [https://localhost](https://localhost) veya [https://127.0.0.1](https://127.0.0.1) adresine girdiğinizde karşınıza çıkan "Gelişmiş" (Advanced) butonuna basıp **"localhost sitesine devam et (güvensiz)"** diyerek uygulamayı sorunsuz açabilirsiniz.
+> *   **Docker İçi Test (Güvenli Yol):** Nginx HTTPS bağlantısının çalıştığını doğrudan Docker içinden test etmek için şu komutu çalıştırabilirsiniz:
+>     ```powershell
+>     docker run --rm --network tahsilat-tahakkuk-harita-analizi_appnet alpine/curl -k -i https://frontend/healthz
+>     ```
+>     *Yanıt `HTTP/2 200` ve `ok` dönüyorsa SSL düzgün yapılandırılmış demektir.*
 
-Nginx ters proxy sunucusunun HTTPS üzerinden düzgün yanıt verdiğini doğrulamak için:
+#### SSL/TLS Bağlantı ve Nginx Sağlık Testi (Eğer yerel işletim sisteminiz izin veriyorsa)
 
 ```powershell
 # SSL sertifika uyarısını yoksayarak HTTPS isteği atar (self-signed kullanıldığı için)
@@ -70,7 +77,7 @@ Nginx ters proxy sunucusunun HTTPS üzerinden düzgün yanıt verdiğini doğrul
 Invoke-RestMethod -Method Get -Uri "https://localhost/healthz"
 ```
 
-*Beklenen Yanıt:* `OK` metni.
+*Beklenen Yanıt:* `ok` metni.
 
 #### Yetkisiz Scrape Girişim Testi (401 Unauthorized)
 
