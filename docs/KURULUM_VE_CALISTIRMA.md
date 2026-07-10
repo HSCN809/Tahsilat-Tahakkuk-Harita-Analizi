@@ -34,9 +34,11 @@ docker compose up -d --build --force-recreate
 *   **Swagger API Dokümantasyonu**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Adım 4: Dev Ortamında Scrape Testi
-Yetkilendirilmiş scrape isteğini tetiklemek için aşağıdaki PowerShell komutunu çalıştırabilirsiniz:
+Yetkilendirilmiş scrape isteğini tetiklemek için aşağıdaki PowerShell komutunu çalıştırabilirsiniz (token'ı `.env` dosyasından otomatik okur):
 ```powershell
-$headers = @{ Authorization = "Bearer dev-token" }
+# .env dosyasından token'ı otomatik okur ve header'a ekler
+$token = (Get-Content .env | Select-String "SCRAPE_TOKEN=").Line.Split("=")[1].Trim()
+$headers = @{ Authorization = "Bearer $token" }
 Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/scrape?year_input=2024" -Headers $headers
 ```
 
