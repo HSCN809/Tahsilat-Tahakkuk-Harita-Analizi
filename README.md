@@ -4,47 +4,25 @@
 sunan tam yığın uygulama. Backend FastAPI, frontend React (Vite + Nginx), veri
 toplayıcı Selenium tabanlı bir one-shot scraper.
 
+## Dokümantasyon ve Kurulum
+
+Projenin kurulumu ve çalıştırılması için aşağıdaki kılavuzları inceleyebilirsiniz:
+
+*   **Yerel Geliştirme (Dev) Ortamı**: Detaylı kurulum adımları, portlar ve yerel test yönergeleri için [docs/DEV_ORTAMI.md](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/docs/DEV_ORTAMI.md) kılavuzuna bakın.
+*   **Canlı Yayın (Production)**: Uygulama **Railway** bulut platformu üzerinde çalışmak üzere optimize edilmiştir. `docker-compose.prod.yml` dosyası doğrudan Railway'e yüklenebilir. Detaylar için ilgili bulut platformunun Docker Compose dokümantasyonunu inceleyin.
+
 ## Dizin Yapısı
 
+```text
+docker-compose.yml          # Geliştirme (Dev) ortamı compose dosyası
+docker-compose.prod.yml     # Üretim (Railway) ortamı compose dosyası
+backend.Dockerfile          # Backend Dockerfile'ı (FastAPI)
+scraper.Dockerfile          # Scraper Dockerfile'ı (Selenium + Chromium)
+frontend/                   # React frontend kaynak kodları ve nginx.conf
+Tahsilat Tahakkuk Harita Analizi/  # Backend Python modülleri ve api.py
+docs/
+  DEV_ORTAMI.md             # Geliştirme ortamı detaylı kurulum kılavuzu
 ```
-backend.Dockerfile          # Backend image (non-root, tini, --reload kapalı)
-scraper.Dockerfile          # Selenium/Chromium scraper image (one-shot)
-docker-compose.yml          # Geliştirme ortamı
-docker-compose.prod.yml     # Üretim ortamı (Nginx TLS + Loki/Grafana)
-frontend/                   # React + Vite + Nginx
-  nginx.conf                #   dev Nginx
-  nginx.prod.conf           #   prod Nginx (TLS, CSP, HSTS, rate limit)
-Tahsilat Tahakkuk Harita Analizi/   # Backend kaynakları (api.py, lib, job_manager, backup)
-promtail/                   # Log toplayıcı config
-grafana/provisioning/       # Loki datasource + hazır dashboard
-certs/                      # TLS sertifikaları (git dışı)
-scripts/run-scraper.sh      # Manuel scrape tetikleyici
-```
-
-## Hızlı Başlangıç (Geliştirme)
-
-```bash
-docker compose up --build
-# frontend: http://localhost:5173  (dev)
-# backend:   http://localhost:8000  (dev, /docs açık)
-```
-
-## Üretim Kurulumu
-
-1. Ortam değişkenlerini hazırlayın:
-   ```bash
-   cp .env.prod.example .env.prod
-   # .env.prod içindeki SCRAPE_TOKEN, GRAFANA_PASSWORD ve ALLOWED_ORIGINS değerlerini doldurun
-   ```
-2. TLS sertifikalarını `certs/` altına koyun (`fullchain.pem`, `privkey.pem`).
-   Geliştirme için: `bash certs/make-selfsigned.sh`
-3. Başlatın:
-   ```bash
-   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-   ```
-4. Erişim:
-   - Uygulama: `https://<domain>` (nginx TLS sonlandırır)
-   - Grafana (loglar): `http://<host>:3000` (admin / .env.prod parolası)
 
 ## Ortam Değişkenleri
 
