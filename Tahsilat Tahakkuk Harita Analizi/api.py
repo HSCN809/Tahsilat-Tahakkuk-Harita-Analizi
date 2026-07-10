@@ -183,6 +183,20 @@ def _make_backup() -> str | None:
     return snapshot_path
 
 
+@app.get("/health")
+def health_check():
+    """Kimlik doğrulaması gerektirmeyen sağlık kontrolü endpoint'i.
+    Railway ve Docker healthcheck tarafından kullanılır."""
+    return {"status": "healthy"}
+
+
+@app.get("/healthz")
+def healthz():
+    """/health ile aynı işlevi gören alternatif sağlık kontrolü endpoint'i.
+    Bazı platformlar (Railway, Kubernetes) /healthz yolunu standart kabul eder."""
+    return {"status": "healthy"}
+
+
 @app.get("/")
 def read_root():
     return {

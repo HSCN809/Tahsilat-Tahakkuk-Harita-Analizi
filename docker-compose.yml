@@ -1,19 +1,19 @@
-# Üretim Compose yapılandırması
+# Üretim / Railway-referans Compose yapılandırması
 # Kullanım:
 #   cp .env.prod.example .env.prod   # değerleri doldur
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   docker compose -f docker-compose.yml --env-file .env.prod up -d --build
 #
-# Geliştirme ortamı için: docker-compose.yml (varsayılan)
+# Geliştirme ortamı için: docker-compose.dev.yml
 
 services:
   backend:
     build:
       context: .
       dockerfile: backend.Dockerfile
-    # DİKKAT: 8000 portu host'a AÇILMIYOR. Yalnızca internal ağ üzerinden
+    # DİKKAT: 8080 portu host'a AÇILMIYOR. Yalnızca internal ağ üzerinden
     # nginx (frontend) ve scraper erişebilir.
     expose:
-      - "8000"
+      - "8080"
     environment:
       - PYTHONUNBUFFERED=1
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
@@ -32,7 +32,7 @@ services:
         reservations:
           memory: 256M
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/').status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -72,6 +72,9 @@ services:
     networks:
       - appnet
 
+  # NOT: Bu servis Railway production'da KULLANILMAZ; yalnızca yerel/manuel
+  # docker compose testleri için burada tanımlıdır. Railway'de scraping işlemi
+  # için backend'in /api/scrape endpoint'ini kullanın (tek servis, tek volume).
   scraper:
     build:
       context: .

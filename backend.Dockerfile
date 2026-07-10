@@ -24,10 +24,10 @@ USER appuser
 
 WORKDIR "/app/Tahsilat Tahakkuk Harita Analizi"
 
-EXPOSE 8000
+EXPOSE 8080
 
 ENV HOST=0.0.0.0 \
-    PORT=8000 \
+    PORT=8080 \
     WORKERS=2
 
 ENTRYPOINT ["/usr/bin/tini","--"]
