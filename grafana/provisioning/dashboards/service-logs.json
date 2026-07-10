@@ -23,7 +23,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=\"backend\"} | json | line_format \"{{.level}} {{.message}}\"",
+          "expr": "{service=\"backend\"} | json | line_format \"{{if .message}}{{.level}} {{.message}}{{else}}{{.__line__}}{{end}}\"",
           "refId": "A"
         }
       ],
