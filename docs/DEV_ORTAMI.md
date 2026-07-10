@@ -23,7 +23,7 @@ New-Item -Path .env -ItemType File -Value "SCRAPE_TOKEN=urettiginiz-token-degeri
 ### Adım 2: Docker Compose ile Başlatma
 Tüm servisleri geliştirme profilinde derleyin ve arka planda çalışacak şekilde başlatın:
 ```powershell
-docker compose up -d --build --force-recreate
+docker compose -f docker-compose.dev.yml up -d --build --force-recreate
 ```
 
 ---

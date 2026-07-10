@@ -9,13 +9,13 @@ toplayıcı Selenium tabanlı bir one-shot scraper.
 Projenin kurulumu ve çalıştırılması için aşağıdaki kılavuzları inceleyebilirsiniz:
 
 *   **Yerel Geliştirme (Dev) Ortamı**: Detaylı kurulum adımları, portlar ve yerel test yönergeleri için [docs/DEV_ORTAMI.md](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/docs/DEV_ORTAMI.md) kılavuzuna bakın.
-*   **Canlı Yayın (Production)**: Uygulama **Railway** bulut platformu üzerinde çalışmak üzere optimize edilmiştir. `docker-compose.prod.yml` dosyası doğrudan Railway'e yüklenebilir. Detaylar için ilgili bulut platformunun Docker Compose dokümantasyonunu inceleyin.
+*   **Canlı Yayın (Production)**: Uygulama **Railway** bulut platformu üzerinde çalışmak üzere optimize edilmiştir. `docker-compose.yml` dosyası doğrudan Railway'e yüklenebilir. Detaylar için ilgili bulut platformunun Docker Compose dokümantasyonunu inceleyin.
 
 ## Dizin Yapısı
 
 ```text
-docker-compose.yml          # Geliştirme (Dev) ortamı compose dosyası
-docker-compose.prod.yml     # Üretim (Railway) ortamı compose dosyası
+docker-compose.yml          # Üretim (Railway) ortamı compose dosyası
+docker-compose.dev.yml      # Geliştirme (Dev) ortamı compose dosyası
 backend.Dockerfile          # Backend Dockerfile'ı (FastAPI)
 scraper.Dockerfile          # Scraper Dockerfile'ı (Selenium + Chromium)
 frontend/                   # React frontend kaynak kodları ve nginx.conf
