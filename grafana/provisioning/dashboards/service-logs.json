@@ -45,7 +45,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=~\".*\"} | json | level=\"ERROR\"",
+          "expr": "{service=~\".+\"} | json | level=\"ERROR\"",
           "refId": "A"
         }
       ],
