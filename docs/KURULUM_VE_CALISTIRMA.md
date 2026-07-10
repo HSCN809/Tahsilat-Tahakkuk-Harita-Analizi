@@ -58,14 +58,14 @@ Backend ve Scraper servisleri güvenli non-root kullanıcı (`appuser`) ile çal
 Aşağıdaki komutları sırayla çalıştırın:
 ```powershell
 # veriler_named volume yetkilerini güncelle
-docker compose -f docker-compose.prod.yml --env-file .env.prod run --user root backend chown -R appuser:appuser /app/veriler
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --user root backend chown -R appuser:appuser /app/veriler
 
 # veriler_backup_named volume yetkilerini güncelle
-docker compose -f docker-compose.prod.yml --env-file .env.prod run --user root backend chown -R appuser:appuser /backups
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --user root backend chown -R appuser:appuser /backups
 ```
 
 > [!TIP]
-> `run` komutları sonrası Docker `Found orphan containers...` (yetim container) uyarısı verebilir. Bu uyarı tamamen zararsızdır. Eğer bu kalıntı container'ları temizlemek isterseniz aşağıdaki komutla temizlik yapabilirsiniz:
+> Yetim container (orphan) birikmesini önlemek için tek seferlik komutlarda `--rm` flag'i kullanılmıştır. Eğer sistemde eskiden kalan yetim container'lar varsa aşağıdaki komutla temizleyebilirsiniz:
 > ```powershell
 > docker compose -f docker-compose.prod.yml --env-file .env.prod down --remove-orphans
 > ```
