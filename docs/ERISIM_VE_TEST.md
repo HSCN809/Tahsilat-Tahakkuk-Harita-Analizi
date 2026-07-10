@@ -47,93 +47,53 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/scrape?year_input
 
 ## 2. Üretim (Prod) Ortamı
 
-Üretim ortamı `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d` komutuyla başlatıldığında tüm güvenlik ve loglama servisleri aktif olur:
+Uygulama Railway'e başarıyla deploy edildikten sonra erişim ve test işlemleri aşağıdaki gibi gerçekleştirilir:
 
 ### 2.1. Servis Adresleri ve Giriş Bilgileri
 
-| Servis                             | Erişim Adresi                                | Giriş Bilgileri                                                                               | Açıklama                                                                            |
-| ---------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| **Frontend (React + Nginx)** | [https://localhost](https://localhost)         | Şifresiz / Açık                                                                             | TLS/SSL şifrelemeli ana kullanıcı arayüzü (port 80 ve 443).                      |
-| **Grafana (Log Arayüzü)**  | [http://localhost:3000](http://localhost:3000) | **Kullanıcı:** `admin`**Şifre:** `.env.prod` içindeki `GRAFANA_PASSWORD` | Logları ve sistem metriklerini izleme paneli.                                        |
-| **Backend API**              | *Dışarıya Kapalı*                       | Yalnızca Nginx üzerinden erişilir                                                           | Güvenlik amacıyla port 8000 dış erişime kapatılmıştır.                       |
-| **API Dokümantasyonu**      | *Kapalı (Kapatıldı)*                     | —                                                                                             | Üretim ortamında`/docs` ve `/redoc` yolları güvenlik için devre dışıdır. |
-
-### 2.2. Sağlık ve Bağlantı Test Komutları
-
-> [!WARNING]
-> **Windows PowerShell SSL Handshake Hatası:** Windows işletim sistemlerindeki güvenlik katmanı (SChannel), self-signed (kendinden imzalı) sertifikalar ve HTTP/2 protokolü bir arada kullanıldığında PowerShell `Invoke-RestMethod` isteklerinde `Temel alınan bağlantı kapatıldı / SSL/TLS connection failed` hatası verebilir.
-> *   **Tarayıcı Testi:** Tarayıcınızda (Chrome/Edge) [https://localhost](https://localhost) veya [https://127.0.0.1](https://127.0.0.1) adresine girdiğinizde karşınıza çıkan "Gelişmiş" (Advanced) butonuna basıp **"localhost sitesine devam et (güvensiz)"** diyerek uygulamayı sorunsuz açabilirsiniz.
-> *   **Docker İçi Test (Güvenli Yol):** Nginx HTTPS bağlantısının çalıştığını doğrudan Docker içinden test etmek için şu komutu çalıştırabilirsiniz:
->     ```powershell
->     docker run --rm --network tahsilat-tahakkuk-harita-analizi_appnet alpine/curl -k -i https://frontend/healthz
->     ```
->     *Yanıt `HTTP/2 200` ve `ok` dönüyorsa SSL düzgün yapılandırılmış demektir.*
-
-#### SSL/TLS Bağlantı ve Nginx Sağlık Testi (Eğer yerel işletim sisteminiz izin veriyorsa)
-
-```powershell
-# SSL sertifika uyarısını yoksayarak HTTPS isteği atar (self-signed kullanıldığı için)
-[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-Invoke-RestMethod -Method Get -Uri "https://localhost/healthz"
-```
-
-*Beklenen Yanıt:* `ok` metni.
-
-#### Yetkisiz Scrape Girişim Testi (401 Unauthorized)
-
-Token olmadan veri çekme endpoint'ine erişmeye çalışıldığında reddedilmesi gerekir:
-
-```powershell
-try {
-    Invoke-RestMethod -Method Post -Uri "https://localhost/api/scrape?year_input=2024"
-} catch {
-    Write-Host "Hata Kodu: $_"
-    # $_.Exception.Response.StatusCode.value__ değeri 401 olmalıdır.
-}
-```
-
-*Beklenen Yanıt:* İstek engellenmeli ve HTTP `401 Unauthorized` hatası alınmalıdır.
-
-#### Yetkili Scrape Testi ve Çakışma Yönetimi (409 Conflict)
-
-Doğru token ile istek atıp durumu izleme:
-
-```powershell
-# 1. İstek (.env.prod dosyasından token'ı otomatik okur ve başlatır - 200 OK)
-$token = (Get-Content .env.prod | Select-String "SCRAPE_TOKEN=").Line.Split("=")[1].Trim()
-$headers = @{ Authorization = "Bearer $token" }
-Invoke-RestMethod -Method Post -Uri "https://localhost/api/scrape?year_input=2024" -Headers $headers
-
-# 2. İstek (İlk işlem devam ederken çakışma yaratır - 409 Conflict)
-try {
-    Invoke-RestMethod -Method Post -Uri "https://localhost/api/scrape?year_input=2024" -Headers $headers
-} catch {
-    Write-Host "Çakışma Testi Başarılı: $_" # 409 Conflict dönmelidir
-}
-
-# 3. Durum Sorgulama
-Invoke-RestMethod -Method Get -Uri "https://localhost/api/jobs/status"
-```
-
-#### Grafana Loki Log Kontrolü
-
-Grafana ([http://localhost:3000](http://localhost:3000)) paneline girin:
-
-1. Sol menüden **Explore** (Pusula simgesi) sekmesine gidin.
-2. Datasource olarak **Loki** seçin.
-3. Sorgu alanına `{container_name="tahsilat-tahakkuk-harita-analizi-backend-1"}` yazarak **Run Query** butonuna basın.
-4. Backend loglarının canlı olarak düştüğünü doğrulayın.
+| Servis                             | Erişim Adresi                                                          | Açıklama                                                                            |
+| ---------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Frontend (React + Nginx)** | `https://<uygulama-adi>.up.railway.app` | Dünyanın her yerinden erişilebilen, SSL/TLS şifrelemeli ana kullanıcı arayüzü. |
+| **Backend API**              | *Dışarıya Kapalı (İç Ağ)*                                                 | Güvenlik amacıyla sadece frontend container'ı üzerinden erişilebilir.                 |
+| **Canlı Loglar**             | **Railway Dashboard -> Deployments -> View Logs**                        | Sistem logları doğrudan Railway arayüzü üzerinden izlenir.                          |
 
 ---
 
-## 3. Sistem Durumu ve Sorun Giderme Testleri
+### 2.2. Canlı API Sağlık ve Scrape Testleri
 
-Tüm servislerin anlık durumunu ve kaynak tüketimini doğrulamak için:
+Railway üzerindeki API uç noktalarını (endpoints) test etmek için aşağıdaki komutları kullanabilirsiniz.
+*(Komutlardaki `<uygulama-adi>` kısmını kendi Railway canlı adresinizle değiştirin).*
 
+#### Sağlık Kontrolü Testi
 ```powershell
-# Tüm container'ların sağlık durumlarını gösterir (Up (healthy) görmelisiniz)
-docker compose -f docker-compose.prod.yml --env-file .env.prod ps
-
-# Container'ların CPU, Bellek ve Ağ kullanımını canlı gösterir
-docker stats
+Invoke-RestMethod -Method Get -Uri "https://<uygulama-adi>.up.railway.app/healthz"
 ```
+*Beklenen Yanıt:* `ok` metni.
+
+#### Yetkisiz Scrape Girişim Testi (401 Unauthorized)
+Token olmadan veri çekme isteği gönderildiğinde reddedilmelidir:
+```powershell
+try {
+    Invoke-RestMethod -Method Post -Uri "https://<uygulama-adi>.up.railway.app/api/scrape?year_input=2024"
+} catch {
+    Write-Host "Hata Kodu: $_"
+    # 401 Unauthorized hatası alınmalıdır.
+}
+```
+
+#### Yetkili Scrape Testi
+Railway arayüzünde belirlediğiniz `SCRAPE_TOKEN` değerini kullanarak veri çekmeyi tetikleme:
+```powershell
+$token = "Railway-Dashboard-Uzerinden-Belirlediginiz-Token"
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Method Post -Uri "https://<uygulama-adi>.up.railway.app/api/scrape?year_input=2024" -Headers $headers
+```
+
+---
+
+## 3. Sistem Sorun Giderme ve Log İzleme
+
+Railway üzerinde herhangi bir sorun yaşanması durumunda:
+1. Railway paneline gidin.
+2. İlgili servisi (`backend` veya `frontend`) seçin.
+3. **Logs** sekmesine tıklayarak canlı hata kayıtlarını ve sistem çıktılarını anlık olarak izleyin.

@@ -44,64 +44,40 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/scrape?year_input
 
 ---
 
-## 2. Üretim (Prod) Ortamı Kurulumu
+## 2. Üretim (Prod) Ortamı ve Railway Canlı Yayın Kılavuzu
 
-Üretim ortamı TLS (Nginx üzerinden HTTPS), sınırlı kaynaklar, non-root güvenlik, log rotasyonu ve Grafana gözlemlenebilirliği içerir.
+Uygulamanın canlı yayına alınması için **Railway** bulut platformu kullanılmaktadır. Railway, otomatik HTTPS (SSL) sertifikası sağlar ve GitHub deponuzu bağladığınızda kod değişikliklerini otomatik olarak yayına alır.
 
-### Adım 1: `.env.prod` Değişkenlerini Tanımlama
-Şablon dosyasını kopyalayın:
-```powershell
-Copy-Item .env.prod.example .env.prod
-```
+### Adım 1: GitHub Reposunu Hazırlama
+Projenizi kendi GitHub hesabınızda özel (private) veya genel (public) bir depoya yükleyin.
 
-Güçlü şifreler ve token'lar üretmek için şu komutu kullanabilirsiniz:
-```powershell
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+### Adım 2: Railway Üzerinde Yeni Proje Oluşturma
+1. [Railway.app](https://railway.app/) adresine gidin ve giriş yapın.
+2. **New Project** -> **Deploy from GitHub repo** seçeneğini seçin ve bu projeyi içeren repoyu bağlayın.
+3. Railway, kök dizindeki `docker-compose.prod.yml` dosyasını otomatik olarak algılayacaktır.
+4. Railway projeyi iki ana servis olarak bölecektir: `backend` ve `frontend`.
 
-> [!IMPORTANT]
-> [ .env.prod ](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/.env.prod) dosyasını açarak `SCRAPE_TOKEN` ve `GRAFANA_PASSWORD` alanlarını yukarıda ürettiğiniz güçlü değerlerle güncelleyin.
+### Adım 3: Ortam Değişkenlerini (Variables) Yapılandırma
+Railway arayüzünde her servis için aşağıdaki çevresel değişkenleri tanımlayın:
 
-### Adım 2: SSL Test Sertifikalarını Oluşturma
-Nginx'in HTTPS üzerinden çalışabilmesi için test amaçlı self-signed sertifikaları Docker yardımıyla oluşturun:
-```powershell
-docker run --rm -v ${PWD}/certs:/certs alpine sh -c "apk add --no-cache openssl && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/privkey.pem -out /certs/fullchain.pem -subj '/C=TR/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'"
-```
+#### Backend Servisi Değişkenleri:
+*   `ALLOWED_ORIGINS`: `https://tahsilat-tahakkuk-analizi.up.railway.app` (Frontend servisinizin Railway üzerinde alacağı canlı URL adresi).
+*   `SCRAPE_TOKEN`: Güçlü ve gizli bir API anahtarı (Scraper isteklerini doğrulamak için).
+*   `BACKUP_DIR`: `/backups`
 
-### Adım 3: Docker Volume İzinlerini Düzenleme (Kritik)
-Backend ve Scraper servisleri güvenli non-root kullanıcı (`appuser`) ile çalıştığından, Docker named volume dizin yetkilerinin verilmesi gerekir. Aksi halde `PermissionError` alınır.
-Aşağıdaki komutları sırayla çalıştırın:
-```powershell
-# veriler_named volume yetkilerini güncelle
-docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --user root backend chown -R appuser:appuser /app/veriler
+#### Frontend Servisi Değişkenleri:
+Hiçbir değişkene gerek yoktur. Nginx gelen tüm `/api` isteklerini Railway iç ağı (private network) üzerinden otomatik olarak `http://backend:8000` adresine yönlendirir.
 
-# veriler_backup_named volume yetkilerini güncelle
-docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --user root backend chown -R appuser:appuser /backups
-```
+### Adım 4: Kalıcı Veri Depolama (Persistent Volume) Ekleme
+Backend container'ı her yeniden başladığında verilerinizin silinmemesi için:
+1. Railway panelinde **backend** servisine tıklayın.
+2. **Settings** -> **Volumes** sekmesine gelin.
+3. **Mount Volume** seçeneğine basarak yeni bir disk oluşturun.
+4. Mount yolu (Mount Path) olarak `/app/veriler` yazın ve kaydedin.
+5. (İsteğe bağlı) Yedekler için `/backups` yoluna ikinci bir disk mount edebilirsiniz.
 
-> [!TIP]
-> Yetim container (orphan) birikmesini önlemek için tek seferlik komutlarda `--rm` flag'i kullanılmıştır. Eğer sistemde eskiden kalan yetim container'lar varsa aşağıdaki komutla temizleyebilirsiniz:
-> ```powershell
-> docker compose -f docker-compose.prod.yml --env-file .env.prod down --remove-orphans
-> ```
-
-### Adım 4: Üretim Ortamını Başlatma
-Tüm servisleri üretim profilinde ayağa kaldırın:
-```powershell
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build --force-recreate
-```
-
-### Adım 5: Erişim ve Kontrol
-*   **Uygulama (Güvenli HTTPS)**: [https://localhost](https://localhost)
-*   **Grafana Log Paneli**: [http://localhost:3000](http://localhost:3000) (Giriş: `admin` / `.env.prod` içinde belirlediğiniz şifre)
-*   **Servis Durumları**:
-    ```powershell
-    docker compose -f docker-compose.prod.yml --env-file .env.prod ps
-    ```
-*   **Canlı Logları Takip Etme**:
-    ```powershell
-    docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f
-    ```
+### Adım 5: Canlı Adresi ve Erişim
+*   **Canlı Uygulama**: Railway'in frontend servisine otomatik atadığı `https://<uygulama-adi>.up.railway.app` adresi üzerinden sisteme dünyanın her yerinden şifresiz ve güvenli (SSL) olarak erişilebilir.
 
 ---
 
