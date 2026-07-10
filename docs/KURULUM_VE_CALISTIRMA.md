@@ -9,7 +9,14 @@ Bu kılavuz, projenin **Geliştirme (Dev)** ve **Üretim (Prod)** ortamlarında 
 Geliştirme ortamı yerel kod değişikliklerini anında yansıtmak (bind mount) ve kolayca test etmek için tasarlanmıştır.
 
 ### Adım 1: `.env` Dosyasını Oluşturma
-Terminalde projenin kök dizinindeyken geliştirme çevresel değişkenlerini içeren `.env` dosyasını oluşturun:
+Terminalde projenin kök dizinindeyken geliştirme çevresel değişkenlerini içeren `.env` dosyasını oluşturun.
+
+Önce güçlü bir 32 karakterlik token üretmek için şu Python komutunu çalıştırabilirsiniz:
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Ardından bu token değerini içeren `.env` dosyasını oluşturun (komut satırındaki `"dev-token"` yerine ürettiğiniz token değerini de yazabilirsiniz):
 ```powershell
 # Windows PowerShell için:
 New-Item -Path .env -ItemType File -Value "SCRAPE_TOKEN=dev-token"
@@ -40,12 +47,18 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/scrape?year_input
 Üretim ortamı TLS (Nginx üzerinden HTTPS), sınırlı kaynaklar, non-root güvenlik, log rotasyonu ve Grafana gözlemlenebilirliği içerir.
 
 ### Adım 1: `.env.prod` Değişkenlerini Tanımlama
-Şablon dosyasını kopyalayın ve içindeki şifreleri kendinize göre güncelleyin:
+Şablon dosyasını kopyalayın:
 ```powershell
 Copy-Item .env.prod.example .env.prod
 ```
+
+Güçlü şifreler ve token'lar üretmek için şu komutu kullanabilirsiniz:
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
 > [!IMPORTANT]
-> [ .env.prod ](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/.env.prod) dosyasını açarak `SCRAPE_TOKEN` ve `GRAFANA_PASSWORD` alanlarını güçlü değerlerle güncelleyin.
+> [ .env.prod ](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/.env.prod) dosyasını açarak `SCRAPE_TOKEN` ve `GRAFANA_PASSWORD` alanlarını yukarıda ürettiğiniz güçlü değerlerle güncelleyin.
 
 ### Adım 2: SSL Test Sertifikalarını Oluşturma
 Nginx'in HTTPS üzerinden çalışabilmesi için test amaçlı self-signed sertifikaları Docker yardımıyla oluşturun:
