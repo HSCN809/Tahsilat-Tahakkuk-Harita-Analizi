@@ -158,6 +158,8 @@ scratch/
 .env
 .env.prod
 .env.*
+# .env.prod.example KOMİTLENİR (şablon dosyadır, gizli anahtar içermez)
+!.env.prod.example
 
 # TLS sertifikaları (özel anahtarlar) — KOMİTELENMEZ
 certs/*.pem

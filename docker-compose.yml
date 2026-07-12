@@ -19,7 +19,7 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - SCRAPE_TOKEN=${SCRAPE_TOKEN}
       - BACKUP_DIR=/backups
-      - WORKERS=${BACKEND_WORKERS:-2}
+      - WORKERS=${BACKEND_WORKERS:-1}
     volumes:
       - veriler_named:/app/veriler
       - veriler_backup_named:/backups
