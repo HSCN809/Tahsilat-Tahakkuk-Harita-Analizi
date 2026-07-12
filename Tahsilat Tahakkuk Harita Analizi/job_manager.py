@@ -68,7 +68,7 @@ class JobManager:
                 info.status = "succeeded"
             except Exception as exc:
                 info.status = "failed"
-                info.error = f"{type(exc).__name__}: {exc}"[:500]
+                info.error = f"{type(exc).__name__}: {exc}"
             finally:
                 info.finished_at = time.time()
                 if info.status == "succeeded" and backup_notifier is not None:

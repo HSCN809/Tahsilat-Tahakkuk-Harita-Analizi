@@ -168,9 +168,9 @@ def _run_scraper(year_input: str) -> None:
     )
     stdout, stderr = process.communicate()
     if process.returncode != 0:
-        logger.error("Scraper başarısız (rc=%s): %s", process.returncode, stderr[:500])
-        raise RuntimeError(f"Scraper başarısız oldu (rc={process.returncode}). Detay: {stderr[:300]}")
-    logger.info("Scraper tamamlandı. Çıktı: %s...", stdout[:200])
+        logger.error("Scraper başarısız (rc=%s): %s", process.returncode, stderr)
+        raise RuntimeError(f"Scraper başarısız oldu (rc={process.returncode}): {stderr}")
+    logger.info("Scraper tamamlandı. Çıktı (son 500 karakter): %s...", stdout[-500:])
     lib.clear_cache()
 
 
