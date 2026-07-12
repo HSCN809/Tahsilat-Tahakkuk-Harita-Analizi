@@ -64,11 +64,13 @@ if ana_klasor is None:
     except PermissionError:
         dirs = []
     for p in dirs:
+        if not p.is_dir():
+            continue
         try:
             children = list(p.iterdir())
-        except PermissionError:
+        except (PermissionError, NotADirectoryError):
             continue
-        if p.is_dir() and any(c.name.startswith("İllere Göre Tahsilat Tahakkuk") for c in children if c.is_dir()):
+        if any(c.name.startswith("İllere Göre Tahsilat Tahakkuk") for c in children if c.is_dir()):
             ana_klasor = p
             break
 
