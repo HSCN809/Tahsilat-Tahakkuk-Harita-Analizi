@@ -67,6 +67,8 @@ def _load_geojson():
     if not geojson_path.exists():
         # Fallback: veriler/ altında
         geojson_path = lib.VERILER_DIR / "tr.json"
+    if not geojson_path.exists():
+        raise FileNotFoundError("tr.json bulunamadı")
     with open(geojson_path, "r", encoding="utf-8") as f:
         _geojson_cache = json.load(f)
     return _geojson_cache
@@ -383,11 +385,10 @@ async def get_data(year: int, category: str, month: str = ""):
 
 @app.get("/api/geojson")
 async def get_geojson():
-    geojson_path = lib.VERILER_DIR / "tr.json"
-    if not geojson_path.exists():
-        raise HTTPException(status_code=404, detail="GeoJSON harita dosyası bulunamadı.")
     try:
         return await run_in_threadpool(_load_geojson)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="GeoJSON harita dosyası bulunamadı.")
     except Exception:
         logger.exception("GeoJSON okuma hatası")
         raise HTTPException(status_code=500, detail="GeoJSON okuma hatası.")
