@@ -57,11 +57,16 @@ _geojson_cache: dict | None = None
 
 
 def _load_geojson():
-    """tr.json dosyasını bir kez belleğe yükler, sonraki çağrılarda cache'den döner."""
+    """tr.json dosyasını bir kez belleğe yükler, sonraki çağrılarda cache'den döner.
+    tr.json kodla birlikte gelir, volume altında değildir — veri kaybı olmaz."""
     global _geojson_cache
     if _geojson_cache is not None:
         return _geojson_cache
-    geojson_path = lib.VERILER_DIR / "tr.json"
+    # Önce kod dizininde ara (volume mount'tan etkilenmez)
+    geojson_path = CURRENT_DIR / "tr.json"
+    if not geojson_path.exists():
+        # Fallback: veriler/ altında
+        geojson_path = lib.VERILER_DIR / "tr.json"
     with open(geojson_path, "r", encoding="utf-8") as f:
         _geojson_cache = json.load(f)
     return _geojson_cache
