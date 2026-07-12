@@ -272,12 +272,15 @@ def _hesapla_config(year: int) -> dict:
         aylar_lower = [a.lower() for a in aylar]
         mevcut_aylar = [ay for ay in lib.AY_SIRALAMASI if ay.lower() in aylar_lower]
 
-    excel_files = [f for f in os.listdir(folder_path) if f.endswith('.xlsx')]
+    # Kategorileri ilk ilin ilk ay Excel'inden oku
+    # (scraper verileri il alt klasörlerine yazar: 01_Adana/Ocak.xlsx)
     cleaned_categories: list[dict] = []
-    if excel_files:
-        dosya_yolu = os.path.join(folder_path, excel_files[0])
+    if il_dirs and mevcut_aylar:
+        ilk_il = il_dirs[0]
+        ilk_ay = mevcut_aylar[0]
+        kategori_dosyasi = os.path.join(folder_path, ilk_il, f"{ilk_ay}.xlsx")
         try:
-            df_raw = pd.read_excel(dosya_yolu)
+            df_raw = pd.read_excel(kategori_dosyasi)
             header_row_idx = None
             for idx in range(len(df_raw)):
                 row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
