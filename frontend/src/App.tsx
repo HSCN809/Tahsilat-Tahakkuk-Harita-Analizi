@@ -63,6 +63,7 @@ function App() {
         console.error('[App] Harita verisi alınırken hata:', err);
         setError(err instanceof Error ? err.message : 'Harita verisi alınırken bir sorun oluştu.');
       } finally {
+        setLoadingGeoJson(false);
       }
     };
 
