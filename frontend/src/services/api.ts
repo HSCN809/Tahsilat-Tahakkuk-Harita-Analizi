@@ -34,22 +34,22 @@ const DataResponseSchema = z.object({
 
 // --- Kullaniciya gosterilecek hata mesajlari ---
 const USER_FRIENDLY_ERRORS: Record<number, string> = {
-  400: 'Gecersiz istek. Lutfen filtre secimlerinizi kontrol edin.',
-  404: 'Istediginiz veri sunucuda bulunamadi. Henuz yuklenmemis olabilir, lutfen once veri cekme islemini baslatin.',
-  429: 'Cok fazla istek gonderildi. Lutfen biraz bekleyip tekrar deneyin.',
-  500: 'Sunucuda gecici bir sorun olustu. Lutfen daha sonra tekrar deneyin.',
-  503: 'Sunucu su anda bakimda veya asiri yuklu. Lutfen biraz bekleyin.',
+  400: 'Geçersiz istek. Lütfen filtre seçimlerinizi kontrol edin.',
+  404: 'İstediğiniz veri sunucuda bulunamadı. Henüz yüklenmemiş olabilir, lütfen önce veri çekme işlemini başlatın.',
+  429: 'Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin.',
+  500: 'Sunucuda geçici bir sorun oluştu. Lütfen daha sonra tekrar deneyin.',
+  503: 'Sunucu şu anda bakımda veya aşırı yüklü. Lütfen biraz bekleyin.',
 };
 
 function getUserMessage(status: number): string {
-  return USER_FRIENDLY_ERRORS[status] ?? 'Beklenmeyen bir sorun olustu. Lutfen daha sonra tekrar deneyin.';
+  return USER_FRIENDLY_ERRORS[status] ?? 'Beklenmeyen bir sorun oluştu. Lütfen daha sonra tekrar deneyin.';
 }
 
 // --- API fonksiyonlari ---
 
 /**
  * Yardimci: fetch + JSON parse + hata yonetimi.
- * Teknik detaylari console.error ile log'a yazar (sadece gelistirici gorur).
+ * Teknik detayları console.error ile log'a yazar (sadece geliştirici görür).
  * Kullaniciya anlasilir hata mesaji firlatir.
  */
 async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
@@ -58,8 +58,8 @@ async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
     response = await fetch(url, { signal });
   } catch (err) {
     // Ag hatasi (internet kesintisi, DNS, CORS vs.)
-    console.error(`[api] Ag hatasi: ${url}`, err);
-    throw new Error('Sunucuya baglanilamadi. Internet baglantinizi kontrol edin.');
+    console.error(`[api] Ağ hatası: ${url}`, err);
+    throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
   }
 
   if (!response.ok) {

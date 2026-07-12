@@ -46,7 +46,7 @@ function App() {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        console.error('[App] Yillar alinirken hata:', err);
+        console.error('[App] Yıllar alınırken hata:', err);
         setError(err instanceof Error ? err.message : 'Yıllar alınırken bir sorun oluştu.');
       } finally {
         setLoadingYears(false);
@@ -60,7 +60,7 @@ function App() {
         setGeoJsonData(data);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        console.error('[App] Harita verisi alinirken hata:', err);
+        console.error('[App] Harita verisi alınırken hata:', err);
         setError(err instanceof Error ? err.message : 'Harita verisi alınırken bir sorun oluştu.');
       } finally {
       }
@@ -103,7 +103,7 @@ function App() {
         }
       } catch (err) {
         if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
-        console.error('[App] Config alinirken hata:', err);
+        console.error('[App] Config alınırken hata:', err);
         setError(err instanceof Error ? err.message : 'Yıl yapılandırması alınırken bir sorun oluştu.');
       } finally {
         if (!cancelled) {
@@ -138,7 +138,7 @@ function App() {
         setRecords(data.data);
       } catch (err) {
         if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
-        console.error('[App] Veriler alinirken hata:', err);
+        console.error('[App] Veriler alınırken hata:', err);
         setError(err instanceof Error ? err.message : 'Veriler alınırken bir sorun oluştu.');
       } finally {
         if (!cancelled) setLoadingData(false);
