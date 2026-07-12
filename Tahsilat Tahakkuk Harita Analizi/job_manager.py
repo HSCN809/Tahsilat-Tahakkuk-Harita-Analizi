@@ -7,11 +7,13 @@ Teke-aktif-iş kuralı ve iş durumu.
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
-import traceback
 from dataclasses import dataclass, asdict, field
 from typing import Callable, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -75,7 +77,7 @@ class JobManager:
                     try:
                         info.backup_created = backup_notifier()
                     except Exception:
-                        traceback.print_exc()
+                        logger.exception("Yedekleme basarisiz")
                 self._lock.release()
 
         thread = threading.Thread(target=_wrapped, name=job_id, daemon=True)

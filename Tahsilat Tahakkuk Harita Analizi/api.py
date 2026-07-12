@@ -286,6 +286,7 @@ def _hesapla_config(year: int) -> dict:
                         clean_name = re.sub(r"^\d+\.\s*", "", cat.strip()).title()
                         cleaned_categories.append({"id": cat, "name": clean_name})
         except Exception:
+            logger.warning("Kategori okunamadi (yil=%s): %s", year, exc_info=True)
             pass
 
     result = {

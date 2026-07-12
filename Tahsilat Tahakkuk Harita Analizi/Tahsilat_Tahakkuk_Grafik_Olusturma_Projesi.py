@@ -333,7 +333,7 @@ def veri_hazirla(iller_dict, secim):
                 "tahsilat/tahakkuk": satir["tahsilat/tahakkuk"]
             })
         except Exception:
-            logger.debug("İl verisi hazırlanırken hata atlandı: %s", il_adi, exc_info=True)
+            logger.warning("Il verisi hazirlanirken hata atlandi: %s", il_adi, exc_info=True)
             continue
 
     gelir_df = pd.DataFrame(veri_listesi)

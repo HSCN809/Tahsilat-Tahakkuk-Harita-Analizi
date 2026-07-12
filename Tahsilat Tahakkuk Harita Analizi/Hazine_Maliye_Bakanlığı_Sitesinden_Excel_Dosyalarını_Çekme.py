@@ -289,6 +289,7 @@ def discover_url(driver, current_year):
             if "404" not in driver.title and len(driver.find_elements(By.XPATH, "//*[contains(text(), 'Genel Bütçe')]")) > 0:
                 return temp_url
         except Exception:
+            logger.debug("URL denenirken hata, sonraki deneniyor: %s", temp_url, exc_info=True)
             continue
     # Fallback
     return f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{current_year}"
@@ -307,7 +308,7 @@ def detect_year_bounds(driver, current_year):
                 if match:
                     found_years.append(int(match.group(1)))
             except Exception:
-                logger.debug("Yıl elementi okunamadı, atlandı", exc_info=True)
+                logger.warning("Yil elementi okunamadi, atlandi", exc_info=True)
         if found_years:
             min_year = min(found_years)
             max_year = max(found_years)
