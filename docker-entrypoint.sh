@@ -2,7 +2,7 @@
 set -e
 
 # Railway volume'u root:root mount eder. appuser'in yazabilmesi icin chown.
-[ -d /app/veriler ] && chown appuser:appuser /app/veriler 2>/dev/null || true
+[ -d /app/veriler ] && chown -R appuser:appuser /app/veriler 2>/dev/null || true
 [ -n "$BACKUP_DIR" ] && mkdir -p "$BACKUP_DIR" && chown -R appuser:appuser "$BACKUP_DIR" 2>/dev/null || true
 
 # Chromium'un temp dosyalari icin appuser'a writable HOME
