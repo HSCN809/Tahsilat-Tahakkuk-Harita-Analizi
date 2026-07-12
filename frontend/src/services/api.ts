@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type { YearsResponse, ConfigResponse, DataResponse, TurkeyGeoJSON } from '../types';
 
 // --- Zod runtime şemaları ---
-// Backend yanıtı beklenenden farklı gelirse (eksik alan, yanlış tip) doğrulama hatası fırlatır.
 
 const YearsResponseSchema = z.object({
   years: z.array(z.number()),
@@ -33,17 +32,49 @@ const DataResponseSchema = z.object({
   })),
 });
 
-// --- API fonksiyonları ---
+// --- Kullaniciya gosterilecek hata mesajlari ---
+const USER_FRIENDLY_ERRORS: Record<number, string> = {
+  400: 'Gecersiz istek. Lutfen filtre secimlerinizi kontrol edin.',
+  404: 'Istediginiz veri sunucuda bulunamadi. Henuz yuklenmemis olabilir, lutfen once veri cekme islemini baslatin.',
+  429: 'Cok fazla istek gonderildi. Lutfen biraz bekleyip tekrar deneyin.',
+  500: 'Sunucuda gecici bir sorun olustu. Lutfen daha sonra tekrar deneyin.',
+  503: 'Sunucu su anda bakimda veya asiri yuklu. Lutfen biraz bekleyin.',
+};
+
+function getUserMessage(status: number): string {
+  return USER_FRIENDLY_ERRORS[status] ?? 'Beklenmeyen bir sorun olustu. Lutfen daha sonra tekrar deneyin.';
+}
+
+// --- API fonksiyonlari ---
 
 /**
- * Yardımcı: fetch + JSON parse + hata yönetimi.
- * HTTP hatası veya parse hatası fırlatır, çağıran catch'ler.
+ * Yardimci: fetch + JSON parse + hata yonetimi.
+ * Teknik detaylari console.error ile log'a yazar (sadece gelistirici gorur).
+ * Kullaniciya anlasilir hata mesaji firlatir.
  */
 async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  let response: Response;
+  try {
+    response = await fetch(url, { signal });
+  } catch (err) {
+    // Ag hatasi (internet kesintisi, DNS, CORS vs.)
+    console.error(`[api] Ag hatasi: ${url}`, err);
+    throw new Error('Sunucuya baglanilamadi. Internet baglantinizi kontrol edin.');
   }
+
+  if (!response.ok) {
+    // Backend'den detayli hata mesaji geliyorsa onu log'a yaz
+    let detail = '';
+    try {
+      const body = await response.json();
+      detail = body?.detail ?? '';
+    } catch {
+      // JSON parse edilemezse bos gec
+    }
+    console.error(`[api] HTTP ${response.status} - ${url}${detail ? ` | detay: ${detail}` : ''}`);
+    throw new Error(getUserMessage(response.status));
+  }
+
   return response.json();
 }
 

@@ -45,6 +45,8 @@ function App() {
           setSelectedYear(data.years[data.years.length - 1]);
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        console.error('[App] Yillar alinirken hata:', err);
         setError(err instanceof Error ? err.message : 'Yıllar alınırken bir sorun oluştu.');
       } finally {
         setLoadingYears(false);
@@ -57,9 +59,10 @@ function App() {
         const data = await fetchGeoJson();
         setGeoJsonData(data);
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        console.error('[App] Harita verisi alinirken hata:', err);
         setError(err instanceof Error ? err.message : 'Harita verisi alınırken bir sorun oluştu.');
       } finally {
-        setLoadingGeoJson(false);
       }
     };
 
@@ -99,7 +102,8 @@ function App() {
           setSelectedCategory('');
         }
       } catch (err) {
-        if (cancelled || err instanceof DOMException) return;
+        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
+        console.error('[App] Config alinirken hata:', err);
         setError(err instanceof Error ? err.message : 'Yıl yapılandırması alınırken bir sorun oluştu.');
       } finally {
         if (!cancelled) {
@@ -133,7 +137,8 @@ function App() {
         setSummary(data.summary);
         setRecords(data.data);
       } catch (err) {
-        if (cancelled || err instanceof DOMException) return;
+        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
+        console.error('[App] Veriler alinirken hata:', err);
         setError(err instanceof Error ? err.message : 'Veriler alınırken bir sorun oluştu.');
       } finally {
         if (!cancelled) setLoadingData(false);
