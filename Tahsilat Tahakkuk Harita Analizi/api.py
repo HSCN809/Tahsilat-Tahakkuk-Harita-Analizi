@@ -162,15 +162,24 @@ def _run_scraper(year_input: str) -> None:
     process = subprocess.Popen(
         [sys.executable, str(script_path), year_input],
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
+        bufsize=1,
     )
-    stdout, stderr = process.communicate()
+    # Canli log: scraper ciktisini satir satir okuyup log'a yaz
+    all_output = []
+    for line in process.stdout:
+        line = line.rstrip()
+        all_output.append(line)
+        logger.info("[scraper] %s", line)
+    process.wait()
+
+    combined = "\n".join(all_output)
     if process.returncode != 0:
-        logger.error("Scraper başarısız (rc=%s): %s", process.returncode, stderr)
-        raise RuntimeError(f"Scraper başarısız oldu (rc={process.returncode}): {stderr}")
-    logger.info("Scraper tamamlandı. Çıktı (son 500 karakter): %s...", stdout[-500:])
+        logger.error("Scraper başarısız (rc=%s)", process.returncode)
+        raise RuntimeError(f"Scraper başarısız oldu (rc={process.returncode}): {combined}")
+    logger.info("Scraper tamamlandı. Toplam %s satir cikti.", len(all_output))
     lib.clear_cache()
 
 
