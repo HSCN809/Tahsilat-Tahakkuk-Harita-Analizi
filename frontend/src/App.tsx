@@ -182,8 +182,8 @@ function App() {
   }, [summary, selectedRegion, filteredRecords]);
 
   const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
-  const isDataLoading = loadingData || loadingMonths || loadingCategories || !selectionsReady;
-  const isMapLoading = loadingGeoJson || isDataLoading;
+  const isAnythingLoading = loadingYears || loadingGeoJson || loadingMonths || loadingCategories || loadingData;
+  const isMapLoading = isAnythingLoading;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
