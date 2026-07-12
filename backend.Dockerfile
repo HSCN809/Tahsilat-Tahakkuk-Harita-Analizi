@@ -11,19 +11,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-RUN groupadd --system appuser \
-    && useradd --system --gid appuser --create-home --shell /usr/sbin/nologin appuser
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chown -R appuser:appuser /app
-
-# Entrypoint: root calisir, volume izinlerini duzeltir, appuser'a gecer
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+WORKDIR "/app/Tahsilat Tahakkuk Harita Analizi"
 
 EXPOSE 8080
 
@@ -31,4 +24,5 @@ ENV HOST=0.0.0.0 \
     PORT=8080 \
     WORKERS=1
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini","--"]
+CMD ["sh","-c","exec uvicorn api:app --host ${HOST} --port ${PORT} --workers ${WORKERS} --proxy-headers --forwarded-allow-ips='*' --no-access-log --timeout-graceful-shutdown 30"]

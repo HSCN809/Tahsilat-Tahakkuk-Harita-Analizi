@@ -74,7 +74,12 @@ if ana_klasor is None:
 
 if ana_klasor is None:
     ana_klasor = VERILER_DIR / olasi_adlar[0]
-    ana_klasor.mkdir(parents=True, exist_ok=True)
+    try:
+        ana_klasor.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        # Volume root'a aitse mkdir basarisiz olabilir;
+        # entrypoint script'i bu dizini zaten olusturmustur.
+        pass
 
 # --- Paylaşılan sabitler (api.py ve scraper tarafından import edilir) ---
 FOLDER_NAME_TEMPLATE = "İllere Göre Tahsilat Tahakkuk {year}"
