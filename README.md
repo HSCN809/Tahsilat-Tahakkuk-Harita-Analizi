@@ -50,14 +50,15 @@ bağladığınızda otomatik olarak algılanır. Aşağıdaki ayarları kontrol 
 |---|---|---|
 | `ALLOWED_ORIGINS` | CORS izin verilen origin'ler (virgülle) | `https://tahsilat.example.com` |
 | `SCRAPE_TOKEN` | `/api/scrape` için Bearer token | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
-| `BACKUP_DIR` | Snapshot yedek dizini (örn. `/app/backups`) | `/app/backups` |
-| `WORKERS` | Uvicorn worker sayısı | `2` |
+| `BACKUP_DIR` | Snapshot yedek dizini (örn. `/app/veriler/backups`) | `/app/veriler/backups` |
+| `WORKERS` | Uvicorn worker sayısı | `1` |
 
 - **Volume**: Railway'de kalıcı veri için **tek bir Volume** tanımlayın ve mount
-  path olarak **`/app`** dizinini kullanın. Railway tek bir volume'un birden fazla
-  mount path'e bağlanmasını desteklemez. `/app` mount path'i sayesinde hem
-  `/app/veriler` (veri dizini) hem de `/app/backups` (yedek dizini) aynı volume
-  üzerinde yer alır. Aksi takdirde veriler container yeniden başladığında silinir.
+  path olarak **`/app/veriler`** dizinini kullanın. ⚠️ **Kesinlikle `/app` mount
+  etmeyin** — boş volume uygulama kodunun üzerine yazar, container başlatılamaz.
+  `/app/veriler` mount path'i hem verileri hem de `BACKUP_DIR` içindeki yedekleri
+  aynı volume üzerinde tutar. Aksi takdirde veriler container yeniden başladığında
+  silinir.
 
 ---
 
@@ -150,7 +151,7 @@ otomatik çözümler.
 1. [ ] Repoyu Railway'e bağlayın (GitHub entegrasyonu)
 2. [ ] Backend servisinin otomatik algılandığını doğrulayın
 3. [ ] Backend servisine ortam değişkenlerini ekleyin (Variables)
-4. [ ] Backend servisine volume tanımlayın (mount path: `/app`; hem `/app/veriler` hem `/app/backups` aynı volume üzerinde yer alır)
+4. [ ] Backend servisine volume tanımlayın (mount path: `/app/veriler`; hem veriler hem yedekler bu volume üzerinde yer alır)
 5. [ ] Frontend servisini manuel oluşturun, Dockerfile path'i ayarlayın
 6. [ ] Scraping için `/api/scrape` endpoint'inin çalıştığını doğrulayın (önerilen yöntem — bkz. bölüm 3)
 7. [ ] Backend health check'in yeşil olduğunu doğrulayın
@@ -175,7 +176,7 @@ docs/
 |---|---|---|
 | `ALLOWED_ORIGINS` | CORS izin verilen origin'ler (virgülle) | localhost |
 | `SCRAPE_TOKEN` | `/api/scrape` için Bearer token (zorunlu) | — |
-| `BACKUP_DIR` | Snapshot yedeğinin yazılacağı dizin | — |
+| `BACKUP_DIR` | Snapshot yedeğinin yazılacağı dizin | `/app/veriler/backups` |
 | `BACKEND_WORKERS` | Uvicorn worker sayısı | 2 |
 | `GRAFANA_USER` / `GRAFANA_PASSWORD` | Grafana erişimi | admin / — |
 | `SCRAPE_YEARS` | One-shot scraper için yıl aralığı | hepsi |
