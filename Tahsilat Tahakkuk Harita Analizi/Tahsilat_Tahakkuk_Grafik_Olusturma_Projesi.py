@@ -59,8 +59,16 @@ for name in olasi_adlar:
         break
 
 if ana_klasor is None:
-    for p in VERILER_DIR.iterdir():
-        if p.is_dir() and any(c.name.startswith("İllere Göre Tahsilat Tahakkuk") for c in p.iterdir() if c.is_dir()):
+    try:
+        dirs = list(VERILER_DIR.iterdir())
+    except PermissionError:
+        dirs = []
+    for p in dirs:
+        try:
+            children = list(p.iterdir())
+        except PermissionError:
+            continue
+        if p.is_dir() and any(c.name.startswith("İllere Göre Tahsilat Tahakkuk") for c in children if c.is_dir()):
             ana_klasor = p
             break
 
