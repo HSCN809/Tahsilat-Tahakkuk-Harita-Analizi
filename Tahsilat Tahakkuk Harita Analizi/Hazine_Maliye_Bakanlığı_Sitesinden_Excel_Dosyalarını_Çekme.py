@@ -268,8 +268,13 @@ def setup_driver():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
 
+    # Sistemde kurulu Chromium ve ChromeDriver'i kullan (Docker imajinda var)
+    chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+    chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+    options.binary_location = chrome_bin
+
     logger.info("Tarayıcı başlatılıyor (Mevcut site yapısı analiz ediliyor)...")
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+    driver = webdriver.Chrome(service=ChromeService(chromedriver_path), options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     return driver
 
