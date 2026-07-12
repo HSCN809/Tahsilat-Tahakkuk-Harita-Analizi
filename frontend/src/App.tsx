@@ -181,7 +181,6 @@ function App() {
     };
   }, [summary, selectedRegion, filteredRecords]);
 
-  const selectionsReady = selectedYear !== null && !!selectedCategory && !!selectedMonth;
   const isAnythingLoading = loadingYears || loadingGeoJson || loadingMonths || loadingCategories || loadingData;
   const isMapLoading = isAnythingLoading;
 
@@ -375,7 +374,7 @@ function App() {
           {/* Middle Panel: Map & Stats Dashboard */}
           <div className="lg:col-span-6 flex flex-col gap-6">
 
-            <StatsCards stats={calculatedSummary} loading={isDataLoading} onCardClick={(metric) => {
+            <StatsCards stats={calculatedSummary} loading={isAnythingLoading} onCardClick={(metric) => {
               setActiveModalMetric(metric);
             }} />
 
@@ -394,7 +393,7 @@ function App() {
 
           {/* Right Panel: Leaderboards */}
           <div className="lg:col-span-3 flex flex-col gap-6">
-            <Leaderboard data={filteredRecords} loading={isDataLoading} />
+            <Leaderboard data={filteredRecords} loading={isAnythingLoading} />
           </div>
 
         </div>
