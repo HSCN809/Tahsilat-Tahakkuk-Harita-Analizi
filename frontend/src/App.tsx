@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Layers, Calendar, MapPin } from 'lucide-react';
+import { Layers, Calendar, MapPin, Download } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
 import { ProvinceModal } from './components/ProvinceModal';
+import { DownloadModal } from './components/DownloadModal';
 import { fetchYears, fetchConfig, fetchData, fetchGeoJson } from './services/api';
 import { REGIONS, normalizeProvinceName } from './utils/provinces';
 import type { Category, Summary, ProvinceRecord, TurkeyGeoJSON, MapType, ModalMetric } from './types';
@@ -26,6 +27,7 @@ function App() {
   const [selectedRegion, setSelectedRegion] = useState<string>('Tüm Ülke');
 
   const [activeModalMetric, setActiveModalMetric] = useState<ModalMetric | null>(null);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
   const [loadingYears, setLoadingYears] = useState(true);
   const [loadingMonths, setLoadingMonths] = useState(false);
@@ -223,10 +225,19 @@ function App() {
 
             {/* Filter Section */}
             <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex flex-col gap-5">
-              <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2 border-b border-slate-800 pb-3">
-                <Calendar className="w-5 h-5 text-blue-400" />
-                Filtre Seçenekleri
-              </h2>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-400" />
+                  Filtre Seçenekleri
+                </h2>
+                <button
+                  onClick={() => setDownloadModalOpen(true)}
+                  title="Ham veri indir"
+                  className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-blue-400 transition-all cursor-pointer"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+              </div>
 
               {/* Year Select */}
               <div className="flex flex-col gap-2">
@@ -414,6 +425,15 @@ function App() {
           categories={categories}
           selectedCategory={selectedCategory}
           onClose={() => setActiveModalMetric(null)}
+        />
+      )}
+
+      {/* Ham Veri İndirme Modalı */}
+      {downloadModalOpen && (
+        <DownloadModal
+          years={years}
+          initialYear={selectedYear}
+          onClose={() => setDownloadModalOpen(false)}
         />
       )}
     </div>

@@ -19,3 +19,14 @@ export const formatCurrency = (rawVal: number | undefined | null): string => {
   }
   return `${val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
 };
+
+export const formatFileSize = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes >= 1_048_576) {
+    return `${(bytes / 1_048_576).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`;
+  }
+  if (bytes >= 1_024) {
+    return `${(bytes / 1_024).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`;
+  }
+  return `${bytes} B`;
+};

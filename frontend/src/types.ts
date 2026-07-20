@@ -46,5 +46,16 @@ export interface DataResponse {
   data: ProvinceRecord[];
 }
 
+export interface RawFileInfo {
+  id: string;
+  name: string;
+  size: number;
+}
+
+export interface FilesResponse {
+  year: number;
+  files: RawFileInfo[];
+}
+
 // GeoJSON Türkiye haritası — geojson tipleri ile
 export type TurkeyGeoJSON = FeatureCollection<Geometry, { name: string }>;

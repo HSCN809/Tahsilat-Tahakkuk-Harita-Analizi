@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { YearsResponse, ConfigResponse, DataResponse, TurkeyGeoJSON } from '../types';
+import type { YearsResponse, ConfigResponse, DataResponse, TurkeyGeoJSON, FilesResponse } from '../types';
 
 // --- Zod runtime şemaları ---
 
@@ -29,6 +29,15 @@ const DataResponseSchema = z.object({
     accrual: z.number().nullable(),
     collection: z.number().nullable(),
     ratio: z.number().nullable(),
+  })),
+});
+
+const FilesResponseSchema = z.object({
+  year: z.number(),
+  files: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    size: z.number(),
   })),
 });
 
@@ -102,4 +111,50 @@ export async function fetchData(
 export async function fetchGeoJson(signal?: AbortSignal): Promise<TurkeyGeoJSON> {
   const json = await fetchJson('/api/geojson', signal);
   return json as TurkeyGeoJSON;
+}
+
+export async function fetchFiles(year: number, signal?: AbortSignal): Promise<FilesResponse> {
+  const json = await fetchJson(`/api/files?year=${year}`, signal);
+  return FilesResponseSchema.parse(json) as FilesResponse;
+}
+
+/**
+ * Seçilen ham .xls dosyalarını zip olarak indirir.
+ * Yanıt fetch ile Blob (bellekte ikili veri) olarak alınır; geçici bir nesne
+ * URL'si üzerinden tarayıcıya dosya olarak kaydettirilir. fetch kullandığımız
+ * için hata durumunda kullanıcıya anlamlı mesaj gösterebiliriz.
+ */
+export async function downloadFiles(year: number, ids: string[]): Promise<void> {
+  const query = ids.map(encodeURIComponent).join(',');
+  const url = `/api/files/download?year=${year}&files=${query}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (err) {
+    console.error(`[api] Ağ hatası: ${url}`, err);
+    throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+  }
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const body = await response.json();
+      detail = body?.detail ?? '';
+    } catch {
+      // JSON parse edilemezse boş geç
+    }
+    console.error(`[api] HTTP ${response.status} - ${url}${detail ? ` | detay: ${detail}` : ''}`);
+    throw new Error(getUserMessage(response.status));
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = `tahsilat-tahakkuk-${year}-ham-veri.zip`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }

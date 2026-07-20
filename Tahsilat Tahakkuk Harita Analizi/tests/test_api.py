@@ -121,3 +121,95 @@ def test_scrape_requires_token():
     assert r.status_code == 401
     # token var ama gerçek scraper'ı tetiklememek için job lock'ı bypass:
     # burada sadece auth katmanını doğruluyoruz; scraper çağrısı uzun sürer.
+
+
+# --- ham veri indirme: /api/files ve /api/files/download ---
+import io as _io
+import zipfile as _zipfile
+
+_TEST_YEAR = 2099
+
+
+def _make_raw_year(tmp_path, monkeypatch):
+    """Sahte yıl klasörü + raw_xls içeriği oluşturur, lib yolunu buna yönlendirir."""
+    year_dir = tmp_path / f"İllere Göre Tahsilat Tahakkuk {_TEST_YEAR}"
+    raw_dir = year_dir / "raw_xls"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / "01-Adana-2099.xls").write_bytes(b"sahte-xls-1")
+    (raw_dir / "06-Ankara-2099.xls").write_bytes(b"sahte-xls-2")
+    (raw_dir / "not-excel.txt").write_text("excel değil")  # listeye girmemeli
+    monkeypatch.setattr(
+        lib, "get_year_folder_path",
+        lambda y: str(tmp_path / f"İllere Göre Tahsilat Tahakkuk {y}"),
+    )
+
+
+def _client():
+    import importlib as _il
+    _il.reload(__import__("api"))
+    import api as api_mod
+    from fastapi.testclient import TestClient
+    return TestClient(api_mod.app)
+
+
+def test_files_listing(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get(f"/api/files?year={_TEST_YEAR}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["year"] == _TEST_YEAR
+    names = [f["name"] for f in body["files"]]
+    assert names == ["01-Adana-2099.xls", "06-Ankara-2099.xls"]
+    ids = [f["id"] for f in body["files"]]
+    assert ids == ["01-Adana-2099", "06-Ankara-2099"]
+    assert all(f["size"] > 0 for f in body["files"])
+
+
+def test_files_listing_year_not_found(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get("/api/files?year=2098")  # klasörü olmayan yıl
+    assert r.status_code == 404
+
+
+def test_files_download_selected_zip(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get(f"/api/files/download?year={_TEST_YEAR}&files=01-Adana-2099")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/zip"
+    assert "attachment" in r.headers["content-disposition"]
+    with _zipfile.ZipFile(_io.BytesIO(r.content)) as zf:
+        assert zf.namelist() == ["01-Adana-2099.xls"]
+        assert zf.read("01-Adana-2099.xls") == b"sahte-xls-1"
+
+
+def test_files_download_all(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get(f"/api/files/download?year={_TEST_YEAR}&all=true")
+    assert r.status_code == 200
+    with _zipfile.ZipFile(_io.BytesIO(r.content)) as zf:
+        assert sorted(zf.namelist()) == ["01-Adana-2099.xls", "06-Ankara-2099.xls"]
+
+
+def test_files_download_invalid_id(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get(f"/api/files/download?year={_TEST_YEAR}&files=99-Olmayan-2099")
+    assert r.status_code == 400
+
+
+def test_files_download_empty_selection(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get(f"/api/files/download?year={_TEST_YEAR}")
+    assert r.status_code == 400
+
+
+def test_files_download_path_traversal_rejected(tmp_path, monkeypatch):
+    _make_raw_year(tmp_path, monkeypatch)
+    client = _client()
+    r = client.get(f"/api/files/download?year={_TEST_YEAR}&files=../../secret")
+    assert r.status_code == 400

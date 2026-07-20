@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import json
@@ -5,13 +6,14 @@ import sys
 import hmac
 import logging
 import subprocess
+import zipfile
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timezone
 from fastapi import FastAPI, Header, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 # api.py dosyasının bulunduğu dizini Python sistem yoluna ekle (İçe aktarmaların sorunsuz çalışması için)
@@ -223,6 +225,8 @@ def read_root():
             "GET /api/config?year=2025": "Yıla ait ayları ve gelir kalemlerini tek istekte döner",
             "GET /api/data?year=2025&category=Özel Tüketim Vergisi": "Yıl ve kalem bazlı ham il verilerini listeler",
             "GET /api/geojson": "Türkiye sınırları GeoJSON dosyasını döner",
+            "GET /api/files?year=2025": "Yıla ait ham .xls dosyalarını listeler",
+            "GET /api/files/download?year=2025&files=01-Adana-2025,06-Ankara-2025": "Seçilen ham dosyaları zip olarak indirir",
             "GET /api/jobs/status": "Aktif/son scrape işinin durumunu döner",
             "POST /api/scrape?year_input=2024-2025": "Arka planda veri indirmeyi başlatır (token gerekir)",
         },
@@ -395,6 +399,97 @@ async def get_geojson():
     except Exception:
         logger.exception("GeoJSON okuma hatası")
         raise HTTPException(status_code=500, detail="GeoJSON okuma hatası.")
+
+
+# --- Ham veri indirme ---
+# Tek istekte indirilebilecek maksimum dosya sayısı (kötüye kullanım sınırı).
+_MAX_DOWNLOAD_FILES = 200
+
+
+def _list_raw_files(year: int) -> list[dict]:
+    """Seçilen yılın raw_xls klasöründeki ham .xls dosyalarını listeler.
+
+    Dosya adları her zaman diskten okunur; istemciden gelen hiçbir değer
+    dosya yolu oluşturmak için kullanılmaz (path traversal koruması).
+    """
+    folder_path = lib.get_year_folder_path(year)
+    raw_dir = os.path.join(folder_path, "raw_xls")
+    if not os.path.isdir(raw_dir):
+        raise FileNotFoundError(f"{year} yılına ait ham veri klasörü bulunamadı.")
+    files = []
+    for fname in sorted(os.listdir(raw_dir)):
+        fpath = os.path.join(raw_dir, fname)
+        if os.path.isfile(fpath) and fname.lower().endswith(".xls"):
+            files.append({
+                "id": os.path.splitext(fname)[0],
+                "name": fname,
+                "size": os.path.getsize(fpath),
+            })
+    return files
+
+
+def _build_raw_zip(year: int, selected: list[dict]) -> bytes:
+    """Seçilen ham .xls dosyalarını bellekte tek bir zip arşivi olarak paketler."""
+    raw_dir = os.path.join(lib.get_year_folder_path(year), "raw_xls")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for f in selected:
+            zf.write(os.path.join(raw_dir, f["name"]), arcname=f["name"])
+    return buffer.getvalue()
+
+
+@app.get("/api/files")
+async def list_files(year: int):
+    """Seçilen yıl için indirilebilir ham .xls dosyalarını listeler."""
+    _validate_year(year)
+    try:
+        files = await run_in_threadpool(_list_raw_files, year)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"{year} yılına ait ham veri klasörü bulunamadı.")
+    except Exception:
+        logger.exception("Ham dosyalar listelenirken hata oluştu (year=%s)", year)
+        raise HTTPException(status_code=500, detail="Ham dosyalar listelenirken hata oluştu.")
+    return {"year": year, "files": files}
+
+
+@app.get("/api/files/download")
+async def download_files(year: int, files: str = "", all: bool = False):
+    """Seçilen ham .xls dosyalarını zip arşivi olarak döner.
+
+    `files`: virgülle ayrılmış dosya id'leri (/api/files yanıtındaki `id` alanları).
+    `all=true` verilirse yıla ait tüm ham dosyalar indirilir.
+    """
+    _validate_year(year)
+    try:
+        available = await run_in_threadpool(_list_raw_files, year)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"{year} yılına ait ham veri klasörü bulunamadı.")
+
+    if all:
+        selected = available
+    else:
+        requested = [f.strip() for f in files.split(",") if f.strip()]
+        if not requested:
+            raise HTTPException(status_code=400, detail="İndirilecek dosya seçilmedi.")
+        by_id = {f["id"]: f for f in available}
+        invalid = [r for r in requested if r not in by_id]
+        if invalid:
+            raise HTTPException(status_code=400, detail=f"Geçersiz dosya seçimi: {', '.join(invalid[:5])}")
+        selected = [by_id[r] for r in requested]
+
+    if not selected:
+        raise HTTPException(status_code=404, detail=f"{year} yılı için indirilebilir ham dosya bulunamadı.")
+    if len(selected) > _MAX_DOWNLOAD_FILES:
+        raise HTTPException(status_code=400, detail=f"Tek seferde en fazla {_MAX_DOWNLOAD_FILES} dosya indirilebilir.")
+
+    zip_bytes = await run_in_threadpool(_build_raw_zip, year, selected)
+    zip_name = f"tahsilat-tahakkuk-{year}-ham-veri.zip"
+    logger.info("Ham veri indirildi: yıl=%s dosya_sayısı=%s", year, len(selected))
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+    )
 
 
 @app.get("/api/jobs/status")
