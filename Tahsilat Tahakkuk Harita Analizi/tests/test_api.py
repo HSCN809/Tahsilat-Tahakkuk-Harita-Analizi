@@ -1,7 +1,9 @@
 import os
+import io
 import sys
 import time
 import tarfile
+import zipfile
 import importlib
 import tempfile
 from pathlib import Path
@@ -124,9 +126,6 @@ def test_scrape_requires_token():
 
 
 # --- ham veri indirme: /api/files ve /api/files/download ---
-import io as _io
-import zipfile as _zipfile
-
 _TEST_YEAR = 2099
 
 
@@ -180,7 +179,7 @@ def test_files_download_selected_zip(tmp_path, monkeypatch):
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/zip"
     assert "attachment" in r.headers["content-disposition"]
-    with _zipfile.ZipFile(_io.BytesIO(r.content)) as zf:
+    with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
         assert zf.namelist() == ["01-Adana-2099.xls"]
         assert zf.read("01-Adana-2099.xls") == b"sahte-xls-1"
 
@@ -190,7 +189,7 @@ def test_files_download_all(tmp_path, monkeypatch):
     client = _client()
     r = client.get(f"/api/files/download?year={_TEST_YEAR}&all=true")
     assert r.status_code == 200
-    with _zipfile.ZipFile(_io.BytesIO(r.content)) as zf:
+    with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
         assert sorted(zf.namelist()) == ["01-Adana-2099.xls", "06-Ankara-2099.xls"]
 
 
