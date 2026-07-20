@@ -8,7 +8,11 @@ RUN npm run build
 
 # --- Stage 2: Serve (nginx) ---
 FROM nginx:alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# NGINX_CONF arg ile dev/prod nginx yapılandırması seçimi
+# Production (varsayılan): nginx.conf
+# Development: nginx-dev.conf
+ARG NGINX_CONF=nginx.conf
+COPY ${NGINX_CONF} /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
