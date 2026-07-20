@@ -1,7 +1,7 @@
 # Üretim / Railway-referans Compose yapılandırması
 # Kullanım:
 #   cp .env.prod.example .env.prod   # değerleri doldur
-#   docker compose -f docker-compose.yml --env-file .env.prod up -d --build
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 #
 # Geliştirme ortamı için: docker-compose.dev.yml
 

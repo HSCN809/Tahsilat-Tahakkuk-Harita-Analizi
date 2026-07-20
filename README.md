@@ -9,15 +9,15 @@ toplayıcı Selenium tabanlı bir one-shot scraper.
 Projenin kurulumu ve çalıştırılması için aşağıdaki kılavuzları inceleyebilirsiniz:
 
 *   **Yerel Geliştirme (Dev) Ortamı**: Detaylı kurulum adımları, portlar ve yerel test yönergeleri için [docs/DEV_ORTAMI.md](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/docs/DEV_ORTAMI.md) kılavuzuna bakın.
-*   **Canlı Yayın (Production)**: Uygulama **Railway** bulut platformu üzerinde çalışmak üzere optimize edilmiştir. Railway'de backend ve frontend **manuel olarak ayrı birer servis** şeklinde oluşturulmalıdır; scraping işlemi Railway'de backend'in `/api/scrape` endpoint'i üzerinden önerilir. `docker-compose.yml` Railway tarafından doğrudan okunmaz. Detaylı kurulum adımları için aşağıdaki [Railway Deployment](#railway-deployment) bölümüne bakın.
+*   **Canlı Yayın (Production)**: Uygulama **Railway** bulut platformu üzerinde çalışmak üzere optimize edilmiştir. Railway'de backend ve frontend **manuel olarak ayrı birer servis** şeklinde oluşturulmalıdır; scraping işlemi Railway'de backend'in `/api/scrape` endpoint'i üzerinden önerilir. `docker-compose.prod.yml` Railway tarafından doğrudan okunmaz. Detaylı kurulum adımları için aşağıdaki [Railway Deployment](#railway-deployment) bölümüne bakın.
 
 ## Railway Deployment
 
 ### ⚠️ Önemli: Railway docker-compose'u çoklu servis olarak deploy ETMEZ
 
-Railway, `docker-compose.yml` dosyasını **doğrudan okumaz** ve bu repodaki
+Railway, `docker-compose.prod.yml` dosyasını **doğrudan okumaz** ve bu repodaki
 çoklu servis yapısını (backend, frontend, scraper) otomatik olarak deploy
-edemez. `docker-compose.yml` üretim/Railway-referans compose dosyası,
+edemez. `docker-compose.prod.yml` üretim/Railway-referans compose dosyası,
 `docker-compose.dev.yml` ise yerel geliştirme/test amaçlıdır.
 
 Railway'de **her bir servis ayrı ayrı manuel olarak oluşturulmalıdır**.
@@ -112,7 +112,7 @@ depolama (örn. S3)** ile mümkündür. Bu durumda hem backend hem scraper aynı
 S3 bucket'ına okuma/yazma yapacak şekilde yapılandırılmalıdır. Mevcut
 named-volume paylaşımı yaklaşımı Railway'de desteklenmez.
 
-Yerel geliştirme/test için `docker-compose.yml` içinde tanımlı scraper
+Yerel geliştirme/test için `docker-compose.prod.yml` içinde tanımlı scraper
 servisi kullanılabilir (bkz. [Manuel Veri Çekme](#manuel-veri-çekme-scraping)).
 
 ---
@@ -160,7 +160,7 @@ otomatik çözümler.
 ## Dizin Yapısı
 
 ```text
-docker-compose.yml          # Üretim / Railway-referans compose dosyası
+docker-compose.prod.yml     # Üretim / Railway-referans compose dosyası
 docker-compose.dev.yml      # Geliştirme (Dev) ortamı compose dosyası
 backend.Dockerfile          # Backend Dockerfile'ı (FastAPI)
 scraper.Dockerfile          # Scraper Dockerfile'ı (Selenium + Chromium)
@@ -197,6 +197,15 @@ yerel docker compose ortamında çalışır (Railway'de kullanılmaz):
 Container işi bitirince otomatik silinir (`--rm`). Veriler `veriler_named`
 volume'una yazılır; backend aynı volume'u paylaşır (docker compose aynı
 volume'u iki servise bağlayabildiği için yerel ortamda çalışır).
+
+### Yerel Production Testi
+
+Production ortamını yerel olarak test etmek için:
+
+```bash
+cp .env.prod.example .env.prod   # değerleri doldur
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+```
 
 ### Railway / Production (API Endpoint ile)
 
