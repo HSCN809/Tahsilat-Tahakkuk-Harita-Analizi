@@ -2,18 +2,17 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend.Dockerfile
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     volumes:
       - .:/app
-      - backend_venv:/app/venv
+      - backend_cargo_target:/app/backend/target
       - frontend_node_modules:/app/frontend/node_modules
     environment:
       - PYTHONUNBUFFERED=1
       - PORT=8000
       - SCRAPE_TOKEN=${SCRAPE_TOKEN:-dev-token}
-      # CORS izin verilen origin'ler (virgülle ayrılmış). Üretimde domain'inizi ekleyin.
       - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173
     networks:
       default:
@@ -23,7 +22,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: frontend.Dockerfile
+      dockerfile: Dockerfile
       args:
         - NGINX_CONF=nginx-dev.conf
     ports:
@@ -32,5 +31,5 @@ services:
       - backend
 
 volumes:
-  backend_venv:
+  backend_cargo_target:
   frontend_node_modules:

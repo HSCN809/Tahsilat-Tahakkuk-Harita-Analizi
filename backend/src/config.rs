@@ -57,17 +57,17 @@ impl AppConfig {
             .map(PathBuf::from)
             .unwrap_or_else(|_| data_dir.join("tahsilat_tahakkuk.db"));
 
-        // tr.json arama
+        // tr.json arama (statik harita varlığı olarak backend/ dizininde tutulur)
         let geojson_candidates = [
-            data_dir.join("tr.json"),
+            current_dir.join("backend").join("tr.json"),
             current_dir.join("tr.json"),
-            current_dir.join("veriler").join("tr.json"),
-            current_dir.parent().map(|p| p.join("veriler").join("tr.json")).unwrap_or_default(),
-            PathBuf::from("veriler/tr.json"),
+            current_dir.parent().map(|p| p.join("backend").join("tr.json")).unwrap_or_default(),
+            PathBuf::from("backend/tr.json"),
             PathBuf::from("tr.json"),
+            data_dir.join("tr.json"),
         ];
 
-        let mut geojson_path = data_dir.join("tr.json");
+        let mut geojson_path = current_dir.join("backend").join("tr.json");
         for candidate in geojson_candidates {
             if candidate.exists() {
                 geojson_path = candidate;

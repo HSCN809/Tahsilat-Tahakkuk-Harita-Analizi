@@ -1,17 +1,15 @@
 # Üretim / Railway-referans Compose yapılandırması
 # Kullanım:
-#   cp .env.prod.example .env.prod   # değerleri doldur
+#   cp .env.prod.example .env.prod
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 #
-# Geliştirme ortamı için: docker-compose.dev.yml
+# Geliştirme ortamı için: docker-compose.dev.yml (veya docker compose up)
 
 services:
   backend:
     build:
       context: .
-      dockerfile: backend.Dockerfile
-    # DİKKAT: 8080 portu host'a AÇILMIYOR. Yalnızca internal ağ üzerinden
-    # nginx (frontend) ve scraper erişebilir.
+      dockerfile: backend/Dockerfile
     expose:
       - "8080"
     environment:
@@ -48,7 +46,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: frontend.Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "80:80"
     depends_on:
@@ -72,13 +70,10 @@ services:
     networks:
       - appnet
 
-  # NOT: Bu servis Railway production'da KULLANILMAZ; yalnızca yerel/manuel
-  # docker compose testleri için burada tanımlıdır. Railway'de scraping işlemi
-  # için backend'in /api/scrape endpoint'ini kullanın (tek servis, tek volume).
   scraper:
     build:
       context: .
-      dockerfile: scraper.Dockerfile
+      dockerfile: scraper/Dockerfile
     profiles:
       - manual
     environment:
