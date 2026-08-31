@@ -6,22 +6,22 @@ use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use backend_rust::config::AppConfig;
-use backend_rust::create_app;
-use backend_rust::db::init_pool;
-use backend_rust::job_manager::JobManager;
-use backend_rust::state::AppState;
+use backend::config::AppConfig;
+use backend::create_app;
+use backend::db::init_pool;
+use backend::job_manager::JobManager;
+use backend::state::AppState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Loki dostu yapılandırılmış loglama
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,backend_rust=debug".into()))
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,backend=debug".into()))
         .with(tracing_subscriber::fmt::layer().json())
         .init();
 
     let config = AppConfig::from_env();
-    info!("Tahsilat-Tahakkuk Rust Backend başlatılıyor...");
+    info!("Tahsilat-Tahakkuk Backend başlatılıyor...");
     info!("Yapılandırma: DB Yolu={:?}, Port={}", config.db_path, config.port);
 
     // Veritabanı havuzunu başlat

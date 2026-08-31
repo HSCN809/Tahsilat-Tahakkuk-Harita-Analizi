@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       chromium chromium-driver tini ca-certificates \
+       chromium chromium-driver tini ca-certificates sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system appuser \
@@ -22,12 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/veriler
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/veriler && chown -R appuser:appuser /app
 
 USER appuser
 
-WORKDIR "/app/Tahsilat Tahakkuk Harita Analizi"
-
-ENTRYPOINT ["/usr/bin/tini","--"]
-CMD ["python","scraper_one_shot.py"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["python", "scraper/scraper.py"]

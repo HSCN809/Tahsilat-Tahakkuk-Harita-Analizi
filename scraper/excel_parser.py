@@ -1,3 +1,4 @@
+import atexit
 import logging
 import os
 import re
@@ -35,16 +36,20 @@ xlrd.biffh.unicode = safe_decode
 xlrd.book.unicode = safe_decode
 xlrd.formatting.unicode = safe_decode
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 'veriler' klasörünü bul; yoksa otomatik oluştur (ilk çalıştırmada).
-# Öncelik sırası: repo kökü (parent), sonra cwd, en son script dizini.
-for candidate in [BASE_DIR.parent / "veriler", Path.cwd() / "veriler", BASE_DIR / "veriler"]:
-    candidate.mkdir(parents=True, exist_ok=True)
-    VERILER_DIR = candidate
-    break
+for candidate in [BASE_DIR / "veriler", Path.cwd() / "veriler", Path("veriler")]:
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        VERILER_DIR = candidate
+        break
+    except Exception:
+        continue
+else:
+    VERILER_DIR = Path("veriler")
 
-# Excel ana klasörünü bul; yoksa varsayılan adla oluştur (scraper buraya yazar)
+# Excel ana klasörünü bul; yoksa varsayılan adla oluştur
 olasi_adlar = [
     "Tahsilat Tahakkuk Excel Dosyaları",
     "İllere Göre Tahsilat Tahakkuk (Yıllara Göre)",
@@ -60,14 +65,14 @@ for name in olasi_adlar:
 if ana_klasor is None:
     try:
         dirs = list(VERILER_DIR.iterdir())
-    except PermissionError:
+    except Exception:
         dirs = []
     for p in dirs:
         if not p.is_dir():
             continue
         try:
             children = list(p.iterdir())
-        except (PermissionError, NotADirectoryError):
+        except Exception:
             continue
         if any(c.name.startswith("İllere Göre Tahsilat Tahakkuk") for c in children if c.is_dir()):
             ana_klasor = p
@@ -77,12 +82,10 @@ if ana_klasor is None:
     ana_klasor = VERILER_DIR / olasi_adlar[0]
     try:
         ana_klasor.mkdir(parents=True, exist_ok=True)
-    except PermissionError:
-        # Volume root'a aitse mkdir basarisiz olabilir;
-        # entrypoint script'i bu dizini zaten olusturmustur.
+    except Exception:
         pass
 
-# --- Paylaşılan sabitler (api.py ve scraper tarafından import edilir) ---
+# --- Paylaşılan sabitler ---
 FOLDER_NAME_TEMPLATE = "İllere Göre Tahsilat Tahakkuk {year}"
 AY_SIRALAMASI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
 
@@ -94,11 +97,11 @@ def get_year_folder_path(year):
 
 def kolonlari_ayarla(df_raw, header_row_idx):
     header_row = [str(val).lower().strip() for val in df_raw.iloc[header_row_idx].tolist()]
-    
+
     tahakkuk_idx = None
     tahsilat_idx = None
     ratio_idx = None
-    
+
     for i, val in enumerate(header_row):
         if "/" in val or "oran" in val or ("tahakkuk" in val and "tahsilat" in val):
             ratio_idx = i
@@ -106,35 +109,30 @@ def kolonlari_ayarla(df_raw, header_row_idx):
             tahakkuk_idx = i
         elif "tahsilat" in val:
             tahsilat_idx = i
-                
+
     if ratio_idx is None and tahsilat_idx is not None and tahsilat_idx + 1 < len(header_row):
         ratio_idx = tahsilat_idx + 1
-        
+
     if tahakkuk_idx is None or tahsilat_idx is None:
         return None
-        
+
     index_idx = tahakkuk_idx - 1
     df = df_raw.iloc[header_row_idx + 1:].copy()
-    
+
     if ratio_idx is not None and ratio_idx < df_raw.shape[1]:
         df = df.iloc[:, [index_idx, tahakkuk_idx, tahsilat_idx, ratio_idx]]
     else:
         df = df.iloc[:, [index_idx, tahakkuk_idx, tahsilat_idx]]
         df['tahsilat/tahakkuk'] = None
-        
+
     df.columns = ['index', 'tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']
     return df
+
 
 def oku_ve_temizle_dosya(dosya_yolu, il_adi, yil, log_etiket=None):
     """
     Tek bir Excel dosyasını dinamik satır tespiti yaparak okuyup temizler.
     Yıllık ve aylık dosyalar için ortak kullanılır.
-
-    Parametreler:
-      dosya_yolu: Okunacak .xlsx dosyasının tam yolu
-      il_adi: Dönecek sonucun il adı etiketi
-      yil: Dönecek sonucun yıl değeri
-      log_etiket: Hata loglarında görünecek dosya tanımlayıcısı (opsiyonel)
     """
     etiket = log_etiket or il_adi
     try:
@@ -189,11 +187,9 @@ def oku_ve_temizle_aylik_dosya(folder_name, month, parent_folder_path, yil):
         return None
     return oku_ve_temizle_dosya(dosya_yolu, il_adi, yil, log_etiket=f"{folder_name}/{month}")
 
+
 class LRUCache:
-    """
-    Thread-safe LRU (Least Recently Used) önbellek.
-    Eşzamanlı erişimde güvenli ve bellek kullanımı sınırlı.
-    """
+    """Thread-safe LRU önbellek."""
     def __init__(self, maxsize: int = 32):
         self._data: OrderedDict = OrderedDict()
         self._lock = threading.RLock()
@@ -203,7 +199,6 @@ class LRUCache:
         with self._lock:
             if key not in self._data:
                 return None
-            # En son kullanılanı sona taşı (LRU sıralaması)
             self._data.move_to_end(key)
             return self._data[key]
 
@@ -212,7 +207,6 @@ class LRUCache:
             if key in self._data:
                 self._data.move_to_end(key)
             self._data[key] = value
-            # maxsize aşılırsa en eski (en az kullanılan) entry'i at
             if len(self._data) > self.maxsize:
                 self._data.popitem(last=False)
 
@@ -236,22 +230,18 @@ class LRUCache:
 _excel_cache = LRUCache(maxsize=32)
 _config_cache = LRUCache(maxsize=32)
 
-# Modül seviyesi tek thread havuzu — her çağrıda yeniden yaratma maliyetinden kaçınır
-import atexit
-
 _executor = ThreadPoolExecutor(max_workers=16)
 atexit.register(_executor.shutdown)
+
 
 def clear_cache():
     _excel_cache.clear()
     _config_cache.clear()
     logger.info("Excel veri ve config önbelleği temizlendi.")
 
+
 def excel_dosyalarini_oku(folder_path, month=None):
-    """
-    Klasördeki tüm il Excel dosyalarını (yıllık veya belirli bir aya ait) paralel olarak okur.
-    Bellek içi önbellekleme kullanır.
-    """
+    """Klasördeki tüm il Excel dosyalarını paralel olarak okur."""
     cache_key = (str(folder_path), month)
     cached = _excel_cache.get(cache_key)
     if cached is not None:
@@ -265,7 +255,6 @@ def excel_dosyalarini_oku(folder_path, month=None):
     yillar = []
 
     if month and month != "Yıl Geneli":
-        # Aylık veriyi oku
         il_klasorleri = sorted([
             d for d in os.listdir(folder_path)
             if os.path.isdir(os.path.join(folder_path, d)) and re.match(r"^\d{2}_", d)
@@ -283,7 +272,6 @@ def excel_dosyalarini_oku(folder_path, month=None):
                 iller_dict[il_adi] = df
                 yillar.append(yil)
     else:
-        # Yıllık veriyi oku
         excel_dosyalari = sorted(
             [f for f in os.listdir(folder_path) if f.endswith('.xlsx')],
             key=lambda x: int(re.search(r"(\d{4})", x).group(1)) if re.search(r"(\d{4})", x) else 0
@@ -304,16 +292,15 @@ def excel_dosyalarini_oku(folder_path, month=None):
     _excel_cache.set(cache_key, (iller_dict, yillar))
     return iller_dict, yillar
 
+
 def temizle_metin(text):
     if not isinstance(text, str):
         return ""
     clean = re.sub(r"^\d+\.\s*", "", text.strip(), flags=re.UNICODE).lower()
     return re.sub(r"\s+", " ", clean)
 
+
 def veri_hazirla(iller_dict, secim):
-    """
-    İl sözlüğündeki verileri seçilen gelir kalemi (secim) bazında filtreleyip DataFrame'e dönüştürür.
-    """
     veri_listesi = []
     for il_adi, df in iller_dict.items():
         try:
@@ -336,5 +323,4 @@ def veri_hazirla(iller_dict, secim):
             logger.warning("Il verisi hazirlanirken hata atlandi: %s", il_adi, exc_info=True)
             continue
 
-    gelir_df = pd.DataFrame(veri_listesi)
-    return gelir_df
+    return pd.DataFrame(veri_listesi)

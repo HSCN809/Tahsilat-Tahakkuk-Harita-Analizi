@@ -20,7 +20,7 @@ Ardından kök dizinde bir `.env` dosyası oluşturun ve ürettiğiniz token'ı 
 New-Item -Path .env -ItemType File -Value "SCRAPE_TOKEN=urettiginiz-token-degeri"
 ```
 
-### Adım 2: Docker Compose ile Başlatma
+### Adım 2: Docker Compose ile Başlatma (Önerilen)
 Tüm servisleri geliştirme profilinde derleyin ve arka planda çalışacak şekilde başlatın:
 ```powershell
 docker compose -f docker-compose.dev.yml up -d --build --force-recreate
@@ -28,20 +28,37 @@ docker compose -f docker-compose.dev.yml up -d --build --force-recreate
 
 ---
 
-## 2. Erişim Adresleri
+## 2. Manuel Çalıştırma (Docker Olmadan)
 
-Geliştirme ortamı başlatıldığında servisler şu adreslerden yayın yapar:
+### 1. Backend (Rust Axum)
+```powershell
+cd backend
+cargo run
+```
+* **API:** http://localhost:8080 veya http://localhost:8000
 
-*   **Kullanıcı Arayüzü (React + Vite)**: [http://localhost:5173](http://localhost:5173) (Yerel kod değişiklikleriniz anında tarayıcıya yansır).
-*   **Backend API**: [http://localhost:8000](http://localhost:8000)
-*   **Swagger API Dokümantasyonu**: [http://localhost:8000/docs](http://localhost:8000/docs)
+### 2. Frontend (React + Vite)
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+* **Kullanıcı Arayüzü:** http://localhost:5173
 
 ---
 
-## 3. Geliştirme Testleri
+## 3. Erişim Adresleri
+
+* **Kullanıcı Arayüzü (React + Vite)**: [http://localhost:5173](http://localhost:5173)
+* **Backend API**: [http://localhost:8000](http://localhost:8000) (veya Rust doğrudan portu 8080)
+* **Sağlık Kontrolü**: [http://localhost:8000/health](http://localhost:8000/health)
+
+---
+
+## 4. Geliştirme Testleri
 
 ### Yetkili Veri Çekme (Scrape) Testi
-Yerelde veri çekme işlemini tetiklemek için aşağıdaki PowerShell komutunu çalıştırabilirsiniz (token'ı `.env` dosyasından otomatik çeker):
+Yerelde veri çekme işlemini tetiklemek için aşağıdaki PowerShell komutunu çalıştırabilirsiniz:
 
 ```powershell
 $token = (Get-Content .env | Select-String "SCRAPE_TOKEN=").Line.Split("=")[1].Trim()
@@ -49,15 +66,8 @@ $headers = @{ Authorization = "Bearer $token" }
 Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/scrape?year_input=2024" -Headers $headers
 ```
 
-### Yerel Pytest Testlerini Koşma
-Backend testlerini yerel makinenizde çalıştırmak için:
-
+### Backend Testlerini Koşma
 ```powershell
-# Python 3.11 veya 3.12 ile temiz bir sanal ortam kurun
-py -3.11 -m venv venv
-.\venv\Scripts\pip install -r requirements-dev.txt
-
-# Testleri koşun
-cd "Tahsilat Tahakkuk Harita Analizi"
-..\venv\Scripts\pytest -v
+cd backend
+cargo test
 ```

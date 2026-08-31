@@ -1,8 +1,8 @@
 # Tahsilat-Tahakkuk-Harita-Analizi
 
 İl bazında vergi gelirleri (tahsilat/tahakkuk) analizlerini harita ve grafiklerle
-sunan tam yığın uygulama. Backend FastAPI, frontend React (Vite + Nginx), veri
-toplayıcı Selenium tabanlı bir one-shot scraper.
+sunan hibrit tam yığın uygulama. Backend Rust (Axum), frontend React (Vite + Nginx), veri
+toplayıcı Selenium tabanlı one-shot Python scraper.
 
 ## Dokümantasyon ve Kurulum
 

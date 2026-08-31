@@ -59,13 +59,15 @@ impl AppConfig {
 
         // tr.json arama
         let geojson_candidates = [
-            current_dir.join("tr.json"),
-            current_dir.join("Tahsilat Tahakkuk Harita Analizi").join("tr.json"),
-            current_dir.parent().map(|p| p.join("Tahsilat Tahakkuk Harita Analizi").join("tr.json")).unwrap_or_default(),
             data_dir.join("tr.json"),
+            current_dir.join("tr.json"),
+            current_dir.join("veriler").join("tr.json"),
+            current_dir.parent().map(|p| p.join("veriler").join("tr.json")).unwrap_or_default(),
+            PathBuf::from("veriler/tr.json"),
+            PathBuf::from("tr.json"),
         ];
 
-        let mut geojson_path = current_dir.join("tr.json");
+        let mut geojson_path = data_dir.join("tr.json");
         for candidate in geojson_candidates {
             if candidate.exists() {
                 geojson_path = candidate;
@@ -75,11 +77,13 @@ impl AppConfig {
 
         // Scraper script yolu
         let scraper_candidates = [
-            current_dir.join("Tahsilat Tahakkuk Harita Analizi").join("Hazine_Maliye_Bakanlığı_Sitesinden_Excel_Dosyalarını_Çekme.py"),
-            current_dir.parent().map(|p| p.join("Tahsilat Tahakkuk Harita Analizi").join("Hazine_Maliye_Bakanlığı_Sitesinden_Excel_Dosyalarını_Çekme.py")).unwrap_or_default(),
+            current_dir.join("scraper").join("scraper.py"),
+            current_dir.parent().map(|p| p.join("scraper").join("scraper.py")).unwrap_or_default(),
+            PathBuf::from("scraper/scraper.py"),
+            PathBuf::from("../scraper/scraper.py"),
         ];
 
-        let mut scraper_script_path = current_dir.join("Tahsilat Tahakkuk Harita Analizi").join("Hazine_Maliye_Bakanlığı_Sitesinden_Excel_Dosyalarını_Çekme.py");
+        let mut scraper_script_path = current_dir.join("scraper").join("scraper.py");
         for candidate in scraper_candidates {
             if candidate.exists() {
                 scraper_script_path = candidate;

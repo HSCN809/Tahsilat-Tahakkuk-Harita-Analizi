@@ -9,12 +9,8 @@ set -e
 export HOME=/home/appuser
 
 # gosu: root'tan appuser'a gec, sinyal iletimini koru
-cd "/app/Tahsilat Tahakkuk Harita Analizi"
-exec gosu appuser /usr/bin/tini -- uvicorn api:app \
-    --host "${HOST:-0.0.0.0}" \
-    --port "${PORT:-8080}" \
-    --workers "${WORKERS:-1}" \
-    --proxy-headers \
-    --forwarded-allow-ips='*' \
-    --no-access-log \
-    --timeout-graceful-shutdown 30
+if command -v gosu >/dev/null 2>&1; then
+    exec gosu appuser /usr/bin/tini -- /usr/local/bin/backend
+else
+    exec /usr/bin/tini -- /usr/local/bin/backend
+fi

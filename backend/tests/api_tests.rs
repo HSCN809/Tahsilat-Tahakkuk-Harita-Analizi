@@ -8,12 +8,12 @@ use http_body_util::BodyExt;
 use serde_json::Value;
 use tower::ServiceExt;
 
-use backend_rust::config::AppConfig;
-use backend_rust::create_app;
-use backend_rust::db::{clean_category_text, init_pool};
-use backend_rust::job_manager::JobManager;
-use backend_rust::security::{validate_year, validate_year_input, verify_scrape_token};
-use backend_rust::state::AppState;
+use backend::config::AppConfig;
+use backend::create_app;
+use backend::db::{clean_category_text, init_pool};
+use backend::job_manager::JobManager;
+use backend::security::{validate_year, validate_year_input, verify_scrape_token};
+use backend::state::AppState;
 
 fn setup_test_state(temp_dir: &tempfile::TempDir) -> AppState {
     let temp_db_path = temp_dir.path().join("test.db");

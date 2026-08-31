@@ -15,12 +15,11 @@ from pathlib import Path
 
 # Ana dizini sys.path'e ekle
 BASE_DIR = Path(__file__).resolve().parent.parent
-LIB_DIR = BASE_DIR / "Tahsilat Tahakkuk Harita Analizi"
-sys.path.insert(0, str(LIB_DIR))
+sys.path.insert(0, str(BASE_DIR))
 
 import pandas as pd
 import numpy as np
-import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
+from scraper import excel_parser as lib
 
 logging.basicConfig(
     level=logging.INFO,

@@ -22,7 +22,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-# İnteraktif çalıştırma için logging yapılandırması
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -30,9 +29,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# safe_decode artık merkezi kütüphanede — monkey-patch için oradan import et
 import xlrd
-from Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi import FOLDER_NAME_TEMPLATE, safe_decode
+try:
+    from .excel_parser import FOLDER_NAME_TEMPLATE, safe_decode
+except ImportError:
+    try:
+        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, safe_decode
+    except ImportError:
+        from excel_parser import FOLDER_NAME_TEMPLATE, safe_decode
 
 xlrd.biffh.unicode = safe_decode
 xlrd.book.unicode = safe_decode
@@ -41,13 +45,12 @@ xlrd.formatting.unicode = safe_decode
 
 def normalize_month_name(name):
     """Ay adını normalize eder: combining marks, Türkçe karakterler ve büyük/küçük harf farkını kaldırır."""
-    # Unicode NFKD ile decompose et ve combining mark'ları sil
     name = unicodedata.normalize('NFKD', name)
     name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
     name = name.strip().lower()
     replacements = {
         'ı': 'i', 'ş': 's', 'ğ': 'g', 'ü': 'u', 'ö': 'o', 'ç': 'c',
-        'i̇': 'i',  # İ decomposed
+        'i̇': 'i',
         '00 merkez': 'mayis',
         'eyul': 'eylul',
         'nisin': 'nisan',
@@ -69,10 +72,6 @@ def get_best_sheet_name(sheet_names):
 
 
 def clean_and_format_filename(link_text, year):
-    """
-    Indirilen dosya adini standardize eder.
-    Ornek: 01-Adana-2022.xls -> 01_Adana_2022.xlsx
-    """
     name = re.sub(r"\.xlsx?$", "", link_text, flags=re.IGNORECASE).strip()
     parts = re.split(r"[-_]", name)
     if len(parts) >= 3:
@@ -81,7 +80,6 @@ def clean_and_format_filename(link_text, year):
         province_name = " ".join(parts[1:-1]).strip()
         province_name = province_name.replace(" ", "_")
 
-        # Merkez veya gecersiz kodlari ele
         if code == "00" or "merkez" in province_name.lower():
             return None
 
@@ -90,12 +88,7 @@ def clean_and_format_filename(link_text, year):
 
 
 def download_file(session, link_text, link_href, target_dir, idx, total):
-    """
-    Tek bir Excel dosyasini requests.Session kullanarak indirir.
-    WAF/Cloudflare engellerini asmak icin tarayıcı basliklari (Headers) kullanir.
-    """
     try:
-        # Guvenli dosya adi olustur
         safe_filename = "".join(c for c in link_text if c.isalnum() or c in (' ', '-', '_')).rstrip()
         if not safe_filename.endswith(('.xlsx', '.xls')):
             safe_filename += '.xls'
@@ -124,16 +117,8 @@ def download_file(session, link_text, link_href, target_dir, idx, total):
 
 
 def convert_file(xls_file, year, indir_konumu):
-    """
-    Tek bir .xls dosyasını il alt klasörüne aylık .xlsx dosyaları olarak dönüştürür.
-    Orijinal .xls dosyası yıl klasörü altındaki raw_xls/ klasöründe saklanır (silinmez).
-
-    Dönüş Değeri:
-      (başarılı_mı, il_mi, kaydedilen_ay_sayısı, beklenen_ay_sayısı)
-    """
     base_name = os.path.basename(xls_file)
 
-    # Standart ay isimleri (xlrd bozuk karakterlerle döndürebilir, normalize ederek eşleştireceğiz)
     MONTH_DISPLAY_NAMES = {
         "ocak": "Ocak", "subat": "Şubat", "mart": "Mart",
         "nisan": "Nisan", "mayis": "Mayıs", "haziran": "Haziran",
@@ -149,18 +134,13 @@ def convert_file(xls_file, year, indir_konumu):
             _archive_raw_xls(xls_file, indir_konumu)
             return True, False, 0, 0, int(year), "", []
 
-        # İl klasör adını dosya adından çıkar (01_Adana_2024.xlsx -> 01_Adana)
         province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
         province_dir = indir_konumu / province_folder_name
         os.makedirs(province_dir, exist_ok=True)
 
-        # Excel dosyasını aç ve tüm sayfaları oku
         xls = pd.ExcelFile(xls_file, engine='xlrd')
         sheet_names = xls.sheet_names
 
-        # Beklenen ay sayısı tespiti:
-        # Cari yıl ise HMB'deki dosyanın sahip olduğu geçerli sayfa sayısı kadardır.
-        # Geçmiş yıl ise 12 aydır.
         valid_sheets_count = sum(1 for sh in sheet_names if normalize_month_name(sh) in MONTH_DISPLAY_NAMES)
         expected_months = valid_sheets_count if int(year) == current_year else 12
 
@@ -177,28 +157,23 @@ def convert_file(xls_file, year, indir_konumu):
                 saved_months += 1
                 saved_month_names.append(display_name)
 
-        # ExcelFile handle'ını kapat (Windows dosya kilidi)
         xls.close()
 
-        # Hangi ayların eksik olduğunu tespit et
         missing_months = []
         if saved_months < expected_months:
             all_standard_months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
             for m in all_standard_months:
                 if m not in saved_month_names:
-                    # Cari yıl ise sadece şimdiye kadar olan geçerli ayları kontrol et
                     if int(year) == current_year and normalize_month_name(m) not in [normalize_month_name(sh) for sh in sheet_names]:
                         continue
                     missing_months.append(m)
 
         logger.info("Dönüştürüldü: %s -> %s/ (%d/%d ay)", base_name, province_folder_name, saved_months, expected_months)
 
-        # Orijinal .xls dosyasını yıl klasörü altındaki raw_xls/ klasörüne taşı
         _archive_raw_xls(xls_file, indir_konumu)
         return True, True, saved_months, expected_months, int(year), province_folder_name, missing_months
     except Exception:
         logger.error("Dönüştürme hatası (%s)", base_name, exc_info=True)
-        # Hata durumunda da orijinal .xls'i raw_xls/ altında sakla (kayıp olmasın)
         if os.path.exists(xls_file):
             try:
                 _archive_raw_xls(xls_file, indir_konumu)
@@ -209,22 +184,16 @@ def convert_file(xls_file, year, indir_konumu):
 
 
 def _archive_raw_xls(xls_file, indir_konumu):
-    """Orijinal .xls dosyasını yıl klasörü altındaki raw_xls/ alt klasörüne taşır."""
     raw_dir = indir_konumu / "raw_xls"
     os.makedirs(raw_dir, exist_ok=True)
     base_name = os.path.basename(xls_file)
     dest = raw_dir / base_name
-    # Aynı isimde dosya varsa üzerine yaz (shutil.move mevcut dosyayı hedefler)
     if os.path.exists(dest):
         os.remove(dest)
     shutil.move(str(xls_file), str(dest))
 
 
 def parse_years_input(input_str, min_year, max_year):
-    """
-    Yil veya yil araligini cozumler.
-    Ornek: hepsi / tümü / all -> tüm yıllar (min_year-max_year)
-    """
     input_str_clean = input_str.strip().lower()
     if input_str_clean in ("hepsi", "tümü", "tüm", "all", "tüm yıllar"):
         return list(range(min_year, max_year + 1))
@@ -254,35 +223,33 @@ def parse_years_input(input_str, min_year, max_year):
             except ValueError:
                 pass
 
-    valid_years = [y for y in sorted(set(years)) if min_year <= y <= max_year]
-    return valid_years
+    return [y for y in sorted(set(years)) if min_year <= y <= max_year]
 
 
 def setup_driver():
-    """Chrome WebDriver'ı başlatır ve yapılandırır."""
     options = ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--disable-extensions")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--headless=new")  # Arka planda calis
+    options.add_argument("--headless=new")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
 
-    # Sistemde kurulu Chromium ve ChromeDriver'i kullan (Docker imajinda var)
     chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
     chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
-    options.binary_location = chrome_bin
+    if os.path.exists(chrome_bin):
+        options.binary_location = chrome_bin
 
-    logger.info("Tarayıcı başlatılıyor (Mevcut site yapısı analiz ediliyor)...")
-    driver = webdriver.Chrome(service=ChromeService(chromedriver_path), options=options)
+    logger.info("Tarayıcı başlatılıyor...")
+    service = ChromeService(chromedriver_path) if os.path.exists(chromedriver_path) else ChromeService()
+    driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     return driver
 
 
 def discover_url(driver, current_year):
-    """Doğru URL'yi dinamik olarak tespit eder (Örn: 2004-2026 veya 2004-2028 vb.)."""
     for temp_year in [current_year, current_year - 1, current_year - 2]:
         temp_url = f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{temp_year}"
         try:
@@ -291,14 +258,11 @@ def discover_url(driver, current_year):
             if "404" not in driver.title and len(driver.find_elements(By.XPATH, "//*[contains(text(), 'Genel Bütçe')]")) > 0:
                 return temp_url
         except Exception:
-            logger.debug("URL denenirken hata, sonraki deneniyor: %s", temp_url, exc_info=True)
             continue
-    # Fallback
     return f"https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-{current_year}"
 
 
 def detect_year_bounds(driver, current_year):
-    """Sitedeki mevcut en küçük ve en büyük yılları dinamik toplar."""
     min_year = 2004
     max_year = current_year
     try:
@@ -310,36 +274,31 @@ def detect_year_bounds(driver, current_year):
                 if match:
                     found_years.append(int(match.group(1)))
             except Exception:
-                logger.warning("Yil elementi okunamadi, atlandi", exc_info=True)
+                continue
         if found_years:
             min_year = min(found_years)
             max_year = max(found_years)
     except Exception:
-        logger.warning("Yıl sınırları dinamik okunamadı, varsayılan değerler kullanılacak", exc_info=True)
+        logger.warning("Yıl sınırları dinamik okunamadı, varsayılanlar kullanılacak", exc_info=True)
     return min_year, max_year
 
 
 def prepare_download_dirs(valid_years, excel_ana_dir):
-    """Her yıl için indirme klasörlerini hazırlar (varsa temizler)."""
     indir_konumlari = {}
     for y in valid_years:
         path = excel_ana_dir / FOLDER_NAME_TEMPLATE.format(year=y)
-
         if path.exists():
             try:
                 shutil.rmtree(path)
             except Exception:
-                logger.warning("Klasör temizlenirken hata oluştu (%s)", y, exc_info=True)
-
+                pass
         os.makedirs(path, exist_ok=True)
         indir_konumlari[y] = path
     return indir_konumlari
 
 
 def _find_and_click_year_header(driver, wait, y):
-    """Yıl ana başlığını bulup tıklar. Başarı durumunu döner."""
     logger.info("%s yılı ana başlığı aranıyor...", y)
-
     try:
         year_main_elements = driver.find_elements(By.XPATH, f"//*[contains(@class, 'submenu-control-init')][contains(text(), '{y}')]")
         visible_elements = [el for el in year_main_elements if el.is_displayed()]
@@ -352,22 +311,18 @@ def _find_and_click_year_header(driver, wait, y):
             logger.info("%s ana başlığı bulundu", y)
             driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
             time.sleep(1)
-
             try:
                 element.click()
             except ElementClickInterceptedException:
                 driver.execute_script("arguments[0].click();", element)
-
             time.sleep(2)
             return True
     except Exception:
         logger.error("Ana başlık arama hatası (%s)", y, exc_info=True)
-
     return False
 
 
 def _find_and_click_budget_tables(driver):
-    """Bütçe Gelir Tabloları alt başlığını bulup tıklar. Başarı durumunu döner."""
     try:
         budget_elements = driver.find_elements(By.XPATH, "//a[contains(text(), 'Bütçe Gelir Tabloları')]")
         for element in budget_elements:
@@ -375,24 +330,19 @@ def _find_and_click_budget_tables(driver):
                 logger.info("Bütçe Gelir Tabloları alt başlığı bulundu")
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
                 time.sleep(1)
-
                 try:
                     element.click()
                 except ElementClickInterceptedException:
                     driver.execute_script("arguments[0].click();", element)
-
                 time.sleep(2)
                 return True
     except Exception:
         logger.error("Alt başlık arama hatası", exc_info=True)
-
     return False
 
 
 def _collect_excel_links(driver, y):
-    """Sayfadaki Excel linklerini toplayıp (link_text, href, year) tuple listesi döner."""
     excel_links = []
-
     xlsx_links = driver.find_elements(By.XPATH, "//a[contains(@href, '.xlsx') or contains(@href, '.xls')]")
     excel_links.extend(xlsx_links)
 
@@ -405,7 +355,6 @@ def _collect_excel_links(driver, y):
         if href and ('.xlsx' in href or '.xls' in href):
             excel_links.append(link)
 
-    # Tekilleştir
     seen_hrefs = set()
     year_links = []
     for link in excel_links:
@@ -418,9 +367,7 @@ def _collect_excel_links(driver, y):
 
 
 def collect_links(driver, wait, target_url, valid_years):
-    """Tüm yıllar için Excel linklerini toplar."""
     all_links_data = []
-
     try:
         for y in valid_years:
             logger.info("%s yılı verileri için siteye bağlanılıyor...", y)
@@ -433,27 +380,22 @@ def collect_links(driver, wait, target_url, valid_years):
                 continue
 
             if not _find_and_click_budget_tables(driver):
-                logger.error("%s için Bütçe Gelir Tabloları bulunamadı, bu yıl atlanıyor.", y)
+                logger.error("%s için Bütçe Gelir Tabloları bulunamadı, atlanıyor.", y)
                 continue
 
             logger.info("%s yılı Excel dosyaları aranıyor...", y)
             year_links = _collect_excel_links(driver, y)
             all_links_data.extend(year_links)
             logger.info("%s yılı için %d Excel linki toplandı.", y, len(year_links))
-
     except TimeoutException:
         logger.error("Sayfa yükleme zaman aşımına uğradı!")
     except Exception:
-        logger.error("Genel hata", exc_info=True)
-
+        logger.error("Genel link toplama hatası", exc_info=True)
     return all_links_data
 
 
 def download_all(all_links_data, indir_konumlari, current_year):
-    """Paralel olarak tüm Excel dosyalarını indirir."""
-    logger.info("Toplam %d adet Excel linki bulundu.", len(all_links_data))
-    logger.info("Paralel indirme başlatılıyor (max_workers=10)...")
-
+    logger.info("Toplam %d adet Excel linki bulundu. Paralel indirme başlatılıyor...", len(all_links_data))
     downloaded_files = []
     session = requests.Session()
     start_time = time.time()
@@ -463,7 +405,6 @@ def download_all(all_links_data, indir_konumlari, current_year):
             executor.submit(download_file, session, text, href, indir_konumlari[y], idx, len(all_links_data))
             for idx, (text, href, y) in enumerate(all_links_data, 1)
         ]
-
         for future in as_completed(futures):
             success, file_path = future.result()
             if success and file_path:
@@ -478,8 +419,7 @@ def download_all(all_links_data, indir_konumlari, current_year):
 
 
 def convert_all(downloaded_files, indir_konumlari):
-    """Paralel olarak tüm .xls dosyalarını .xlsx'e dönüştürür ve istatistik döner."""
-    logger.info("Dosya biçimleri paralel olarak dönüştürülüyor (Excel conversion)...")
+    logger.info("Dosya biçimleri paralel olarak dönüştürülüyor...")
     start_time = time.time()
 
     total_provinces_expected = 0
@@ -527,31 +467,11 @@ def convert_all(downloaded_files, indir_konumlari):
 
 
 def print_report(valid_years, excel_ana_dir, stats):
-    """Sonuç özetini ekrana yazdırır."""
     total_provinces_expected = stats["total_provinces_expected"]
     total_provinces_converted = stats["total_provinces_converted"]
     total_months_expected = stats["total_months_expected"]
     total_months_converted = stats["total_months_converted"]
-    year_stats = stats["year_stats"]
     missing_data_list = stats["missing_data_list"]
-
-    # Dinamik formül oluşturma
-    formula_groups = {}
-    for y_val, st in sorted(year_stats.items()):
-        key = (st["provinces"], st["expected_months_per_province"])
-        if key not in formula_groups:
-            formula_groups[key] = []
-        formula_groups[key].append(y_val)
-
-    prov_parts = []
-    month_parts = []
-    for (p_count, m_count), years in sorted(formula_groups.items(), key=lambda x: x[0][1], reverse=True):
-        y_len = len(years)
-        prov_parts.append(f"({y_len} yıl * {p_count} il)")
-        month_parts.append(f"({y_len} yıl * {p_count} il * {m_count} ay)")
-
-    province_formula = " + ".join(prov_parts)
-    month_formula = " + ".join(month_parts)
 
     print(f"\n{'='*80}")
     print("🎉 TÜM İŞLEMLER BAŞARIYLA TAMAMLANDI!")
@@ -559,14 +479,12 @@ def print_report(valid_years, excel_ana_dir, stats):
     print(f"📁 Dosyaların Ana Konumu: {excel_ana_dir}")
     print(f"{'-'*80}")
     print("📈 SONUÇ RAPORU:")
-    print(f"  - Beklenen İl Sayısı        : {total_provinces_expected}  <- Hesaplama: {province_formula}")
-    print(f"  - Dönüştürülen İl Sayısı    : {total_provinces_converted}")
-    print(f"  - Beklenen Toplam Ay Sayısı : {total_months_expected}  <- Hesaplama: {month_formula}")
-    print(f"  - Çekilen Toplam Ay Sayısı  : {total_months_converted}")
+    print(f"  - Beklenen / Dönüştürülen İl : {total_provinces_converted} / {total_provinces_expected}")
+    print(f"  - Çekilen / Beklenen Ay       : {total_months_converted} / {total_months_expected}")
 
     if total_months_expected > 0:
         basari_orani = (total_months_converted / total_months_expected) * 100
-        print(f"  - Veri Başarı Oranı         : %{basari_orani:.2f}")
+        print(f"  - Veri Başarı Oranı           : %{basari_orani:.2f}")
 
     if missing_data_list:
         print(f"{'-'*80}")
@@ -576,51 +494,40 @@ def print_report(valid_years, excel_ana_dir, stats):
             print(f"  - Yıl: {y_val} | İl: {prov_name:<20} | Eksik Aylar: [{months_str}]")
 
     print(f"{'='*80}")
-    print(f"{'='*60}")
 
 
 def main():
-    """Ana orchestration fonksiyonu — argparse ile yıl input alır, adımları sırayla çağırır."""
     parser = argparse.ArgumentParser(description="HMB vergi gelirleri Excel scraper")
     parser.add_argument(
         "years",
         nargs="?",
         default=None,
-        help="Yıl/yıl aralığı (örn: 2024, 2024-2025, 2024-2025,2023, hepsi). Belirtilmezse interaktif sorulur."
+        help="Yıl/yıl aralığı (örn: 2024, 2024-2025, hepsi). Ortam değişkeni SCRAPE_YEARS da okunur."
     )
     args = parser.parse_args()
 
     current_year = datetime.date.today().year
 
-    # --- 1. Driver başlat ---
+    # 1. Driver başlat
     driver = setup_driver()
     wait = WebDriverWait(driver, 20)
 
     try:
-        # --- 2. URL tespiti ---
         target_url = discover_url(driver, current_year)
-
-        # --- 3. Yıl sınırları tespiti ---
         min_year, max_year = detect_year_bounds(driver, current_year)
         logger.info("Sitede mevcut yıllar: %d-%d arası", min_year, max_year)
 
-        # --- 4. Yıl input al (argparse veya interaktif) ---
-        if args.years:
-            year_input = args.years.strip()
-            logger.info("Argüman olarak alınan yıl: %s", year_input)
-        else:
-            logger.info("Giriş formatları: '2023' veya '2022-2025' veya 'hepsi'")
-            year_input = input("Yıl girin: ").strip()
+        year_input = args.years or os.environ.get("SCRAPE_YEARS", "").strip()
+        if not year_input:
+            year_input = "hepsi"
 
         valid_years = parse_years_input(year_input, min_year, max_year)
-
         if not valid_years:
-            logger.error("Geçerli bir yıl veya yıl aralığı girin (%d-%d)!", min_year, max_year)
+            logger.error("Geçerli bir yıl bulunamadı (%s)", year_input)
             return
 
         logger.info("Seçilen Yıllar: %s", ', '.join(map(str, valid_years)))
 
-        # --- 5. Klasör hazırlığı ---
         BASE_DIR = Path(__file__).resolve().parent.parent
         veriler_dir = BASE_DIR / "veriler"
         excel_ana_dir = veriler_dir / "Tahsilat Tahakkuk Excel Dosyaları"
@@ -628,25 +535,18 @@ def main():
         os.makedirs(excel_ana_dir, exist_ok=True)
         indir_konumlari = prepare_download_dirs(valid_years, excel_ana_dir)
 
-        # --- 6. Link toplama ---
         all_links_data = collect_links(driver, wait, target_url, valid_years)
-
     finally:
         logger.info("Tarayıcı kapatılıyor...")
         driver.quit()
         logger.info("Tarayıcı kapatıldı.")
 
-    # --- 7. İndirme ---
     if not all_links_data:
         logger.error("İndirilecek link bulunamadı.")
         return
 
     downloaded_files = download_all(all_links_data, indir_konumlari, current_year)
-
-    # --- 8. Dönüştürme ---
     stats = convert_all(downloaded_files, indir_konumlari)
-
-    # --- 9. Rapor ---
     print_report(valid_years, excel_ana_dir, stats)
 
 

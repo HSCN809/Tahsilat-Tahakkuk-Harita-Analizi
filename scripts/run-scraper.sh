@@ -14,7 +14,7 @@ YEARS="${1:-hepsi}"
 
 cd "$(dirname "$0")/.."
 
-docker compose -f docker-compose.yml --env-file .env.prod run --rm \
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm \
   -e SCRAPE_YEARS="$YEARS" \
   scraper \
   "$YEARS"
