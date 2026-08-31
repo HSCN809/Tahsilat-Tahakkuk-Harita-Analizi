@@ -287,12 +287,17 @@ def detect_year_bounds(driver, current_year):
 def prepare_download_dirs(valid_years, excel_ana_dir):
     indir_konumlari = {}
     for y in valid_years:
+        if excel_ana_dir.exists():
+            for d in os.listdir(excel_ana_dir):
+                m = re.search(r"(\d{4})", d)
+                if m and int(m.group(1)) == y:
+                    p = excel_ana_dir / d
+                    try:
+                        shutil.rmtree(p)
+                    except Exception:
+                        pass
+
         path = excel_ana_dir / FOLDER_NAME_TEMPLATE.format(year=y)
-        if path.exists():
-            try:
-                shutil.rmtree(path)
-            except Exception:
-                pass
         os.makedirs(path, exist_ok=True)
         indir_konumlari[y] = path
     return indir_konumlari

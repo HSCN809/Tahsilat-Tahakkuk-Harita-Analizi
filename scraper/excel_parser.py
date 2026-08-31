@@ -480,8 +480,8 @@ def export_all_to_sqlite(target_years: list[int] | None = None, db_path: Path | 
         conn.close()
         return db_path
 
-    # Yıl klasörlerini tekilleştirerek ve sadece geçerli il alt klasörleri (\d{2}_) içerenleri tespit et
-    year_folders_map: dict[int, Path] = {}
+    # Yıl klasörlerini tekilleştirerek ve en çok .xlsx dosyası içeren aktif klasörü tespit et
+    year_folders_map: dict[int, tuple[Path, int]] = {}
     for d in os.listdir(ana_klasor):
         p = ana_klasor / d
         if p.is_dir() and "raw_xls" not in d.lower() and "backup" not in d.lower():
@@ -498,14 +498,11 @@ def export_all_to_sqlite(target_years: list[int] | None = None, db_path: Path | 
                         has_prov_dirs = False
 
                     if has_prov_dirs:
-                        if y_val not in year_folders_map:
-                            year_folders_map[y_val] = p
-                        else:
-                            # Daha çok il/dosya içeren klasörü seç
-                            if len(os.listdir(p)) > len(os.listdir(year_folders_map[y_val])):
-                                year_folders_map[y_val] = p
+                        xlsx_cnt = sum(len([f for f in files if f.endswith(".xlsx")]) for _, _, files in os.walk(p))
+                        if y_val not in year_folders_map or xlsx_cnt > year_folders_map[y_val][1]:
+                            year_folders_map[y_val] = (p, xlsx_cnt)
 
-    year_folders = sorted(year_folders_map.items(), key=lambda x: x[0])
+    year_folders = sorted([(y, p) for y, (p, _) in year_folders_map.items()], key=lambda x: x[0])
 
     total_records = 0
     with conn:
