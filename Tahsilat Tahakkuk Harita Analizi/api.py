@@ -1,19 +1,19 @@
+import hmac
 import io
+import json
+import logging
 import os
 import re
-import json
-import sys
-import hmac
-import logging
 import subprocess
+import sys
 import zipfile
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from datetime import datetime, timezone
-from fastapi import FastAPI, Header, HTTPException, status, Depends
+
+import numpy as np
+import pandas as pd
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 # api.py dosyasının bulunduğu dizini Python sistem yoluna ekle (İçe aktarmaların sorunsuz çalışması için)
@@ -21,9 +21,9 @@ CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(CURRENT_DIR))
 
 # Kütüphane modülünü import et
-import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
-import job_manager
 import backup
+import job_manager
+import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
 
 logger = logging.getLogger("api")
 
@@ -247,7 +247,7 @@ async def get_years():
             match = re.search(r"\d{4}", folder)
             if match:
                 years.append(int(match.group(0)))
-        return {"years": sorted(list(set(years)))}
+        return {"years": sorted(set(years))}
     except Exception:
         logger.exception("Yıllar listelenirken hata oluştu")
         raise HTTPException(status_code=500, detail="Yıllar listelenirken hata oluştu.")
@@ -301,7 +301,6 @@ def _hesapla_config(year: int) -> dict:
                         cleaned_categories.append({"id": cat, "name": clean_name})
         except Exception:
             logger.warning("Kategori okunamadi (yil=%s): %s", year, exc_info=True)
-            pass
 
     result = {
         "year": year,

@@ -1,24 +1,26 @@
-import os
 import argparse
-import unicodedata
-import time
-import logging
-import requests
 import datetime
+import logging
+import os
 import re
-import glob
-import pandas as pd
 import shutil
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
-from webdriver_manager.chrome import ChromeDriverManager
-from pathlib import Path
+import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import pandas as pd
+import requests
+from selenium import webdriver
+from selenium.common.exceptions import (
+    ElementClickInterceptedException,
+    TimeoutException,
+)
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 # İnteraktif çalıştırma için logging yapılandırması
 logging.basicConfig(
@@ -29,9 +31,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # safe_decode artık merkezi kütüphanede — monkey-patch için oradan import et
-from Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi import safe_decode, FOLDER_NAME_TEMPLATE
-
 import xlrd
+from Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi import FOLDER_NAME_TEMPLATE, safe_decode
+
 xlrd.biffh.unicode = safe_decode
 xlrd.book.unicode = safe_decode
 xlrd.formatting.unicode = safe_decode
@@ -252,7 +254,7 @@ def parse_years_input(input_str, min_year, max_year):
             except ValueError:
                 pass
 
-    valid_years = [y for y in sorted(list(set(years))) if min_year <= y <= max_year]
+    valid_years = [y for y in sorted(set(years)) if min_year <= y <= max_year]
     return valid_years
 
 
@@ -556,7 +558,7 @@ def print_report(valid_years, excel_ana_dir, stats):
     print(f"📊 İndirilen ve Dönüştürülen Yıllar: {', '.join(map(str, valid_years))}")
     print(f"📁 Dosyaların Ana Konumu: {excel_ana_dir}")
     print(f"{'-'*80}")
-    print(f"📈 SONUÇ RAPORU:")
+    print("📈 SONUÇ RAPORU:")
     print(f"  - Beklenen İl Sayısı        : {total_provinces_expected}  <- Hesaplama: {province_formula}")
     print(f"  - Dönüştürülen İl Sayısı    : {total_provinces_converted}")
     print(f"  - Beklenen Toplam Ay Sayısı : {total_months_expected}  <- Hesaplama: {month_formula}")

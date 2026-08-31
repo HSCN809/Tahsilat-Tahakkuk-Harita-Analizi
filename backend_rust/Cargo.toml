@@ -1,0 +1,28 @@
+[package]
+name = "backend_rust"
+version = "2.0.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8", features = ["multipart"] }
+tokio = { version = "1.43", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-full", "set-header"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.33", features = ["bundled"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.26"
+subtle = "2.6"
+regex = "1.11"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+uuid = { version = "1.10", features = ["v4"] }
+walkdir = "2.5"
+bytes = "1.9"
+
+[dev-dependencies]
+tempfile = "3.16"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

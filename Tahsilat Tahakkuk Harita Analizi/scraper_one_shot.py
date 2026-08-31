@@ -7,10 +7,10 @@ o da yoksa "hepsi" ile çalışır.
 
 İş bittiğinde container `--rm` ile otomatik silinir (kalıcı servis yok).
 """
-import sys
-import os
 import glob
 import importlib.util
+import os
+import sys
 
 
 def _load_scraper_module():

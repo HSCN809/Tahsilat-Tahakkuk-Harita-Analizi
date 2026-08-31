@@ -1,23 +1,22 @@
+import logging
 import os
 import re
-import json
-import logging
 import threading
 from collections import OrderedDict
-import pandas as pd
-import numpy as np
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 # xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için yamala (monkey patch)
-import xlrd
-
 # pandas >=1.5.x, xlrd için 2.0.1 minimum sürümünü zorunlu kılar; ancak xlrd 2.x
 # .xls (BIFF) desteğini kaldırdığı için eski HMB .xls dosyalarını okuyamayız.
 # xlrd 1.2.0 ile .xls okumaya devam etmek için pandas'ın sürüm kontrolünü bypass et.
 import pandas.compat._optional as _pd_opt
+import xlrd
+
 _pd_opt.VERSIONS["xlrd"] = "1.2.0"
 
 
@@ -239,6 +238,7 @@ _config_cache = LRUCache(maxsize=32)
 
 # Modül seviyesi tek thread havuzu — her çağrıda yeniden yaratma maliyetinden kaçınır
 import atexit
+
 _executor = ThreadPoolExecutor(max_workers=16)
 atexit.register(_executor.shutdown)
 

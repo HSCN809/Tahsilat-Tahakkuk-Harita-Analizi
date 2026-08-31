@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from dataclasses import dataclass, asdict, field
-from typing import Callable, Any, Optional
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +21,17 @@ class JobInfo:
     job_id: str
     year_input: str
     started_at: float
-    finished_at: Optional[float] = None
+    finished_at: float | None = None
     status: str = "running"  # running | succeeded | failed
-    error: Optional[str] = None
-    backup_created: Optional[str] = None
+    error: str | None = None
+    backup_created: str | None = None
 
 
 class JobManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._state_lock = threading.Lock()
-        self._current: Optional[JobInfo] = None
+        self._current: JobInfo | None = None
         self._job_counter = 0
 
     def _next_id(self) -> str:
@@ -42,14 +42,14 @@ class JobManager:
         with self._state_lock:
             return self._current is not None and self._current.status == "running"
 
-    def current(self) -> Optional[dict]:
+    def current(self) -> dict | None:
         with self._state_lock:
             if self._current is None:
                 return None
             return asdict(self._current)
 
     def submit(self, year_input: str, runner: Callable[[JobInfo], None],
-               backup_notifier: Optional[Callable[[], Optional[str]]] = None) -> tuple[bool, dict]:
+               backup_notifier: Callable[[], str | None] | None = None) -> tuple[bool, dict]:
         """
         runner(job_info): asıl işi yapan sync fonksiyon.
         backup_notifier(): opsiyonel. İş başarılı tamamlandığında tetiklenir;

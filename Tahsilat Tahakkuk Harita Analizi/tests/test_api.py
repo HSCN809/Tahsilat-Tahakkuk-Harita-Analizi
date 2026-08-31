@@ -1,11 +1,10 @@
-import os
 import io
+import os
 import sys
-import time
 import tarfile
-import zipfile
-import importlib
 import tempfile
+import time
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -13,8 +12,8 @@ import pytest
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-import job_manager
 import backup
+import job_manager
 import Tahsilat_Tahakkuk_Grafik_Olusturma_Projesi as lib
 
 
@@ -80,18 +79,20 @@ def test_backup_take_snapshot_overwrites():
 
 # --- input validation ---
 def test_validate_year():
+    from fastapi import HTTPException
     import api as api_mod
     api_mod._validate_year(2025)  # hata vermez
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException):
         api_mod._validate_year(1900)
 
 
 def test_validate_year_input():
+    from fastapi import HTTPException
     import api as api_mod
     for good in ["2024", "2024-2025", "2024-2025,2023", "hepsi"]:
         api_mod._validate_year_input(good)  # hata vermez
     for bad in ["", "abc", "2024x", "20"]:
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             api_mod._validate_year_input(bad)
 
 
