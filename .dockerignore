@@ -1,14 +1,36 @@
-venv
-frontend/node_modules
-**/node_modules
-.git
-.gemini
-.agents
-graphify-out
-__pycache__
+# Rust build artifacts
+target/
+**/target/
+backend/target/
+
+# Python & Virtual Environments
+venv/
+.venv/
+__pycache__/
 *.pyc
-dist
-dist-ssr
-*.log
-veriler/Tahsilat Tahakkuk Excel Dosyaları/
+.pytest_cache/
+.ruff_cache/
+
+# Node.js
+frontend/node_modules/
+**/node_modules/
 node_modules/
+dist/
+dist-ssr/
+
+# Data & Large DB files (handled via volumes)
+veriler/
+*.db
+*.sqlite
+*.sqlite3
+
+# Git & IDE configs
+.git/
+.github/
+.gemini/
+.agents/
+.claude/
+graphify-out/
+
+# Logs
+*.log
