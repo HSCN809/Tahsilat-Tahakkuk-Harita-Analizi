@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Layers, Calendar, MapPin, Download } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
@@ -29,129 +29,171 @@ function App() {
   const [activeModalMetric, setActiveModalMetric] = useState<ModalMetric | null>(null);
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
-  const [loadingYears, setLoadingYears] = useState(true);
-  const [loadingMonths, setLoadingMonths] = useState(false);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
-  const [loadingGeoJson, setLoadingGeoJson] = useState(true);
+  // Birleşik yükleme durumları (flicker / çift animasyonu önler)
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [updatingData, setUpdatingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch years and GeoJSON on mount
+  // İstek iptali (race condition önleme)
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 1. Sayfa Açılışında Tekil ve Senkronize Başlatma (Single Pipeline Bootstrapping)
   useEffect(() => {
-    const fetchYearsData = async () => {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const bootstrap = async () => {
       try {
-        setLoadingYears(true);
-        const data = await fetchYears();
-        setYears(data.years);
-        if (data.years && data.years.length > 0) {
-          setSelectedYear(data.years[data.years.length - 1]);
+        setInitialLoading(true);
+        setError(null);
+
+        // Yılları ve Haritayı paralel çek
+        const [yearsRes, geoJsonRes] = await Promise.all([
+          fetchYears(controller.signal),
+          fetchGeoJson(controller.signal),
+        ]);
+
+        if (controller.signal.aborted) return;
+
+        const availableYears = yearsRes.years || [];
+        if (availableYears.length === 0) {
+          setYears([]);
+          setGeoJsonData(geoJsonRes);
+          setInitialLoading(false);
+          return;
+        }
+
+        const latestYear = availableYears[availableYears.length - 1];
+
+        // En son yıla ait konfigürasyonu çek
+        const configRes = await fetchConfig(latestYear, controller.signal);
+        if (controller.signal.aborted) return;
+
+        const availableMonths = configRes.months || [];
+        const availableCats = configRes.categories || [];
+        const defaultMonth = availableMonths.length > 0 ? availableMonths[availableMonths.length - 1] : '';
+        const defaultCat = availableCats.length > 0 ? availableCats[0].id : '';
+
+        // İlk veriyi çek
+        let dataRes: { summary: Summary; data: ProvinceRecord[] } | null = null;
+        if (defaultCat && defaultMonth) {
+          dataRes = await fetchData(latestYear, defaultCat, defaultMonth, controller.signal);
+        }
+
+        if (controller.signal.aborted) return;
+
+        // Tüm state'leri tek seferde senkronize commit et
+        setYears(availableYears);
+        setSelectedYear(latestYear);
+        setGeoJsonData(geoJsonRes);
+        setMonths(availableMonths);
+        setSelectedMonth(defaultMonth);
+        setCategories(availableCats);
+        setSelectedCategory(defaultCat);
+        if (dataRes) {
+          setSummary(dataRes.summary);
+          setRecords(dataRes.data);
         }
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        console.error('[App] Yıllar alınırken hata:', err);
-        setError(err instanceof Error ? err.message : 'Yıllar alınırken bir sorun oluştu.');
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
+        console.error('[App] Başlatma hatası:', err);
+        setError(err instanceof Error ? err.message : 'Sistem verileri yüklenirken bir sorun oluştu.');
       } finally {
-        setLoadingYears(false);
+        if (!controller.signal.aborted) {
+          setInitialLoading(false);
+        }
       }
     };
 
-    const fetchGeoJsonData = async () => {
-      try {
-        setLoadingGeoJson(true);
-        const data = await fetchGeoJson();
-        setGeoJsonData(data);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        console.error('[App] Harita verisi alınırken hata:', err);
-        setError(err instanceof Error ? err.message : 'Harita verisi alınırken bir sorun oluştu.');
-      } finally {
-        setLoadingGeoJson(false);
-      }
-    };
+    bootstrap();
 
-    fetchYearsData();
-    fetchGeoJsonData();
+    return () => {
+      controller.abort();
+    };
   }, []);
 
-  // Yıl değiştiğinde aylar + kategorileri TEK istekle çek
-  useEffect(() => {
-    if (selectedYear === null) return;
+  // 2. Yıl Değişikliği Yöneticisi (Config + Data tek akışta yüklenir)
+  const handleYearChange = useCallback(async (newYear: number) => {
+    if (newYear === selectedYear) return;
 
-    setMonths([]);
-    setSelectedMonth('');
-    setCategories([]);
-    setSelectedCategory('');
-    setRecords([]);
-    setSummary(null);
-
+    abortControllerRef.current?.abort();
     const controller = new AbortController();
-    let cancelled = false;
+    abortControllerRef.current = controller;
 
-    const fetchConfigData = async () => {
-      try {
-        setLoadingMonths(true);
-        setLoadingCategories(true);
-        const data = await fetchConfig(selectedYear, controller.signal);
-        if (cancelled) return;
+    try {
+      setUpdatingData(true);
+      setError(null);
+      setSelectedYear(newYear);
 
-        setMonths(data.months);
-        const mevcutAy = data.months && data.months.length > 0 ? data.months[data.months.length - 1] : '';
-        setSelectedMonth(mevcutAy);
+      const configRes = await fetchConfig(newYear, controller.signal);
+      if (controller.signal.aborted) return;
 
-        setCategories(data.categories);
-        if (data.categories && data.categories.length > 0) {
-          setSelectedCategory(data.categories[0].id);
-        } else {
-          setSelectedCategory('');
-        }
-      } catch (err) {
-        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
-        console.error('[App] Config alınırken hata:', err);
-        setError(err instanceof Error ? err.message : 'Yıl yapılandırması alınırken bir sorun oluştu.');
-      } finally {
-        if (!cancelled) {
-          setLoadingMonths(false);
-          setLoadingCategories(false);
-        }
+      const availableMonths = configRes.months || [];
+      const availableCats = configRes.categories || [];
+
+      // Mevcut ay/kategori yeni yılda var mı kontrol et, yoksa varsayılana dön
+      const targetMonth = availableMonths.includes(selectedMonth)
+        ? selectedMonth
+        : (availableMonths[availableMonths.length - 1] || '');
+
+      const targetCat = availableCats.some(c => c.id === selectedCategory)
+        ? selectedCategory
+        : (availableCats[0]?.id || '');
+
+      setMonths(availableMonths);
+      setSelectedMonth(targetMonth);
+      setCategories(availableCats);
+      setSelectedCategory(targetCat);
+
+      if (targetCat && targetMonth) {
+        const dataRes = await fetchData(newYear, targetCat, targetMonth, controller.signal);
+        if (controller.signal.aborted) return;
+        setSummary(dataRes.summary);
+        setRecords(dataRes.data);
+      } else {
+        setSummary(null);
+        setRecords([]);
       }
-    };
-
-    fetchConfigData();
-
-    return () => { cancelled = true; controller.abort(); };
-  }, [selectedYear]);
-
-  // Fetch summary and records when year/category/month changes
-  useEffect(() => {
-    if (selectedYear === null || !selectedCategory || !selectedMonth) {
-      setLoadingData(false);
-      return;
+    } catch (err) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
+      console.error('[App] Yıl değiştirme hatası:', err);
+      setError(err instanceof Error ? err.message : 'Yıl verileri yüklenirken hata oluştu.');
+    } finally {
+      if (!controller.signal.aborted) {
+        setUpdatingData(false);
+      }
     }
+  }, [selectedYear, selectedMonth, selectedCategory]);
 
+  // 3. Kategori veya Ay Değişikliği Yöneticisi
+  const handleFilterChange = useCallback(async (newCat: string, newMonth: string) => {
+    if (!selectedYear || !newCat || !newMonth) return;
+
+    abortControllerRef.current?.abort();
     const controller = new AbortController();
-    let cancelled = false;
+    abortControllerRef.current = controller;
 
-    const fetchStats = async () => {
-      try {
-        setLoadingData(true);
-        setError(null);
-        const data = await fetchData(selectedYear, selectedCategory, selectedMonth, controller.signal);
-        if (cancelled) return;
-        setSummary(data.summary);
-        setRecords(data.data);
-      } catch (err) {
-        if (cancelled || (err instanceof DOMException && err.name === 'AbortError')) return;
-        console.error('[App] Veriler alınırken hata:', err);
-        setError(err instanceof Error ? err.message : 'Veriler alınırken bir sorun oluştu.');
-      } finally {
-        if (!cancelled) setLoadingData(false);
+    try {
+      setUpdatingData(true);
+      setError(null);
+      setSelectedCategory(newCat);
+      setSelectedMonth(newMonth);
+
+      const dataRes = await fetchData(selectedYear, newCat, newMonth, controller.signal);
+      if (controller.signal.aborted) return;
+
+      setSummary(dataRes.summary);
+      setRecords(dataRes.data);
+    } catch (err) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return;
+      console.error('[App] Filtre verisi hatası:', err);
+      setError(err instanceof Error ? err.message : 'Veriler filtrelenirken bir hata oluştu.');
+    } finally {
+      if (!controller.signal.aborted) {
+        setUpdatingData(false);
       }
-    };
-
-    fetchStats();
-
-    return () => { cancelled = true; controller.abort(); };
-  }, [selectedYear, selectedCategory, selectedMonth]);
+    }
+  }, [selectedYear]);
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchCategory.toLowerCase())
@@ -184,8 +226,8 @@ function App() {
     };
   }, [summary, selectedRegion, filteredRecords]);
 
-  const isAnythingLoading = loadingYears || loadingGeoJson || loadingMonths || loadingCategories || loadingData;
-  const isMapLoading = isAnythingLoading;
+  const isAnythingLoading = initialLoading || updatingData;
+  const isMapLoading = initialLoading || updatingData;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
@@ -242,16 +284,12 @@ function App() {
               {/* Year Select */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
-                {loadingYears ? (
+                {initialLoading ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
                     value={selectedYear || ''}
-                    onChange={(e) => {
-                      setSelectedMonth('');
-                      setSelectedCategory('');
-                      setSelectedYear(Number(e.target.value));
-                    }}
+                    onChange={(e) => handleYearChange(Number(e.target.value))}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                   >
                     {years.map((y) => (
@@ -266,12 +304,12 @@ function App() {
               {/* Month Select */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
-                {loadingMonths ? (
+                {initialLoading ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
                     value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    onChange={(e) => handleFilterChange(selectedCategory, e.target.value)}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                   >
                     {months.map((m) => (
@@ -351,7 +389,7 @@ function App() {
                   className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
                 />
 
-                {loadingCategories ? (
+                {initialLoading ? (
                   <div className="space-y-2 mt-2">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="h-8 bg-slate-800/40 rounded-lg animate-pulse"></div>
@@ -365,7 +403,7 @@ function App() {
                       filteredCategories.map((cat) => (
                         <button
                           key={cat.id}
-                          onClick={() => setSelectedCategory(cat.id)}
+                          onClick={() => handleFilterChange(cat.id, selectedMonth)}
                           title={cat.name}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${selectedCategory === cat.id
                             ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
