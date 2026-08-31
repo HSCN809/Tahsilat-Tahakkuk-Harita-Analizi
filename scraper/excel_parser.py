@@ -5,6 +5,7 @@ import os
 import re
 import sqlite3
 import threading
+import unicodedata
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -107,6 +108,75 @@ _executor = ThreadPoolExecutor(max_workers=8)
 atexit.register(_executor.shutdown, wait=False)
 
 
+def normalize_header(s: str) -> str:
+    """Başlık metnini Türkçe karakter ve büyük/küçük harf bağımsız normalize eder."""
+    if not isinstance(s, str):
+        s = str(s)
+    s = s.replace('İ', 'i').replace('I', 'ı').replace('ı', 'i')
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return s.lower().strip()
+
+
+def extract_clean_df(df_raw: pd.DataFrame) -> pd.DataFrame | None:
+    """
+    Excel'den okunan DataFrame'i tahakkuk, tahsilat ve oran kolonlarıyla temizler.
+    Hem doğrudan kolon başlığı olan hem de satır içi başlık içeren dosyaları destekler.
+    """
+    if df_raw is None or df_raw.empty:
+        return None
+
+    # 1. Durum: Kolon başlıkları doğrudan tahakkuk/tahsilat içeriyorsa (örn: .xlsx dosyaları)
+    col_strs = [normalize_header(c) for c in df_raw.columns]
+    if any("tahakkuk" in c for c in col_strs) and any("tahsilat" in c for c in col_strs):
+        tahakkuk_col = None
+        tahsilat_col = None
+        oran_col = None
+        index_col = df_raw.columns[0]
+
+        for c in df_raw.columns:
+            c_norm = normalize_header(c)
+            if "tahakkuk" in c_norm and "oran" not in c_norm and "/" not in c_norm:
+                tahakkuk_col = c
+            elif "tahsilat" in c_norm and "oran" not in c_norm and "/" not in c_norm:
+                tahsilat_col = c
+            elif "oran" in c_norm or "/" in c_norm or "%" in c_norm or "yuzde" in c_norm:
+                oran_col = c
+
+        if tahakkuk_col is not None and tahsilat_col is not None:
+            res_df = pd.DataFrame()
+            res_df["index"] = df_raw[index_col]
+            res_df["tahakkuk"] = pd.to_numeric(df_raw[tahakkuk_col], errors="coerce")
+            res_df["tahsilat"] = pd.to_numeric(df_raw[tahsilat_col], errors="coerce")
+            if oran_col is not None:
+                res_df["tahsilat/tahakkuk"] = pd.to_numeric(df_raw[oran_col], errors="coerce")
+            else:
+                res_df["tahsilat/tahakkuk"] = (res_df["tahsilat"] / res_df["tahakkuk"]) * 100
+
+            res_df = res_df.dropna(subset=["index"])
+            res_df.set_index("index", inplace=True)
+            return res_df
+
+    # 2. Durum: Tablo başlığı satırların içinde gizliyse (örn: ham .xls dosyaları)
+    header_row_idx = None
+    for idx in range(len(df_raw)):
+        row_values = [normalize_header(val) for val in df_raw.iloc[idx].tolist()]
+        if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
+            header_row_idx = idx
+            break
+
+    if header_row_idx is not None:
+        df = kolonlari_ayarla(df_raw, header_row_idx)
+        if df is not None:
+            df.set_index("index", inplace=True)
+            for col in ["tahakkuk", "tahsilat", "tahsilat/tahakkuk"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+            return df
+
+    return None
+
+
 def kolonlari_ayarla(df, header_row_idx):
     headers = [str(col).strip() for col in df.iloc[header_row_idx]]
 
@@ -115,12 +185,12 @@ def kolonlari_ayarla(df, header_row_idx):
     oran_idx = None
 
     for i, h in enumerate(headers):
-        h_lower = h.lower()
-        if "tahakkuk" in h_lower and "oran" not in h_lower and "/" not in h_lower:
+        h_norm = normalize_header(h)
+        if "tahakkuk" in h_norm and "oran" not in h_norm and "/" not in h_norm:
             tahakkuk_idx = i
-        elif "tahsilat" in h_lower and "oran" not in h_lower and "/" not in h_lower:
+        elif "tahsilat" in h_norm and "oran" not in h_norm and "/" not in h_norm:
             tahsilat_idx = i
-        elif "oran" in h_lower or "/" in h_lower or "yüzde" in h_lower or "%" in h_lower:
+        elif "oran" in h_norm or "/" in h_norm or "yuzde" in h_norm or "%" in h_norm:
             oran_idx = i
 
     if tahakkuk_idx is None or tahsilat_idx is None:
@@ -151,24 +221,9 @@ def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     dosya_yolu = os.path.join(folder_path, dosya_adi)
     try:
         df_raw = pd.read_excel(dosya_yolu)
-
-        header_row_idx = None
-        for idx, row in df_raw.iterrows():
-            row_str = " ".join([str(val).lower() for val in row.values])
-            if "tahakkuk" in row_str and "tahsilat" in row_str:
-                header_row_idx = idx
-                break
-
-        if header_row_idx is None:
-            return None
-
-        df = kolonlari_ayarla(df_raw, header_row_idx)
+        df = extract_clean_df(df_raw)
         if df is None:
             return None
-
-        df.set_index('index', inplace=True)
-        for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
 
         match_il = re.search(r"^\d{2}_([^_]+)", dosya_adi)
         if not match_il:
@@ -191,24 +246,9 @@ def oku_ve_temizle_aylik_dosya(klasor_adi, month, folder_path, yil):
 
     try:
         df_raw = pd.read_excel(dosya_yolu)
-
-        header_row_idx = None
-        for idx, row in df_raw.iterrows():
-            row_str = " ".join([str(val).lower() for val in row.values])
-            if "tahakkuk" in row_str and "tahsilat" in row_str:
-                header_row_idx = idx
-                break
-
-        if header_row_idx is None:
-            return None
-
-        df = kolonlari_ayarla(df_raw, header_row_idx)
+        df = extract_clean_df(df_raw)
         if df is None:
             return None
-
-        df.set_index('index', inplace=True)
-        for col in ['tahakkuk', 'tahsilat', 'tahsilat/tahakkuk']:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
 
         il_adi = "_".join(klasor_adi.split("_")[1:]) if "_" in klasor_adi else klasor_adi
         il_adi = il_adi.replace("_", " ").strip()
@@ -346,7 +386,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
 
 def process_year(year: int, year_folder: Path) -> tuple[int, list[dict], list[str], list[dict]]:
     """Tek bir yılın tüm il/ay Excel dosyalarını okuyup satır listesi üretir."""
-    logger.info("ETL işleniyor: Yıl %d", year)
+    logger.info("ETL işleniyor: Yıl %d (%s)", year, year_folder.name)
     records = []
 
     il_dirs = sorted([
@@ -357,11 +397,26 @@ def process_year(year: int, year_folder: Path) -> tuple[int, list[dict], list[st
     if not il_dirs:
         return year, [], [], []
 
-    ilk_il_klasoru = year_folder / il_dirs[0]
-    aylik_dosyalar = [f for f in os.listdir(ilk_il_klasoru) if f.endswith(".xlsx")]
-    aylar = [os.path.splitext(f)[0] for f in aylik_dosyalar]
-    aylar_lower = [a.lower() for a in aylar]
-    mevcut_aylar = [ay for ay in AY_SIRALAMASI if ay.lower() in aylar_lower]
+    # Tüm illeri tarayarak mevcut ayların tam listesini çıkar (tek bir ildeki eksiklik tüm ayları bozmasın)
+    found_months_set = set()
+    for il_dir_name in il_dirs:
+        il_path = year_folder / il_dir_name
+        try:
+            for f in os.listdir(il_path):
+                if f.endswith(".xlsx"):
+                    found_months_set.add(os.path.splitext(f)[0])
+        except Exception:
+            continue
+
+    found_normalized = {normalize_header(m): m for m in found_months_set}
+    mevcut_aylar = []
+    for ay in AY_SIRALAMASI:
+        ay_norm = normalize_header(ay)
+        if ay_norm in found_normalized:
+            mevcut_aylar.append(found_normalized[ay_norm])
+
+    if not mevcut_aylar:
+        mevcut_aylar = sorted(list(found_months_set))
 
     categories_map: dict[str, tuple[str, str]] = {}
     cleaned_categories_list = []
@@ -375,25 +430,9 @@ def process_year(year: int, year_folder: Path) -> tuple[int, list[dict], list[st
 
             try:
                 df_raw = pd.read_excel(excel_path)
-                header_row_idx = None
-                for idx in range(len(df_raw)):
-                    row_values = [str(val).lower().strip() for val in df_raw.iloc[idx].tolist()]
-                    if any("tahakkuk" in val for val in row_values) and any("tahsilat" in val for val in row_values):
-                        header_row_idx = idx
-                        break
-
-                if header_row_idx is None:
-                    continue
-
-                df = kolonlari_ayarla(df_raw, header_row_idx)
+                df = extract_clean_df(df_raw)
                 if df is None:
                     continue
-
-                df.set_index("index", inplace=True)
-                for col in ["tahakkuk", "tahsilat", "tahsilat/tahakkuk"]:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-
-                df = df.dropna(subset=["tahakkuk", "tahsilat"], how="all")
 
                 for cat_raw, row in df.iterrows():
                     if not isinstance(cat_raw, str) or not cat_raw.strip():
@@ -404,9 +443,9 @@ def process_year(year: int, year_folder: Path) -> tuple[int, list[dict], list[st
                         title_name = re.sub(r"^\d+\.\s*", "", cat_raw.strip()).title()
                         categories_map[clean_lookup] = (cat_raw, title_name)
 
-                    accrual = row["tahakkuk"]
-                    collection = row["tahsilat"]
-                    excel_ratio = row["tahsilat/tahakkuk"]
+                    accrual = row.get("tahakkuk")
+                    collection = row.get("tahsilat")
+                    excel_ratio = row.get("tahsilat/tahakkuk")
 
                     accrual_val = float(accrual) if pd.notna(accrual) else None
                     collection_val = float(collection) if pd.notna(collection) else None
@@ -458,23 +497,34 @@ def export_all_to_sqlite(target_years: list[int] | None = None, db_path: Path | 
         conn.close()
         return db_path
 
-    year_folders = []
+    # Yıl klasörlerini tekilleştirerek ve sadece geçerli il alt klasörleri (\d{2}_) içerenleri tespit et
+    year_folders_map: dict[int, Path] = {}
     for d in os.listdir(ana_klasor):
         p = ana_klasor / d
-        if p.is_dir():
-            m = re.search(r"\d{4}", d)
+        if p.is_dir() and "raw_xls" not in d.lower() and "backup" not in d.lower():
+            m = re.search(r"(\d{4})", d)
             if m:
-                y_val = int(m.group(0))
+                y_val = int(m.group(1))
                 if target_years is None or y_val in target_years:
-                    year_folders.append((y_val, p))
+                    try:
+                        has_prov_dirs = any(
+                            (p / sub).is_dir() and re.match(r"^\d{2}_", sub)
+                            for sub in os.listdir(p)
+                        )
+                    except Exception:
+                        has_prov_dirs = False
 
-    year_folders.sort(key=lambda x: x[0])
+                    if has_prov_dirs:
+                        year_folders_map[y_val] = p
+
+    year_folders = sorted(year_folders_map.items(), key=lambda x: x[0])
 
     total_records = 0
     with conn:
         for year, folder in year_folders:
             y, records, aylar, categories = process_year(year, folder)
             if not records:
+                logger.warning("Yıl %d için kayıt üretilemedi (klasör boş veya okunamadı: %s)", y, folder.name)
                 continue
 
             conn.execute("DELETE FROM tax_records WHERE year = ?", (y,))
@@ -496,7 +546,7 @@ def export_all_to_sqlite(target_years: list[int] | None = None, db_path: Path | 
             ))
 
             total_records += len(records)
-            logger.info("Yıl %d kaydedildi: %d kayıt, %d kategori.", y, len(records), len(categories))
+            logger.info("Yıl %d kaydedildi: %d kayıt, %d ay, %d kategori.", y, len(records), len(aylar), len(categories))
 
     conn.close()
     logger.info("ETL tamamlandı! Toplam %d satır veri %s dosyasına yazıldı.", total_records, db_path)
