@@ -31,16 +31,17 @@ logger = logging.getLogger(__name__)
 
 import xlrd
 try:
-    from .excel_parser import FOLDER_NAME_TEMPLATE, safe_decode
+    from .excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite
 except ImportError:
     try:
-        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, safe_decode
+        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite
     except ImportError:
-        from excel_parser import FOLDER_NAME_TEMPLATE, safe_decode
+        from excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite
 
 xlrd.biffh.unicode = safe_decode
 xlrd.book.unicode = safe_decode
 xlrd.formatting.unicode = safe_decode
+
 
 
 def normalize_month_name(name):
@@ -497,14 +498,36 @@ def print_report(valid_years, excel_ana_dir, stats):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="HMB vergi gelirleri Excel scraper")
+    parser = argparse.ArgumentParser(description="HMB vergi gelirleri Excel scraper ve SQLite ETL aracı")
     parser.add_argument(
         "years",
         nargs="?",
         default=None,
         help="Yıl/yıl aralığı (örn: 2024, 2024-2025, hepsi). Ortam değişkeni SCRAPE_YEARS da okunur."
     )
+    parser.add_argument(
+        "--etl-only",
+        action="store_true",
+        help="Web kazıma yapmadan sadece mevcut Excel dosyalarını SQLite veritabanına aktarır."
+    )
     args = parser.parse_args()
+
+    year_input = args.years or os.environ.get("SCRAPE_YEARS", "").strip() or "hepsi"
+
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    veriler_dir = BASE_DIR / "veriler"
+    excel_ana_dir = veriler_dir / "Tahsilat Tahakkuk Excel Dosyaları"
+    os.makedirs(veriler_dir, exist_ok=True)
+    os.makedirs(excel_ana_dir, exist_ok=True)
+
+    if args.etl_only:
+        logger.info("ETL modu devrede: Sadece Excel -> SQLite aktarımı yapılıyor...")
+        target_years = None
+        if year_input != "hepsi":
+            min_y, max_y = 2004, datetime.date.today().year
+            target_years = parse_years_input(year_input, min_y, max_y)
+        export_all_to_sqlite(target_years)
+        return
 
     current_year = datetime.date.today().year
 
@@ -517,22 +540,12 @@ def main():
         min_year, max_year = detect_year_bounds(driver, current_year)
         logger.info("Sitede mevcut yıllar: %d-%d arası", min_year, max_year)
 
-        year_input = args.years or os.environ.get("SCRAPE_YEARS", "").strip()
-        if not year_input:
-            year_input = "hepsi"
-
         valid_years = parse_years_input(year_input, min_year, max_year)
         if not valid_years:
             logger.error("Geçerli bir yıl bulunamadı (%s)", year_input)
             return
 
         logger.info("Seçilen Yıllar: %s", ', '.join(map(str, valid_years)))
-
-        BASE_DIR = Path(__file__).resolve().parent.parent
-        veriler_dir = BASE_DIR / "veriler"
-        excel_ana_dir = veriler_dir / "Tahsilat Tahakkuk Excel Dosyaları"
-        os.makedirs(veriler_dir, exist_ok=True)
-        os.makedirs(excel_ana_dir, exist_ok=True)
         indir_konumlari = prepare_download_dirs(valid_years, excel_ana_dir)
 
         all_links_data = collect_links(driver, wait, target_url, valid_years)
@@ -549,6 +562,11 @@ def main():
     stats = convert_all(downloaded_files, indir_konumlari)
     print_report(valid_years, excel_ana_dir, stats)
 
+    # 2. Otomatik SQLite ETL aktarımı
+    logger.info("Excel verileri SQLite veritabanına aktarılıyor...")
+    export_all_to_sqlite(valid_years)
+
 
 if __name__ == "__main__":
     main()
+

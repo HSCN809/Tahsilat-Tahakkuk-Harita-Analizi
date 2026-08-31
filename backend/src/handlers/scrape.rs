@@ -4,7 +4,7 @@ use axum::http::HeaderMap;
 use axum::Json;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::models::{JobStatusResponse, ScrapeQuery, ScrapeTriggerResponse};
 use crate::security::{validate_year_input, verify_scrape_token, AppError};
@@ -58,22 +58,7 @@ pub async fn trigger_scrape(
                 return Err(format!("Scraper hata kodu ile sonlandı: {:?}", status.code()));
             }
 
-            info!("Scraper tamamlandı. SQLite veritabanı güncelleniyor...");
-            // ETL tetikleme: Excel'den SQLite'a aktarım
-            let etl_res = Command::new(&python_bin)
-                .arg("scripts/export_excel_to_sqlite.py")
-                .output()
-                .await;
-
-            if let Ok(etl_out) = etl_res {
-                if !etl_out.status.success() {
-                    let err = String::from_utf8_lossy(&etl_out.stderr);
-                    error!("ETL çalıştırma hatası: {}", err);
-                } else {
-                    info!("ETL SQLite veritabanı başarıyla güncellendi.");
-                }
-            }
-
+            info!("Scraper ve SQLite ETL aktarımı başarıyla tamamlandı.");
             Ok(None)
         })
         .await;
