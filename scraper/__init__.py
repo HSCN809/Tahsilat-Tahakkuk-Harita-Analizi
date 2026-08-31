@@ -9,6 +9,7 @@ try:
         excel_dosyalarini_oku,
         veri_hazirla,
         export_all_to_sqlite,
+        clean_year_data,
         init_db,
     )
 except ImportError:
@@ -19,6 +20,7 @@ except ImportError:
         excel_dosyalarini_oku,
         veri_hazirla,
         export_all_to_sqlite,
+        clean_year_data,
         init_db,
     )
 
@@ -29,5 +31,6 @@ __all__ = [
     "excel_dosyalarini_oku",
     "veri_hazirla",
     "export_all_to_sqlite",
+    "clean_year_data",
     "init_db",
 ]

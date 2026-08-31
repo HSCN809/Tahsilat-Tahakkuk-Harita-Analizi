@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import threading
 import unicodedata
@@ -543,3 +544,50 @@ def export_all_to_sqlite(target_years: list[int] | None = None, db_path: Path | 
     conn.close()
     logger.info("ETL tamamlandı! Toplam %d satır veri %s dosyasına yazıldı.", total_records, db_path)
     return db_path
+
+
+def clean_year_data(year: int, excel_ana_dir: Path | None = None, db_path: Path | None = None):
+    """
+    Seçilen yıla ait tüm disk klasörlerini ve veritabanı kayıtlarını tertemiz siler.
+    DİĞER YILLARIN (2004..2025) HİÇBİR VERİSİNE VE DOSYASINA ASLA DOKUNMAZ.
+    """
+    if excel_ana_dir is None:
+        excel_ana_dir = ana_klasor
+
+    if db_path is None:
+        db_path = VERILER_DIR / "tahsilat_tahakkuk.db"
+
+    logger.info("Yıl %d için eski disk ve veritabanı kayıtları temizleniyor...", year)
+
+    # 1. Excel ana klasörü ve veriler klasöründeki o yıla ait tüm klasörleri sil
+    search_dirs = [VERILER_DIR]
+    if excel_ana_dir and excel_ana_dir.exists():
+        search_dirs.append(excel_ana_dir)
+
+    for base in set(search_dirs):
+        if not base.exists():
+            continue
+        for item in os.listdir(base):
+            item_path = base / item
+            if item_path.is_dir():
+                m = re.search(r"(\d{4})", item)
+                if m and int(m.group(1)) == year:
+                    try:
+                        logger.info("Eski/çakışan yıl klasörü siliniyor: %s", item_path)
+                        shutil.rmtree(item_path, ignore_errors=True)
+                    except Exception as e:
+                        logger.warning("Klasör silinemedi: %s (%s)", item_path, e)
+
+    # 2. SQLite veritabanındaki o yıla ait kayıtları sil
+    if db_path.exists():
+        try:
+            conn = sqlite3.connect(db_path)
+            with conn:
+                conn.execute("DELETE FROM tax_records WHERE year = ?", (year,))
+                conn.execute("DELETE FROM metadata_config WHERE year = ?", (year,))
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            conn.close()
+            logger.info("Yıl %d SQLite kayıtları temizlendi.", year)
+        except Exception as e:
+            logger.warning("SQLite temizleme hatası: %s", e)
+

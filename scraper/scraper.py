@@ -31,12 +31,12 @@ logger = logging.getLogger(__name__)
 
 import xlrd
 try:
-    from .excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite
+    from .excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite, clean_year_data
 except ImportError:
     try:
-        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite
+        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite, clean_year_data
     except ImportError:
-        from excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite
+        from excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite, clean_year_data
 
 xlrd.biffh.unicode = safe_decode
 xlrd.book.unicode = safe_decode
@@ -515,6 +515,11 @@ def main():
         action="store_true",
         help="Web kazıma yapmadan sadece mevcut Excel dosyalarını SQLite veritabanına aktarır."
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Seçilen yıla ait eski/çakışan klasörleri ve DB kayıtlarını tamamen silip sıfırdan oluşturur."
+    )
     args = parser.parse_args()
 
     year_input = args.years or os.environ.get("SCRAPE_YEARS", "").strip() or "hepsi"
@@ -531,6 +536,9 @@ def main():
         if year_input != "hepsi":
             min_y, max_y = 2004, datetime.date.today().year
             target_years = parse_years_input(year_input, min_y, max_y)
+        if args.clean and target_years:
+            for y in target_years:
+                clean_year_data(y, excel_ana_dir)
         export_all_to_sqlite(target_years)
         return
 
@@ -551,8 +559,12 @@ def main():
             return
 
         logger.info("Seçilen Yıllar: %s", ', '.join(map(str, valid_years)))
-        indir_konumlari = prepare_download_dirs(valid_years, excel_ana_dir)
 
+        # Seçilen yılların eski/çakışan klasörlerini ve DB kayıtlarını temizle
+        for y in valid_years:
+            clean_year_data(y, excel_ana_dir)
+
+        indir_konumlari = prepare_download_dirs(valid_years, excel_ana_dir)
         all_links_data = collect_links(driver, wait, target_url, valid_years)
     finally:
         logger.info("Tarayıcı kapatılıyor...")
@@ -574,4 +586,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
