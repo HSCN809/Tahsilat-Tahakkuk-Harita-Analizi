@@ -5,11 +5,11 @@
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   <url>
-    <loc>https://tahsilat-tahakkuk.up.railway.app/</loc>
+    <loc>https://tahsilat-tahakkuk-analizi.up.railway.app/</loc>
     <lastmod>2026-09-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="tr" href="https://tahsilat-tahakkuk.up.railway.app/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://tahsilat-tahakkuk.up.railway.app/" />
+    <xhtml:link rel="alternate" hreflang="tr" href="https://tahsilat-tahakkuk-analizi.up.railway.app/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://tahsilat-tahakkuk-analizi.up.railway.app/" />
   </url>
 </urlset>

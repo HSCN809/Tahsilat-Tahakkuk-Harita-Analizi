@@ -1,5 +1,5 @@
 # Robots.txt - Tahsilat & Tahakkuk Harita Analizi
-# https://tahsilat-tahakkuk.up.railway.app
+# https://tahsilat-tahakkuk-analizi.up.railway.app
 
 User-agent: *
 Allow: /
@@ -10,4 +10,4 @@ Disallow: /health
 Disallow: /healthz
 
 # Sitemap location
-Sitemap: https://tahsilat-tahakkuk.up.railway.app/sitemap.xml
+Sitemap: https://tahsilat-tahakkuk-analizi.up.railway.app/sitemap.xml
