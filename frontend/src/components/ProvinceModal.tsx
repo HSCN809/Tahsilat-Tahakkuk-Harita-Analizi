@@ -82,6 +82,7 @@ export const ProvinceModal: React.FC<ProvinceModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Pencereyi Kapat"
             className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />

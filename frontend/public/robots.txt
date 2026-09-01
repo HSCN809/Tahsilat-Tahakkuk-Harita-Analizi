@@ -1,0 +1,13 @@
+# Robots.txt - Tahsilat & Tahakkuk Harita Analizi
+# https://tahsilat-tahakkuk.up.railway.app
+
+User-agent: *
+Allow: /
+
+# Prevent bots from wasting crawl budget on API proxy endpoints and internal health routes
+Disallow: /api/
+Disallow: /health
+Disallow: /healthz
+
+# Sitemap location
+Sitemap: https://tahsilat-tahakkuk.up.railway.app/sitemap.xml

@@ -120,6 +120,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Pencereyi Kapat"
             className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -130,6 +131,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Veri Yılı</label>
           <select
+            aria-label="Veri Yılı Seçin"
             value={selectedYear ?? ''}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
             className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"

@@ -2,12 +2,117 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Türkiye İl Bazında Vergi Gelirleri Tahsilat ve Tahakkuk Harita Analiz Platformu" />
-    <title>Tahsilat &amp; Tahakkuk | Harita Analizi</title>
+    <title>Tahsilat &amp; Tahakkuk Harita Analizi | Türkiye Vergi Gelirleri İstatistikleri</title>
+
+    <!-- Temel SEO Meta Etiketleri -->
+    <meta name="description" content="Türkiye genelinde 81 ilin vergi gelirleri, tahsilat ve tahakkuk oranlarını gösteren interaktif harita ve karşılaştırmalı grafik analiz platformu. Hazine ve Maliye Bakanlığı güncel verileriyle il bazında bütçe performansını keşfedin." />
+    <meta name="keywords" content="tahsilat tahakkuk, vergi gelirleri analizi, il bazında vergi, türkiye vergi haritası, maliye bakanlığı istatistikleri, 81 il vergi tahsilatı, bütçe gelirleri, vergi performans analizi, interaktif türkiye haritası, hazine maliye verileri" />
+    <meta name="author" content="Tahsilat &amp; Tahakkuk Harita Analizi" />
+    <meta name="publisher" content="Tahsilat &amp; Tahakkuk Analiz Portalı" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <link rel="canonical" href="https://tahsilat-tahakkuk.up.railway.app/" />
+
+    <!-- Tarayıcı & Cihaz Ayarları -->
+    <meta name="theme-color" content="#0b0f19" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="application-name" content="Tahsilat &amp; Tahakkuk" />
+    <meta name="apple-mobile-web-app-title" content="Tahsilat &amp; Tahakkuk" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- İkonlar & PWA Manifest -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tahsilat-tahakkuk.up.railway.app/" />
+    <meta property="og:title" content="Tahsilat &amp; Tahakkuk Harita Analizi | Türkiye Vergi Gelirleri İstatistikleri" />
+    <meta property="og:description" content="Türkiye il bazında vergi gelirleri, tahsilat ve tahakkuk oranlarının interaktif harita ve grafik analiz platformu." />
+    <meta property="og:image" content="https://tahsilat-tahakkuk.up.railway.app/og-image.png" />
+    <meta property="og:image:secure_url" content="https://tahsilat-tahakkuk.up.railway.app/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Tahsilat &amp; Tahakkuk Harita Analizi - 81 İl Vergi Gelirleri İstatistikleri Platformu" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta property="og:site_name" content="Tahsilat &amp; Tahakkuk Harita Analizi" />
+
+    <!-- Twitter Kartı -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tahsilat &amp; Tahakkuk Harita Analizi | Türkiye Vergi Gelirleri İstatistikleri" />
+    <meta name="twitter:description" content="Türkiye geneli 81 ilin vergi gelirleri, tahsilat ve tahakkuk oranlarını harita üzerinde analiz edin." />
+    <meta name="twitter:image" content="https://tahsilat-tahakkuk.up.railway.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Tahsilat &amp; Tahakkuk Harita Analizi Platformu Önizleme" />
+
+    <!-- Yapısal Veri (JSON-LD) - Schema.org Arama Motoru Zengin Sonuçları -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://tahsilat-tahakkuk.up.railway.app/#website",
+          "url": "https://tahsilat-tahakkuk.up.railway.app/",
+          "name": "Tahsilat & Tahakkuk Harita Analizi",
+          "description": "Türkiye il bazında vergi gelirleri tahsilat ve tahakkuk oranlarının interaktif harita ve grafik analiz platformu.",
+          "inLanguage": "tr-TR"
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://tahsilat-tahakkuk.up.railway.app/#webapp",
+          "name": "Tahsilat & Tahakkuk Harita Analizi",
+          "url": "https://tahsilat-tahakkuk.up.railway.app/",
+          "description": "Türkiye genelinde 81 ilin vergi tahsilat ve tahakkuk verilerini harita, grafik ve liderlik tablolarıyla inceleyin.",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "All",
+          "browserRequirements": "Requires JavaScript. Requires HTML5.",
+          "inLanguage": "tr-TR",
+          "isAccessibleForFree": true,
+          "featureList": [
+            "81 İl İnteraktif Kloroplet Harita Analizi",
+            "Tahsilat ve Tahakkuk Oran Karşılaştırmaları",
+            "Mali Yıl ve Ay Bazlı Filtreleme",
+            "Bölgesel ve Kategori Bazlı Vergi İncelemeleri",
+            "CSV ve JSON Formatında Ham Veri İndirme"
+          ]
+        },
+        {
+          "@type": "Dataset",
+          "@id": "https://tahsilat-tahakkuk.up.railway.app/#dataset",
+          "name": "Türkiye İl Bazında Vergi Gelirleri Tahsilat ve Tahakkuk İstatistikleri",
+          "description": "Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü verilerine dayalı il bazlı vergi tahsilat ve tahakkuk rakamları.",
+          "url": "https://tahsilat-tahakkuk.up.railway.app/",
+          "license": "https://creativecommons.org/licenses/by/4.0/",
+          "isAccessibleForFree": true,
+          "spatialCoverage": {
+            "@type": "Place",
+            "name": "Türkiye"
+          },
+          "variableMeasured": [
+            "Tahakkuk Tutarı",
+            "Tahsilat Tutarı",
+            "Tahsilat / Tahakkuk Oranı (%)"
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
+    <noscript>
+      <div style="padding: 2rem; font-family: sans-serif; background-color: #0b0f19; color: #f8fafc; min-height: 100vh;">
+        <h1>Tahsilat &amp; Tahakkuk Harita Analizi</h1>
+        <p>Türkiye genelinde 81 ilin vergi gelirleri, tahsilat ve tahakkuk oranlarını gösteren interaktif harita ve grafik analiz platformu.</p>
+        <p>Bu uygulamayı tam performansıyla kullanmak için tarayıcınızda JavaScript'i etkinleştirmeniz gerekmektedir.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

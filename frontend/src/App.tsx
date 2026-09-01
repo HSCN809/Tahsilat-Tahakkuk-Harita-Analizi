@@ -274,7 +274,7 @@ function App() {
                 </h2>
                 <button
                   onClick={() => setDownloadModalOpen(true)}
-                  title="Ham veri indir"
+                  title="Ham veri indir" aria-label="Ham verileri indir"
                   className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-blue-400 transition-all cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
@@ -283,12 +283,12 @@ function App() {
 
               {/* Year Select */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
+                <label htmlFor="year-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
                 {initialLoading ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
-                    value={selectedYear || ''}
+                    id="year-select" aria-label="Analiz Yılı Seçin" value={selectedYear || ''}
                     onChange={(e) => handleYearChange(Number(e.target.value))}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                   >
@@ -303,12 +303,12 @@ function App() {
 
               {/* Month Select */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
+                <label htmlFor="month-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
                 {initialLoading ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
-                    value={selectedMonth}
+                    id="month-select" aria-label="Analiz Ayı Seçin" value={selectedMonth}
                     onChange={(e) => handleFilterChange(selectedCategory, e.target.value)}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                   >
@@ -323,9 +323,9 @@ function App() {
 
               {/* Region Select */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Bölgesi</label>
+                <label htmlFor="region-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Bölgesi</label>
                 <select
-                  value={selectedRegion}
+                  id="region-select" aria-label="Analiz Bölgesi Seçin" value={selectedRegion}
                   onChange={(e) => setSelectedRegion(e.target.value)}
                   className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                 >
@@ -343,7 +343,7 @@ function App() {
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Harita Gösterim Tipi</label>
                 <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-slate-800 rounded-xl">
                   <button
-                    onClick={() => setMapType('tahakkuk')}
+                    onClick={() => setMapType('tahakkuk')} aria-label="Haritada Tahakkuk Tutarlarını Göster"
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahakkuk'
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -352,7 +352,7 @@ function App() {
                     Tahakkuk
                   </button>
                   <button
-                    onClick={() => setMapType('tahsilat')}
+                    onClick={() => setMapType('tahsilat')} aria-label="Haritada Tahsilat Tutarlarını Göster"
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahsilat'
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -361,7 +361,7 @@ function App() {
                     Tahsilat
                   </button>
                   <button
-                    onClick={() => setMapType('ratio')}
+                    onClick={() => setMapType('ratio')} aria-label="Haritada Tahsilat Oranını Göster"
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'ratio'
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
@@ -375,7 +375,7 @@ function App() {
               {/* Category Search & Select */}
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">GELİR KALEMİ / VERGİ TÜRÜ</label>
+                  <label htmlFor="category-search" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">GELİR KALEMİ / VERGİ TÜRÜ</label>
                   {categories.length > 0 && (
                     <span className="text-[10px] text-slate-500 font-mono">Toplam: {categories.length}</span>
                   )}
@@ -383,7 +383,7 @@ function App() {
 
                 <input
                   type="text"
-                  placeholder="Vergi türü ara..."
+                  id="category-search" aria-label="Vergi türü veya gelir kalemi ara" placeholder="Vergi türü ara..."
                   value={searchCategory}
                   onChange={(e) => setSearchCategory(e.target.value)}
                   className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
