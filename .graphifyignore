@@ -1,0 +1,38 @@
+﻿# Build artifacts
+backend/target/
+target/
+*.pdb
+*.exe
+
+# Dependencies & frontend build
+frontend/node_modules/
+node_modules/
+frontend/dist/
+dist/
+
+# Raw data & binary files
+veriler/
+*.xls
+*.xlsx
+*.csv
+*.sqlite3
+*.db
+*.geojson
+
+# Graphify generated temp & converted
+graphify-out/converted/
+graphify-out/cache/
+graphify-out/obsidian/
+
+# Python environments
+venv/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Scratch and IDE
+scratch/
+.idea/
+.vscode/
+.claude/
