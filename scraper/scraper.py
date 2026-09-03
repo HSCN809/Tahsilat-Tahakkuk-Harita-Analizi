@@ -560,11 +560,15 @@ def main():
 
         logger.info("Seçilen Yıllar: %s", ', '.join(map(str, valid_years)))
 
-        # Seçilen yılların eski/çakışan klasörlerini ve DB kayıtlarını temizle
+        # 1. ADIM: Silme (Eski klasörler ve SQLite kayıtları)
+        logger.info(">>> [ADIM 1/3] Eski kayıtlar ve klasörler temizleniyor...")
         for y in valid_years:
             clean_year_data(y, excel_ana_dir)
 
         indir_konumlari = prepare_download_dirs(valid_years, excel_ana_dir)
+
+        # 2. ADIM: Web'den indirme
+        logger.info(">>> [ADIM 2/3] Web'den güncel Excel dosyaları indiriliyor...")
         all_links_data = collect_links(driver, wait, target_url, valid_years)
     finally:
         logger.info("Tarayıcı kapatılıyor...")
@@ -579,9 +583,12 @@ def main():
     stats = convert_all(downloaded_files, indir_konumlari)
     print_report(valid_years, excel_ana_dir, stats)
 
-    # 2. Otomatik SQLite ETL aktarımı
-    logger.info("Excel verileri SQLite veritabanına aktarılıyor...")
+    # 3. ADIM: SQLite Veritabanına Yazma
+    logger.info(">>> [ADIM 3/3] Excel verileri SQLite veritabanına aktarılıyor (ETL)...")
     export_all_to_sqlite(valid_years)
+    logger.info("================================================================================")
+    logger.info(">>> [TAMAMLANDI] %s yılı silme, indirme ve DB aktarımı tek seferde bitti!", ', '.join(map(str, valid_years)))
+    logger.info("================================================================================")
 
 
 if __name__ == "__main__":
