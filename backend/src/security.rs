@@ -107,3 +107,37 @@ pub fn is_safe_filename(name: &str) -> bool {
         && !name.contains('\\')
         && !name.contains('\0')
 }
+
+use std::net::IpAddr;
+use tower_governor::errors::GovernorError;
+use tower_governor::key_extractor::KeyExtractor;
+
+#[derive(Clone, Copy, Default)]
+pub struct SmartPeerIpExtractor;
+
+impl KeyExtractor for SmartPeerIpExtractor {
+    type Key = IpAddr;
+
+    fn extract<B>(&self, req: &axum::http::Request<B>) -> Result<Self::Key, GovernorError> {
+        // 1. X-Forwarded-For (proxy / cloud / railway)
+        if let Some(forwarded_for) = req.headers().get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            if let Some(first_ip) = forwarded_for.split(',').next() {
+                if let Ok(ip) = first_ip.trim().parse::<IpAddr>() {
+                    return Ok(ip);
+                }
+            }
+        }
+        // 2. X-Real-IP
+        if let Some(real_ip) = req.headers().get("x-real-ip").and_then(|v| v.to_str().ok()) {
+            if let Ok(ip) = real_ip.trim().parse::<IpAddr>() {
+                return Ok(ip);
+            }
+        }
+        // 3. ConnectInfo extension
+        if let Some(connect_info) = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>() {
+            return Ok(connect_info.0.ip());
+        }
+        // 4. Fallback (yerel test veya başlık yoksa 127.0.0.1)
+        Ok(IpAddr::from([127, 0, 0, 1]))
+    }
+}

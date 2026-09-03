@@ -46,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db_pool,
         job_manager,
         geojson_cache: Arc::new(geojson_val),
+        cache: backend::state::AppCache::new(),
     };
 
     let app = create_app(state);
@@ -54,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Sunucu dinlemede: http://{}", addr);
 
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
 
     Ok(())
 }

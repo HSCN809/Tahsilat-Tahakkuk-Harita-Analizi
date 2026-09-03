@@ -28,6 +28,7 @@ pub async fn trigger_scrape(
     let python_bin = state.config.python_bin.clone();
     let scraper_path = state.config.scraper_script_path.clone();
     let _db_path = state.config.db_path.clone();
+    let cache = state.cache.clone();
 
     let (started, info) = state
         .job_manager
@@ -42,11 +43,24 @@ pub async fn trigger_scrape(
                 .spawn()
                 .map_err(|e| format!("Python scraper başlatılamadı: {}", e))?;
 
+            let stderr_task = child.stderr.take().map(|stderr| {
+                tokio::spawn(async move {
+                    let mut reader = BufReader::new(stderr).lines();
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        tracing::warn!("[scraper-err] {}", line);
+                    }
+                })
+            });
+
             if let Some(stdout) = child.stdout.take() {
                 let mut reader = BufReader::new(stdout).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
                     info!("[scraper] {}", line);
                 }
+            }
+
+            if let Some(task) = stderr_task {
+                let _ = task.await;
             }
 
             let status = child
@@ -59,6 +73,7 @@ pub async fn trigger_scrape(
             }
 
             info!("Scraper ve SQLite ETL aktarımı başarıyla tamamlandı.");
+            cache.invalidate_all().await;
             Ok(None)
         })
         .await;

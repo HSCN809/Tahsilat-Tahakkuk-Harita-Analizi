@@ -1,7 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import { geoMercator, geoPath } from 'd3-geo';
-import type { Feature, Geometry } from 'geojson';
 import { formatCurrency } from '../utils/format';
 import { REGIONS, normalizeProvinceName } from '../utils/provinces';
 import type { ProvinceRecord, TurkeyGeoJSON, MapType } from '../types';
@@ -48,28 +46,26 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     };
   }, [invalidateBounds]);
 
-  // Automatically calculate projection center, scale and map height to fit selected region using d3-geo
-  const { projection, calculatedHeight } = useMemo(() => {
-    if (!geoJsonData) return { projection: null, calculatedHeight: 450 };
+  const filteredFeatures = useMemo(() => {
+    if (!geoJsonData) return [];
+    const features = geoJsonData.features || [];
+    if (selectedRegion === 'Tüm Ülke') return features;
+    return features.filter((f) => {
+      const name = f.properties?.name;
+      const normalized = normalizeProvinceName(name);
+      return REGIONS[selectedRegion]?.includes(normalized);
+    });
+  }, [geoJsonData, selectedRegion]);
 
-    let features: TurkeyGeoJSON['features'] = [];
-    if (geoJsonData.type === 'FeatureCollection') {
-      features = geoJsonData.features || [];
+  // Otomatik projeksiyon merkezi, ölçeği ve harita yüksekliğini d3-geo ile hesapla
+  const { pathGenerator, calculatedHeight } = useMemo(() => {
+    if (filteredFeatures.length === 0) {
+      return { pathGenerator: null, calculatedHeight: 450 };
     }
-
-    const filteredFeatures = selectedRegion === 'Tüm Ülke'
-      ? features
-      : features.filter((f) => {
-        const name = f.properties?.name;
-        const normalized = normalizeProvinceName(name);
-        return REGIONS[selectedRegion]?.includes(normalized);
-      });
-
-    if (filteredFeatures.length === 0) return { projection: null, calculatedHeight: 450 };
 
     const featureCollection = {
       type: 'FeatureCollection',
-      features: filteredFeatures
+      features: filteredFeatures,
     };
 
     const width = 800;
@@ -82,17 +78,15 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
       featureCollection as any
     );
 
-    // Otomatik hesaplanan projeksiyon ölçeğini çarpan (multiplier) kullanarak doğrudan büyütüp küçültüyoruz
-    // 1.0'dan büyük değerler büyütür (zoom-in), küçük değerler küçültür (zoom-out)
     const scaleMultipliers: { [key: string]: number } = {
-      "Tüm Ülke": 1.05,
-      "Marmara": 1.2,
-      "Ege": 1.25,
-      "Akdeniz": 1.0,
-      "İç Anadolu": 1.3,
-      "Karadeniz": 1.25,
-      "Doğu Anadolu": 1.3,
-      "Güneydoğu Anadolu": 1.0
+      'Tüm Ülke': 1.05,
+      'Marmara': 1.2,
+      'Ege': 1.25,
+      'Akdeniz': 1.0,
+      'İç Anadolu': 1.3,
+      'Karadeniz': 1.25,
+      'Doğu Anadolu': 1.3,
+      'Güneydoğu Anadolu': 1.0,
     };
     const multiplier = scaleMultipliers[selectedRegion] ?? 1.0;
 
@@ -106,21 +100,19 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
       const cy = baseHeight / 2;
       proj.translate([
         cx + (tx - cx) * multiplier,
-        cy + (ty - cy) * multiplier
+        cy + (ty - cy) * multiplier,
       ]);
     }
 
-    // Haritanın gerçek yüksekliğini sınır poligonlarına (bounding box) göre hesaplıyoruz
-    const pathGenerator = geoPath().projection(proj);
-    const [[, y0], [, y1]] = pathGenerator.bounds(featureCollection as any);
+    const generator = geoPath().projection(proj);
+    const [[, y0], [, y1]] = generator.bounds(featureCollection as any);
 
-    // Kenar boşlukları dahil dikey piksel yüksekliği
-    const paddingTotal = padding * 2 + 40; // Ek padding ve kart iç boşluğu
+    const paddingTotal = padding * 2 + 40;
     const rawHeight = (y1 - y0) + paddingTotal;
-    const calculatedHeight = Math.max(280, Math.min(450, Math.round(rawHeight)));
+    const height = Math.max(280, Math.min(450, Math.round(rawHeight)));
 
-    return { projection: proj, calculatedHeight };
-  }, [geoJsonData, selectedRegion]);
+    return { pathGenerator: generator, calculatedHeight: height };
+  }, [filteredFeatures, selectedRegion]);
 
   const recordsMap = useMemo(() => {
     const map = new Map<string, ProvinceRecord>();
@@ -182,7 +174,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
             style={{
               left: tooltip.alignLeft ? tooltip.x - 15 : tooltip.x + 15,
               top: tooltip.y - 15,
-              transform: tooltip.alignLeft ? 'translateX(-100%)' : 'none'
+              transform: tooltip.alignLeft ? 'translateX(-100%)' : 'none',
             }}
           >
             <span className="font-bold text-sm text-slate-200 border-b border-slate-800 pb-1 mb-1 block">
@@ -209,76 +201,48 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
           </div>
         )}
 
-        {!geoJsonData ? (
+        {!geoJsonData || !pathGenerator ? (
           <div className="text-slate-500 text-sm font-medium">Harita verisi bekleniyor...</div>
         ) : (
           <div className="w-full h-full flex items-center justify-center overflow-hidden">
-            <ComposableMap
-              width={800}
-              height={380}
-              // d3-geo GeoProjection ile react-simple-maps ProjectionFunction tipleri uyumsuz,
-              // runtime'da ikisi de çalıştığı için cast gereklidir
-              projection={(projection ?? "geoMercator") as unknown as string}
+            <svg
+              viewBox="0 0 800 380"
+              className="w-full h-full select-none"
               style={{ width: '100%', height: '100%' }}
+              preserveAspectRatio="xMidYMid meet"
             >
-              <Geographies geography={geoJsonData}>
-                {({ geographies }: { geographies: Feature<Geometry, { name: string }>[] }) => {
-                  const filteredGeos = selectedRegion === 'Tüm Ülke'
-                    ? geographies
-                    : geographies.filter(geo => {
-                      const name = geo.properties.name;
-                      const normalized = normalizeProvinceName(name);
-                      return REGIONS[selectedRegion]?.includes(normalized);
-                    });
+              <g>
+                {filteredFeatures.map((geo) => {
+                  const d = pathGenerator(geo);
+                  if (!d) return null;
+                  const name = geo.properties.name;
+                  const record = recordsMap.get(normalizeProvinceName(name));
+                  return (
+                    <path
+                      key={name}
+                      d={d}
+                      fill={getColor(name)}
+                      stroke="#0f172a"
+                      strokeWidth={0.7}
+                      className="transition-all duration-200 outline-none hover:!fill-[#6366f1] hover:!stroke-[#f8fafc] hover:stroke-[1.2px] active:!fill-[#4338ca] cursor-pointer"
+                      onMouseMove={(e: React.MouseEvent<SVGPathElement>) => {
+                        const bounds = getCachedBounds();
+                        const x = e.clientX - (bounds?.left || 0);
+                        const y = e.clientY - (bounds?.top || 0);
+                        const containerWidth = bounds?.width || 0;
+                        const alignLeft = x > containerWidth / 2;
 
-                  return filteredGeos.map((geo) => {
-                    const name = geo.properties.name;
-                    const record = recordsMap.get(normalizeProvinceName(name));
-                    return (
-                      <Geography
-                        key={name}
-                        geography={geo}
-                        onMouseMove={(e: React.MouseEvent) => {
-                          const bounds = getCachedBounds();
-                          const x = e.clientX - (bounds?.left || 0);
-                          const y = e.clientY - (bounds?.top || 0);
-                          const containerWidth = bounds?.width || 0;
-                          const alignLeft = x > containerWidth / 2;
-
-                          setTooltip({ x, y, name, record, alignLeft });
-                        }}
-                        onMouseLeave={() => {
-                          invalidateBounds();
-                          setTooltip(null);
-                        }}
-                        style={{
-                          default: {
-                            fill: getColor(name),
-                            stroke: '#0f172a',
-                            strokeWidth: 0.7,
-                            outline: 'none',
-                            transition: 'all 200ms ease',
-                          },
-                          hover: {
-                            fill: '#6366f1',
-                            stroke: '#f8fafc',
-                            strokeWidth: 1.2,
-                            outline: 'none',
-                            cursor: 'pointer',
-                          },
-                          pressed: {
-                            fill: '#4338ca',
-                            stroke: '#f8fafc',
-                            strokeWidth: 1.2,
-                            outline: 'none',
-                          },
-                        }}
-                      />
-                    );
-                  });
-                }}
-              </Geographies>
-            </ComposableMap>
+                        setTooltip({ x, y, name, record, alignLeft });
+                      }}
+                      onMouseLeave={() => {
+                        invalidateBounds();
+                        setTooltip(null);
+                      }}
+                    />
+                  );
+                })}
+              </g>
+            </svg>
           </div>
         )}
       </div>

@@ -66,6 +66,7 @@ fn setup_test_state(temp_dir: &tempfile::TempDir) -> AppState {
         db_pool: pool,
         job_manager: JobManager::new(),
         geojson_cache: Arc::new(serde_json::json!({"type": "FeatureCollection", "features": []})),
+        cache: backend::state::AppCache::new(),
     }
 }
 
@@ -303,3 +304,145 @@ fn test_category_text_cleaning() {
     assert_eq!(clean_category_text("01.02.   Kurumlar   Vergisi "), "02. kurumlar vergisi");
     assert_eq!(clean_category_text("Özel Tüketim Vergisi"), "özel tüketim vergisi");
 }
+
+#[tokio::test]
+async fn test_security_headers_and_caching() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = setup_test_state(&tmp);
+    let app = create_app(state.clone());
+
+    // 1. Güvenlik başlıkları kontrolü
+    let resp = app
+        .clone()
+        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let headers = resp.headers();
+    assert_eq!(
+        headers.get("x-content-type-options").and_then(|v| v.to_str().ok()),
+        Some("nosniff")
+    );
+    assert_eq!(
+        headers.get("x-frame-options").and_then(|v| v.to_str().ok()),
+        Some("DENY")
+    );
+    assert_eq!(
+        headers.get("x-xss-protection").and_then(|v| v.to_str().ok()),
+        Some("1; mode=block")
+    );
+    assert_eq!(
+        headers.get("referrer-policy").and_then(|v| v.to_str().ok()),
+        Some("strict-origin-when-cross-origin")
+    );
+    assert!(headers.contains_key("content-security-policy"));
+
+    // 2. Önbellek (Moka cache) kontrolü: Years, Config ve Data
+    let resp_years1 = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/years").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_years1.status(), StatusCode::OK);
+
+    // Cache'den hızlı get kontrolü
+    let cached_years = state.cache.years.get(&()).await;
+    assert!(cached_years.is_some());
+    assert_eq!(cached_years.unwrap(), vec![2025]);
+
+    // Config cache kontrolü
+    let resp_config = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/config?year=2025").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_config.status(), StatusCode::OK);
+    assert!(state.cache.config.get(&2025).await.is_some());
+
+    // Data cache kontrolü
+    let resp_data = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/data?year=2025&category=01.+Gelir+Vergisi&month=Ocak")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp_data.status(), StatusCode::OK);
+    let data_cache_key = (2025, "01. Gelir Vergisi".to_string(), Some("Ocak".to_string()));
+    assert!(state.cache.data.get(&data_cache_key).await.is_some());
+
+    // Cache invalidate_all testi (years, config, data hepsini temizlemeli)
+    state.cache.invalidate_all().await;
+    assert!(state.cache.years.get(&()).await.is_none());
+    assert!(state.cache.config.get(&2025).await.is_none());
+    assert!(state.cache.data.get(&data_cache_key).await.is_none());
+}
+
+#[test]
+fn test_smart_peer_ip_extractor() {
+    use backend::security::SmartPeerIpExtractor;
+    use tower_governor::key_extractor::KeyExtractor;
+    use std::net::IpAddr;
+
+    let extractor = SmartPeerIpExtractor;
+
+    // 1. X-Forwarded-For birden fazla IP ile (ilk IP seçilmeli)
+    let req1 = Request::builder()
+        .header("x-forwarded-for", "198.51.100.25, 203.0.113.195")
+        .body(())
+        .unwrap();
+    assert_eq!(extractor.extract(&req1).unwrap(), "198.51.100.25".parse::<IpAddr>().unwrap());
+
+    // 2. X-Real-IP
+    let req2 = Request::builder()
+        .header("x-real-ip", "203.0.113.50")
+        .body(())
+        .unwrap();
+    assert_eq!(extractor.extract(&req2).unwrap(), "203.0.113.50".parse::<IpAddr>().unwrap());
+
+    // 3. ConnectInfo extension
+    let mut req3 = Request::builder().body(()).unwrap();
+    req3.extensions_mut().insert(axum::extract::ConnectInfo(
+        "192.168.1.100:12345".parse::<std::net::SocketAddr>().unwrap(),
+    ));
+    assert_eq!(extractor.extract(&req3).unwrap(), "192.168.1.100".parse::<IpAddr>().unwrap());
+
+    // 4. Başlık ve extension yoksa güvenli yerel fallback (127.0.0.1)
+    let req4 = Request::builder().body(()).unwrap();
+    assert_eq!(extractor.extract(&req4).unwrap(), "127.0.0.1".parse::<IpAddr>().unwrap());
+}
+
+#[tokio::test]
+async fn test_rate_limiting_governor() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = setup_test_state(&tmp);
+    let app = create_app(state);
+
+    let mut hit_429 = false;
+    for i in 0..120 {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .header("x-forwarded-for", "192.0.2.99")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            hit_429 = true;
+            break;
+        }
+        let _ = i;
+    }
+
+    assert!(hit_429, "120 ardışık hızlı istek sonrasında rate limiter 429 Too Many Requests döndürmelidir");
+}
+

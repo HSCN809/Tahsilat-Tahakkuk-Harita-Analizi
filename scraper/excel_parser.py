@@ -201,10 +201,25 @@ def extract_clean_df(df_raw: pd.DataFrame) -> pd.DataFrame | None:
     return res_df
 
 
+def safe_read_excel(file_path_or_buffer, **kwargs):
+    """
+    Excel dosyasını öncelikle yüksek performanslı calamine motoru ile okur.
+    Calamine yüklü değilse veya herhangi bir sebeple hata verirse varsayılan pandas motoruna (openpyxl/xlrd) geçer.
+    """
+    opts = kwargs.copy()
+    engine = opts.pop("engine", "calamine")
+    try:
+        return pd.read_excel(file_path_or_buffer, engine=engine, **opts)
+    except Exception:
+        fallback_opts = kwargs.copy()
+        fallback_opts.pop("engine", None)
+        return pd.read_excel(file_path_or_buffer, **fallback_opts)
+
+
 def oku_ve_temizle_tek_dosya(dosya_adi, folder_path):
     dosya_yolu = os.path.join(folder_path, dosya_adi)
     try:
-        df_raw = pd.read_excel(dosya_yolu)
+        df_raw = safe_read_excel(dosya_yolu)
         df = extract_clean_df(df_raw)
         if df is None:
             return None
@@ -229,7 +244,7 @@ def oku_ve_temizle_aylik_dosya(klasor_adi, month, folder_path, yil):
         return None
 
     try:
-        df_raw = pd.read_excel(dosya_yolu)
+        df_raw = safe_read_excel(dosya_yolu)
         df = extract_clean_df(df_raw)
         if df is None:
             return None
@@ -413,7 +428,7 @@ def process_year(year: int, year_folder: Path) -> tuple[int, list[dict], list[st
                 continue
 
             try:
-                df_raw = pd.read_excel(excel_path)
+                df_raw = safe_read_excel(excel_path)
                 df = extract_clean_df(df_raw)
                 if df is None or df.empty:
                     continue

@@ -21,6 +21,8 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 uuid = { version = "1.10", features = ["v4"] }
 walkdir = "2.5"
 bytes = "1.9"
+moka = { version = "0.12.16", features = ["future"] }
+tower_governor = "0.8.0"
 
 [dev-dependencies]
 tempfile = "3.16"

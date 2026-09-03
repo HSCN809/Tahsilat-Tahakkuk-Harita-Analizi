@@ -6,13 +6,20 @@ pub mod models;
 pub mod security;
 pub mod state;
 
-use axum::http::{HeaderValue, Method};
+use std::sync::Arc;
+use axum::http::header::{HeaderName, HeaderValue, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS};
+use axum::http::Method;
 use axum::routing::{get, post};
 use axum::Router;
+use tower::ServiceBuilder;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::GovernorLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::security::SmartPeerIpExtractor;
 use crate::state::AppState;
 
 pub fn create_app(state: AppState) -> Router {
@@ -36,6 +43,43 @@ pub fn create_app(state: AppState) -> Router {
         cors = cors.allow_origin(origins).allow_credentials(true);
     }
 
+    // Temel rate limiting: İstemci başına saniyede 50 istek, 100 burst kapasitesi
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_millisecond(20)
+            .burst_size(100)
+            .key_extractor(SmartPeerIpExtractor)
+            .finish()
+            .expect("GovernorConfig oluşturulamadı"),
+    );
+
+    // OWASP & Güvenlik Başlıkları Katmanı
+    let security_headers = ServiceBuilder::new()
+        .layer(SetResponseHeaderLayer::overriding(
+            X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-xss-protection"),
+            HeaderValue::from_static("1; mode=block"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("content-security-policy"),
+            HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("geolocation=(), camera=(), microphone=()"),
+        ));
+
     Router::new()
         .route("/health", get(handlers::health::health_check))
         .route("/healthz", get(handlers::health::healthz))
@@ -48,7 +92,9 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/files/download", get(handlers::files::download_files))
         .route("/api/jobs/status", get(handlers::scrape::get_job_status))
         .route("/api/scrape", post(handlers::scrape::trigger_scrape))
+        .layer(GovernorLayer::new(governor_conf))
         .layer(cors)
+        .layer(security_headers)
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
