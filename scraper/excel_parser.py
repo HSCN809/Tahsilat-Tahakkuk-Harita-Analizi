@@ -348,9 +348,17 @@ def veri_hazirla(iller_dict, secim):
 def init_db(db_path: Path) -> sqlite3.Connection:
     """Veritabanı şemasını ve indekslerini oluşturur."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA journal_mode = WAL;")
+    conn = sqlite3.connect(db_path, timeout=60.0)
+    conn.execute("PRAGMA busy_timeout = 60000;")
     conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA foreign_keys = ON;")
+    try:
+        current_mode = conn.execute("PRAGMA journal_mode;").fetchone()
+        if not current_mode or current_mode[0].lower() not in ("wal", "truncate"):
+            target_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL")
+            conn.execute(f"PRAGMA journal_mode = {target_mode};")
+    except Exception as e:
+        logger.debug("Journal mode ayarlanamadı (mevcut mod korunuyor): %s", e)
 
     conn.execute("""
     CREATE TABLE IF NOT EXISTS tax_records (
@@ -596,13 +604,44 @@ def clean_year_data(year: int, excel_ana_dir: Path | None = None, db_path: Path 
     # 2. SQLite veritabanındaki o yıla ait kayıtları sil
     if db_path.exists():
         try:
-            conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(db_path, timeout=60.0)
+            conn.execute("PRAGMA busy_timeout = 60000;")
             with conn:
                 conn.execute("DELETE FROM tax_records WHERE year = ?", (year,))
                 conn.execute("DELETE FROM metadata_config WHERE year = ?", (year,))
-                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                try:
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                except Exception:
+                    pass
             conn.close()
             logger.info("Yıl %d SQLite kayıtları temizlendi.", year)
         except Exception as e:
             logger.warning("SQLite temizleme hatası: %s", e)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%H:%M:%S'
+    )
+
+    parser = argparse.ArgumentParser(description="Tahsilat Tahakkuk Excel to SQLite Parser & Cleaner")
+    parser.add_argument("--clean", type=int, help="Belirtilen yılın verilerini hem diskten hem de SQLite'tan siler (örn: --clean 2026)")
+    parser.add_argument("--export", type=str, default="", help="Mevcut Excel dosyalarını SQLite'a aktarır (örn: --export 2026 veya --export all)")
+    args = parser.parse_args()
+
+    if args.clean:
+        clean_year_data(args.clean)
+    elif args.export:
+        if args.export.lower() in ("all", "hepsi", "tümü"):
+            export_all_to_sqlite()
+        else:
+            yillar = [int(y.strip()) for y in args.export.split(",") if y.strip().isdigit()]
+            export_all_to_sqlite(yillar)
+    else:
+        export_all_to_sqlite()
+
 

@@ -24,30 +24,50 @@ pub fn init_pool(db_path: &Path) -> Result<DbPool, AppError> {
         let _ = std::fs::create_dir_all(parent);
     }
 
+    // Şema, indeks ve journal modunu tek bir bağlantıyla bir kez başlat
+    {
+        let single_conn = Connection::open(db_path)
+            .map_err(|e| AppError::Internal(format!("Veritabanı açılamadı: {}", e)))?;
+
+        single_conn
+            .execute_batch(
+                "PRAGMA busy_timeout = 30000;
+                 PRAGMA foreign_keys = ON;
+                 PRAGMA synchronous = NORMAL;
+                 CREATE TABLE IF NOT EXISTS tax_records (
+                     year INTEGER NOT NULL,
+                     month TEXT NOT NULL,
+                     category_id TEXT NOT NULL,
+                     category_clean TEXT NOT NULL,
+                     province TEXT NOT NULL,
+                     accrual REAL,
+                     collection REAL,
+                     ratio REAL,
+                     PRIMARY KEY (year, month, category_clean, province)
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_tax_lookup
+                 ON tax_records(year, category_clean, month);
+                 CREATE TABLE IF NOT EXISTS metadata_config (
+                     year INTEGER PRIMARY KEY,
+                     months_json TEXT NOT NULL,
+                     categories_json TEXT NOT NULL
+                 );",
+            )
+            .map_err(|e| AppError::Internal(format!("Veritabanı şema başlatma hatası: {}", e)))?;
+
+        // Journal mode: WAL dene; ağ / Windows bind mount ortamında hata verirse TRUNCATE moduna geç
+        let journal_mode = std::env::var("SQLITE_JOURNAL_MODE").unwrap_or_else(|_| "WAL".to_string());
+        let _ = single_conn.execute_batch(&format!(
+            "PRAGMA journal_mode = {};",
+            journal_mode
+        ));
+    }
+
     let manager = SqliteConnectionManager::file(db_path).with_init(|c| {
         c.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = NORMAL;
+            "PRAGMA busy_timeout = 30000;
              PRAGMA foreign_keys = ON;
-             PRAGMA busy_timeout = 5000;
-             CREATE TABLE IF NOT EXISTS tax_records (
-                 year INTEGER NOT NULL,
-                 month TEXT NOT NULL,
-                 category_id TEXT NOT NULL,
-                 category_clean TEXT NOT NULL,
-                 province TEXT NOT NULL,
-                 accrual REAL,
-                 collection REAL,
-                 ratio REAL,
-                 PRIMARY KEY (year, month, category_clean, province)
-             );
-             CREATE INDEX IF NOT EXISTS idx_tax_lookup
-             ON tax_records(year, category_clean, month);
-             CREATE TABLE IF NOT EXISTS metadata_config (
-                 year INTEGER PRIMARY KEY,
-                 months_json TEXT NOT NULL,
-                 categories_json TEXT NOT NULL
-             );",
+             PRAGMA synchronous = NORMAL;",
         )
     });
 
