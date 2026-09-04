@@ -21,37 +21,31 @@ edemez. `docker-compose.prod.yml` üretim/Railway-referans compose dosyası,
 `docker-compose.dev.yml` ise yerel geliştirme/test amaçlıdır.
 
 Railway'de **her bir servis ayrı ayrı manuel olarak oluşturulmalıdır**.
-Repo kökündeki `railway.toml` dosyası yalnızca **backend** servisini tanımlar;
-Railway bu repoyu GitHub'a bağladığınızda yalnızca backend servisini otomatik
-algılar. Frontend ve scraper için Dashboard üzerinden ek servisler tanımlamanız
-gerekir.
+Railway projenize GitHub reponuzu bağladıktan sonra Backend ve Frontend servislerini
+Dashboard üzerinden ilgili Dockerfile yollarını (`backend/Dockerfile`, `frontend/Dockerfile`)
+belirterek tanımlamanız gerekir.
 
 Her servis için aşağıdaki adımları sırasıyla uygulayın.
 
 ---
 
-### 1. Backend Servisi (Otomatik Algılanır)
+### 1. Backend Servisi
 
-Repo kökündeki `railway.toml` dosyası sayesinde backend servisi, repoyu Railway'e
-bağladığınızda otomatik olarak algılanır. Aşağıdaki ayarları kontrol edin:
+Backend servisini Railway Dashboard üzerinden oluşturun (New Service > GitHub Repo):
 
-- **Kaynak**: GitHub reposu (otomatik)
-- **Root Directory**: `/` (repo kökü — Railway otomatik belirler)
-- **Dockerfile Path**: `backend.Dockerfile` (`railway.toml` içinde tanımlı)
-- **Health Check Path**: `/health` veya `/healthz` (auth gerektirmez,
-  `railway.toml` içinde tanımlı)
-- **Port**: `8080` (iç port — Railway `PORT` env değişkenini otomatik atar,
-  ancak `backend.Dockerfile` varsayılan olarak 8080 kullanır)
+- **Kaynak**: GitHub reposu
+- **Root Directory**: `/` (repo kökü)
+- **Dockerfile Path**: `backend/Dockerfile`
+- **Health Check Path**: `/health` veya `/healthz` (auth gerektirmez)
+- **Port**: `8080` (Railway `PORT` env değişkenini otomatik atar; backend varsayılan olarak 8080 kullanır)
 - **Ortam Değişkenleri**: Railway Dashboard > Servis > Variables sekmesinden
-  aşağıdaki değişkenleri tanımlayın (`.env.prod.example` referans alınabilir,
-  ancak Railway bu dosyayı **otomatik okumaz**):
+  aşağıdaki değişkenleri tanımlayın (`.env.prod.example` referans alınabilir):
 
 | Değişken | Açıklama | Örnek |
 |---|---|---|
 | `ALLOWED_ORIGINS` | CORS izin verilen origin'ler (virgülle) | `https://tahsilat.example.com` |
 | `SCRAPE_TOKEN` | `/api/scrape` için Bearer token | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `BACKUP_DIR` | Snapshot yedek dizini (örn. `/app/veriler/backups`) | `/app/veriler/backups` |
-| `WORKERS` | Uvicorn worker sayısı | `1` |
 
 - **Volume**: Railway'de kalıcı veri için **tek bir Volume** tanımlayın ve mount
   path olarak **`/app/veriler`** dizinini kullanın. ⚠️ **Kesinlikle `/app` mount
@@ -68,11 +62,8 @@ Frontend için Railway Dashboard'da **yeni bir servis** oluşturun
 (New Service > GitHub Repo > aynı repo):
 
 - **Kaynak**: Aynı GitHub reposu (manuel seçin)
-- **Root Directory**: `/` (repo kökü) — Railway'in Dockerfile'ı bulabilmesi
-  için root directory'yi repo kökü olarak bırakın veya servis ayarlarından
-  Dockerfile path'i mutlak yol olarak `frontend/frontend.Dockerfile` şeklinde
-  belirtin.
-- **Dockerfile Path**: `frontend/frontend.Dockerfile` (Servis ayarları >
+- **Root Directory**: `/` (repo kökü)
+- **Dockerfile Path**: `frontend/Dockerfile` (Servis ayarları >
   Settings > Dockerfile Path)
 - **Port**: `80` (Nginx'in dinlediği port — Railway `PORT` env değişkenini
   otomatik atar, Nginx bu portu dinleyecek şekilde yapılandırılmıştır)
@@ -92,7 +83,7 @@ desteklemez.** Bu nedenle, scraper'ı backend'den ayrı bir Railway servisi
 olarak çalıştırıp aynı volume'u paylaşmak mümkün değildir.
 
 **Önerilen yöntem:** Backend'in sunduğu `/api/scrape` endpoint'ini kullanın.
-Bu endpoint (`api.py` içinde halihazırda uygulanmıştır) scraping işlemini
+Bu endpoint (Rust Axum backend `handlers/scrape.rs` tarafından yönetilir) scraping işlemini
 **backend container'ı içinde** (tek servis, tek volume) çalıştırır ve
 indirilen veriler doğrudan backend'in bağlı olduğu volume'a yazılır.
 
@@ -131,8 +122,7 @@ yerel `docker compose` testleri için kullanılır.
 |---|---|---|---|---|
 | `ALLOWED_ORIGINS` | ✅ | — | CORS izin verilen origin'ler |
 | `SCRAPE_TOKEN` | ✅ | — | `/api/scrape` için Bearer token |
-| `BACKUP_DIR` | ✅ | — | Snapshot yedek dizini (örn. `/app/backups`) |
-| `WORKERS` | ✅ | — | Uvicorn worker sayısı (varsayılan: 2) |
+| `BACKUP_DIR` | ✅ | — | Snapshot yedek dizini (örn. `/app/veriler/backups`) |
 | `SCRAPE_YEARS` | — | — | Yerel/manuel: one-shot scraper yıl aralığı |
 
 ---
@@ -149,23 +139,32 @@ otomatik çözümler.
 ### 6. Hızlı Başlangıç Kontrol Listesi
 
 1. [ ] Repoyu Railway'e bağlayın (GitHub entegrasyonu)
-2. [ ] Backend servisinin otomatik algılandığını doğrulayın
+2. [ ] Backend servisini oluşturun (Dockerfile yolu: `backend/Dockerfile`, port: `8080`)
 3. [ ] Backend servisine ortam değişkenlerini ekleyin (Variables)
 4. [ ] Backend servisine volume tanımlayın (mount path: `/app/veriler`; hem veriler hem yedekler bu volume üzerinde yer alır)
-5. [ ] Frontend servisini manuel oluşturun, Dockerfile path'i ayarlayın
+5. [ ] Frontend servisini manuel oluşturun (Dockerfile yolu: `frontend/Dockerfile`, port: `80`)
 6. [ ] Scraping için `/api/scrape` endpoint'inin çalıştığını doğrulayın (önerilen yöntem — bkz. bölüm 3)
-7. [ ] Backend health check'in yeşil olduğunu doğrulayın
-8. [ ] Frontend health check'in yeşil olduğunu doğrulayın
+7. [ ] Backend health check'in yeşil olduğunu doğrulayın (`/health`)
+8. [ ] Frontend health check'in yeşil olduğunu doğrulayın (`/healthz`)
 
 ## Dizin Yapısı
 
 ```text
 docker-compose.prod.yml     # Üretim / Railway-referans compose dosyası
 docker-compose.dev.yml      # Geliştirme (Dev) ortamı compose dosyası
-backend.Dockerfile          # Backend Dockerfile'ı (FastAPI)
-scraper.Dockerfile          # Scraper Dockerfile'ı (Selenium + Chromium)
-frontend/                   # React frontend kaynak kodları ve nginx.conf
-Tahsilat Tahakkuk Harita Analizi/  # Backend Python modülleri ve api.py
+backend/
+  Dockerfile                # Multi-stage Dockerfile (Rust derleme + Python/Selenium runtime)
+  src/                      # Rust (Axum) API sunucusu kaynak kodları
+  tests/                    # Entegrasyon ve API testleri
+  tr.json                   # İl GeoJSON harita verisi
+frontend/
+  Dockerfile                # Multi-stage Dockerfile (Vite build + Nginx alpine)
+  src/                      # React 19 (Vite, TypeScript, Tailwind) kaynak kodları
+  nginx.conf                # Üretim Nginx reverse-proxy ve güvenlik yapılandırması
+scraper/
+  Dockerfile                # Bağımsız scraper container'ı (Selenium + Chromium)
+  scraper.py                # Veri toplama ve indirme motoru
+  excel_parser.py           # Excel parse etme ve SQLite aktarım modülü
 docs/
   DEV_ORTAMI.md             # Geliştirme ortamı detaylı kurulum kılavuzu
 ```
@@ -177,8 +176,9 @@ docs/
 | `ALLOWED_ORIGINS` | CORS izin verilen origin'ler (virgülle) | localhost |
 | `SCRAPE_TOKEN` | `/api/scrape` için Bearer token (zorunlu) | — |
 | `BACKUP_DIR` | Snapshot yedeğinin yazılacağı dizin | `/app/veriler/backups` |
-| `BACKEND_WORKERS` | Uvicorn worker sayısı | 2 |
-| `GRAFANA_USER` / `GRAFANA_PASSWORD` | Grafana erişimi | admin / — |
+| `PORT` | API sunucusu dinleme portu | 8080 |
+| `HOST` | API sunucusu dinleme adresi | 0.0.0.0 |
+| `DB_PATH` | SQLite veritabanı dosya yolu | `/app/veriler/tahsilat_tahakkuk.db` |
 | `SCRAPE_YEARS` | One-shot scraper için yıl aralığı | hepsi |
 
 ## Manuel Veri Çekme (Scraping)
@@ -240,27 +240,34 @@ docker run --rm -v veriler_backup_named:/backup -v $(pwd):/out alpine \
          cd /backup && tar xzf veriler-snapshot.tar.gz"
 ```
 
-## Gözlemlenebilirlik
+## Gözlemlenebilirlik & Loglama
 
-- **Loki + Promtail**: Tüm container logları JSON olarak toplanır.
-- **Grafana**: Hazır "Servis Logları" dashboard'u `grafana/provisioning/dashboards/`
-  altında provision edilir. Backend logları JSON formatında (`level`, `message`).
-- Hata olayları için Sentry kullanılmaz; loglar Grafana'da sorgulanır.
+- **Yapılandırılmış JSON Logları**: Rust backend `tracing-subscriber` ile JSON formatında (`level`, `message`, `target`) yapılandırılmış loglar üretir.
+- **Docker & Railway Log Akışı**: Docker Compose ortamında `json-file` log sürücüsü (dosya başı 10MB, maksimum 5 dosya rotasyonu) kullanılır. Railway üzerinde stdout/stderr logları Railway Dashboard üzerinden canlı olarak izlenebilir.
+- **Scraper & İş Takibi**: Scraper süreç çıktısı ve olası hatalar backend log akışında `[scraper]` ve `[scraper-err]` etiketleriyle eş zamanlı takip edilir; aktif iş durumu `GET /api/jobs/status` endpoint'i üzerinden sorgulanabilir.
 
 ## Güvenlik Notları
 
-- Backend 8080 portu host'a **açık değildir**; yalnızca nginx (internal ağ) erişir.
-- `/docs`, `/redoc`, `/openapi.json` üretimde **kapalıdır**.
-- `/api/scrape` Bearer token ile korunur; yoksa `401`/`503`.
-- Nginx: TLS zorunlu, HSTS, CSP, `/api/scrape` rate limit (dakikada 1).
-- Image'lar non-root kullanıcı ve `tini` ile çalışır.
+- Backend 8080 portu host'a **açık değildir**; yalnızca internal ağ veya nginx üzerinden erişilir.
+- Rust Axum mimarisinde `tower-governor` ile IP tabanlı rate limiting uygulanır.
+- OWASP uyumlu güvenlik başlıkları (`Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`) tüm API yanıtlarına otomatik eklenir.
+- `/api/scrape` endpoint'i Bearer token ile korunur; geçersiz veya eksik token durumunda `401`/`503` döner.
+- Container image'ları non-root kullanıcı (`appuser`) ve `tini` init sistemi ile çalışır.
 
 ## Test & CI
 
 ```bash
-pip install -r requirements-dev.txt
-cd "Tahsilat Tahakkuk Harita Analizi" && pytest -q
+# Backend testleri (Rust):
+cd backend
+cargo test
+
+# Frontend lint ve derleme (React 19, TypeScript):
+cd frontend
+npm run lint
+npm run build
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`): backend pytest, frontend lint+build,
-ve prod compose config doğrulaması çalıştırır.
+GitHub Actions (`.github/workflows/ci.yml`):
+- **backend**: Rust stabil toolchain üzerinde `cargo test` ile tüm birim ve entegrasyon testlerini koşar.
+- **frontend**: Node.js 24 ortamında `oxlint` ile lint ve `vite build` ile üretim derlemesini doğrular.
+- **compose-config**: `docker-compose.prod.yml` ve `docker-compose.dev.yml` dosyalarını `docker compose config --quiet` ile doğrular.

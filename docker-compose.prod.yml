@@ -17,7 +17,6 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - SCRAPE_TOKEN=${SCRAPE_TOKEN}
       - BACKUP_DIR=/backups
-      - WORKERS=${BACKEND_WORKERS:-1}
     volumes:
       - veriler_named:/app/veriler
       - veriler_backup_named:/backups
@@ -26,11 +25,11 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 768M
+          memory: 1G
         reservations:
-          memory: 256M
+          memory: 512M
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
