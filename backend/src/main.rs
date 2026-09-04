@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Read;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -28,15 +26,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db_pool = init_pool(&config.db_path)
         .map_err(|e| format!("Veritabanı başlatma hatası: {:?}", e))?;
 
-    // tr.json harita dosyasını başlangıçta bir kez belleğe yükle
-    let geojson_val = if config.geojson_path.exists() {
-        let mut f = File::open(&config.geojson_path)?;
-        let mut content = String::new();
-        f.read_to_string(&mut content)?;
-        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}))
+    // tr.json harita dosyasını başlangıçta bir kez ham bayt olarak belleğe yükle
+    let geojson_bytes = if config.geojson_path.exists() {
+        match std::fs::read(&config.geojson_path) {
+            Ok(raw) => bytes::Bytes::from(raw),
+            Err(e) => {
+                info!("GeoJSON dosyası okunamadı: {:?}, boş nesne ile başlatıldı.", e);
+                bytes::Bytes::from_static(b"{}")
+            }
+        }
     } else {
         info!("GeoJSON dosyası ({:?}) bulunamadı, boş nesne ile başlatıldı.", config.geojson_path);
-        serde_json::json!({})
+        bytes::Bytes::from_static(b"{}")
     };
 
     let job_manager = JobManager::new();
@@ -45,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         db_pool,
         job_manager,
-        geojson_cache: Arc::new(geojson_val),
+        geojson_cache: Arc::new(geojson_bytes),
         cache: backend::state::AppCache::new(),
     };
 

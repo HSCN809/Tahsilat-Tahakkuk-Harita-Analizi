@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::{Cursor, Read, Write};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use axum::extract::{Query, State};
@@ -75,8 +75,14 @@ pub async fn list_files(
     Query(query): Query<FilesQuery>,
 ) -> Result<Json<FilesResponse>, AppError> {
     validate_year(query.year)?;
-    let raw_dir = get_raw_dir(&state.config.data_dir, query.year);
-    let files = list_raw_files_from_dir(&raw_dir)?;
+    let data_dir = state.config.data_dir.clone();
+    let year = query.year;
+    let files = tokio::task::spawn_blocking(move || {
+        let raw_dir = get_raw_dir(&data_dir, year);
+        list_raw_files_from_dir(&raw_dir)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Dosya listeleme görevi başarısız: {}", e)))??;
 
     Ok(Json(FilesResponse {
         year: query.year,
@@ -89,84 +95,105 @@ pub async fn download_files(
     Query(query): Query<DownloadQuery>,
 ) -> Result<Response, AppError> {
     validate_year(query.year)?;
-    let raw_dir = get_raw_dir(&state.config.data_dir, query.year);
-    let available_files = list_raw_files_from_dir(&raw_dir)?;
-
     let is_all = query.all.unwrap_or(false);
-    let selected: Vec<FileItem> = if is_all {
-        available_files
-    } else {
-        let requested_raw = query.files.unwrap_or_default();
-        let requested: Vec<&str> = requested_raw
-            .split(',')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect();
+    let requested_raw = query.files.clone().unwrap_or_default();
 
-        if requested.is_empty() {
-            return Err(AppError::BadRequest("İndirilecek dosya seçilmedi.".to_string()));
-        }
-
-        let map: HashMap<&str, &FileItem> = available_files.iter().map(|f| (f.id.as_str(), f)).collect();
-
-        let mut sel = Vec::new();
-        for r in requested {
-            if let Some(item) = map.get(r) {
-                sel.push((*item).clone());
-            } else {
-                return Err(AppError::BadRequest(format!("Geçersiz dosya seçimi: {}", r)));
-            }
-        }
-        sel
-    };
-
-    if selected.is_empty() {
-        return Err(AppError::NotFound(format!(
-            "{} yılı için indirilebilir ham dosya bulunamadı.",
-            query.year
-        )));
+    // Seçim yapılmamışsa spawn_blocking başlatmadan hızlıca hata döndür
+    if !is_all && requested_raw.split(',').all(|s| s.trim().is_empty()) {
+        return Err(AppError::BadRequest("İndirilecek dosya seçilmedi.".to_string()));
     }
 
-    if selected.len() > MAX_DOWNLOAD_FILES {
-        return Err(AppError::BadRequest(format!(
-            "Tek seferde en fazla {} dosya indirilebilir.",
-            MAX_DOWNLOAD_FILES
-        )));
-    }
+    let data_dir = state.config.data_dir.clone();
+    let year = query.year;
 
-    // ZIP arşivini bellekte oluştur
-    let mut zip_buffer = Cursor::new(Vec::new());
-    {
-        let mut zip = ZipWriter::new(&mut zip_buffer);
-        let options = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
+    let (zip_bytes, selected_len) = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, usize), AppError> {
+        let raw_dir = get_raw_dir(&data_dir, year);
+        let available_files = list_raw_files_from_dir(&raw_dir)?;
 
-        for file_item in &selected {
-            if !is_safe_filename(&file_item.name) {
-                continue;
+        let selected: Vec<FileItem> = if is_all {
+            available_files
+        } else {
+            let requested: Vec<&str> = requested_raw
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            if requested.is_empty() {
+                return Err(AppError::BadRequest("İndirilecek dosya seçilmedi.".to_string()));
             }
 
-            let file_path = raw_dir.join(&file_item.name);
-            if let Ok(mut f) = File::open(&file_path) {
-                let _ = zip.start_file(&file_item.name, options);
-                let mut content = Vec::new();
-                if f.read_to_end(&mut content).is_ok() {
-                    let _ = zip.write_all(&content);
+            // Hem id (stem) hem de name (tam dosya adı) üzerinden eşleşmeyi destekle
+            let mut map: HashMap<&str, &FileItem> = HashMap::with_capacity(available_files.len() * 2);
+            for f in &available_files {
+                map.insert(f.id.as_str(), f);
+                map.insert(f.name.as_str(), f);
+            }
+
+            let mut seen = HashSet::new();
+            let mut sel = Vec::new();
+            for r in requested {
+                if let Some(item) = map.get(r) {
+                    if seen.insert(&item.name) {
+                        sel.push((*item).clone());
+                    }
+                } else {
+                    return Err(AppError::BadRequest(format!("Geçersiz dosya seçimi: {}", r)));
                 }
             }
+            sel
+        };
+
+        if selected.is_empty() {
+            return Err(AppError::NotFound(format!(
+                "{} yılı için indirilebilir ham dosya bulunamadı.",
+                year
+            )));
         }
 
-        zip.finish()
-            .map_err(|e| AppError::Internal(format!("ZIP arşivi oluşturulamadı: {}", e)))?;
-    }
+        if selected.len() > MAX_DOWNLOAD_FILES {
+            return Err(AppError::BadRequest(format!(
+                "Tek seferde en fazla {} dosya indirilebilir.",
+                MAX_DOWNLOAD_FILES
+            )));
+        }
 
-    let zip_bytes = zip_buffer.into_inner();
+        // ZIP arşivini bellekte akış kopyalama ile oluştur
+        let mut zip_buffer = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut zip_buffer);
+            let options = SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+
+            for file_item in &selected {
+                if !is_safe_filename(&file_item.name) {
+                    continue;
+                }
+
+                let file_path = raw_dir.join(&file_item.name);
+                if let Ok(mut f) = File::open(&file_path) {
+                    if zip.start_file(&file_item.name, options).is_ok() {
+                        let _ = std::io::copy(&mut f, &mut zip);
+                    }
+                }
+            }
+
+            zip.finish()
+                .map_err(|e| AppError::Internal(format!("ZIP arşivi oluşturulamadı: {}", e)))?;
+        }
+
+        let count = selected.len();
+        Ok((zip_buffer.into_inner(), count))
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Dosya indirme görevi başarısız: {}", e)))??;
+
     let zip_name = format!("tahsilat-tahakkuk-{}-ham-veri.zip", query.year);
 
     info!(
         "Ham veri indirildi: yıl={} dosya_sayısı={}",
         query.year,
-        selected.len()
+        selected_len
     );
 
     let mut headers = HeaderMap::new();

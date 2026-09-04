@@ -29,18 +29,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-import xlrd
 try:
-    from .excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite, clean_year_data
+    from .excel_parser import FOLDER_NAME_TEMPLATE, export_all_to_sqlite, clean_year_data, apply_xlrd_patch
 except ImportError:
     try:
-        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite, clean_year_data
+        from scraper.excel_parser import FOLDER_NAME_TEMPLATE, export_all_to_sqlite, clean_year_data, apply_xlrd_patch
     except ImportError:
-        from excel_parser import FOLDER_NAME_TEMPLATE, safe_decode, export_all_to_sqlite, clean_year_data
+        from excel_parser import FOLDER_NAME_TEMPLATE, export_all_to_sqlite, clean_year_data, apply_xlrd_patch
 
-xlrd.biffh.unicode = safe_decode
-xlrd.book.unicode = safe_decode
-xlrd.formatting.unicode = safe_decode
+try:
+    apply_xlrd_patch()
+except Exception:
+    pass
 
 
 
@@ -138,8 +138,10 @@ def convert_file(xls_file, year, indir_konumu):
         province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
         province_dir = indir_konumu / province_folder_name
         os.makedirs(province_dir, exist_ok=True)
-
-        xls = pd.ExcelFile(xls_file, engine='xlrd')
+        try:
+            xls = pd.ExcelFile(xls_file, engine='calamine')
+        except Exception:
+            xls = pd.ExcelFile(xls_file, engine='xlrd')
         sheet_names = xls.sheet_names
 
         valid_sheets_count = sum(1 for sh in sheet_names if normalize_month_name(sh) in MONTH_DISPLAY_NAMES)

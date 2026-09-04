@@ -65,7 +65,7 @@ fn setup_test_state(temp_dir: &tempfile::TempDir) -> AppState {
         config,
         db_pool: pool,
         job_manager: JobManager::new(),
-        geojson_cache: Arc::new(serde_json::json!({"type": "FeatureCollection", "features": []})),
+        geojson_cache: Arc::new(bytes::Bytes::from_static(b"{\"type\": \"FeatureCollection\", \"features\": []}")),
         cache: backend::state::AppCache::new(),
     }
 }
@@ -200,6 +200,7 @@ async fn test_files_list_and_download_endpoint() {
 
     // /api/files/download?year=2025&all=true
     let resp_dl = app
+        .clone()
         .oneshot(Request::builder().uri("/api/files/download?year=2025&all=true").body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -207,6 +208,54 @@ async fn test_files_list_and_download_endpoint() {
     assert_eq!(resp_dl.headers().get(header::CONTENT_TYPE).unwrap(), "application/zip");
     let zip_bytes = resp_dl.into_body().collect().await.unwrap().to_bytes();
     assert!(!zip_bytes.is_empty());
+
+    // /api/files/download?year=2025&files=01-Adana-2025 (ID / stem ile seçim)
+    let resp_dl_id = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/files/download?year=2025&files=01-Adana-2025").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_dl_id.status(), StatusCode::OK);
+    assert_eq!(resp_dl_id.headers().get(header::CONTENT_TYPE).unwrap(), "application/zip");
+
+    // /api/files/download?year=2025&files=01-Adana-2025.xls (tam dosya adı ile seçim)
+    let resp_dl_name = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/files/download?year=2025&files=01-Adana-2025.xls").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_dl_name.status(), StatusCode::OK);
+
+    // /api/files/download?year=2025&files=01-Adana-2025,01-Adana-2025.xls (tekrar eden seçim deduplication)
+    let resp_dl_dedup = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/files/download?year=2025&files=01-Adana-2025,01-Adana-2025.xls").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_dl_dedup.status(), StatusCode::OK);
+
+    // /api/files/download?year=2025 (seçim parametresi yok -> 400 Bad Request)
+    let resp_no_sel = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/files/download?year=2025").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_no_sel.status(), StatusCode::BAD_REQUEST);
+
+    // /api/files/download?year=2025&files=   (boş seçim -> 400 Bad Request)
+    let resp_empty_sel = app
+        .clone()
+        .oneshot(Request::builder().uri("/api/files/download?year=2025&files=%20%20").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_empty_sel.status(), StatusCode::BAD_REQUEST);
+
+    // /api/files/download?year=2025&files=nonexistent.xls (olmayan dosya -> 400 Bad Request)
+    let resp_invalid_sel = app
+        .oneshot(Request::builder().uri("/api/files/download?year=2025&files=nonexistent.xls").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp_invalid_sel.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
@@ -444,5 +493,29 @@ async fn test_rate_limiting_governor() {
     }
 
     assert!(hit_429, "120 ardışık hızlı istek sonrasında rate limiter 429 Too Many Requests döndürmelidir");
+}
+
+#[tokio::test]
+async fn test_geojson_endpoint() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = setup_test_state(&tmp);
+    let app = create_app(state);
+
+    let resp = app
+        .oneshot(Request::builder().uri("/api/geojson").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(
+        resp.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/json"
+    );
+    assert_eq!(
+        resp.headers().get(header::CACHE_CONTROL).unwrap(),
+        "public, max-age=31536000, immutable"
+    );
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body.as_ref(), b"{\"type\": \"FeatureCollection\", \"features\": []}");
 }
 

@@ -15,13 +15,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için yamala (monkey patch)
-import pandas.compat._optional as _pd_opt
-import xlrd
-
-_pd_opt.VERSIONS["xlrd"] = "1.2.0"
-
-
+# xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için güvenli yamalama (monkey patch)
 def safe_decode(b, enc):
     """Çok katmanlı güvenli byte decode: önce istenen encoding, sonra utf-8, en son latin1."""
     try:
@@ -33,9 +27,24 @@ def safe_decode(b, enc):
             return b.decode('latin1', 'replace')
 
 
-xlrd.biffh.unicode = safe_decode
-xlrd.book.unicode = safe_decode
-xlrd.formatting.unicode = safe_decode
+def apply_xlrd_patch():
+    """xlrd kütüphanesini Türkçe ve bozuk karakter hatalarını yok sayması için güvenli şekilde yamalar."""
+    try:
+        import pandas.compat._optional as _pd_opt
+        _pd_opt.VERSIONS["xlrd"] = "1.2.0"
+    except Exception:
+        pass
+
+    try:
+        import xlrd
+        for mod in [getattr(xlrd, 'biffh', None), getattr(xlrd, 'book', None), getattr(xlrd, 'formatting', None)]:
+            if mod is not None:
+                mod.unicode = safe_decode
+    except Exception:
+        pass
+
+
+apply_xlrd_patch()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

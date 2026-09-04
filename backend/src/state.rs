@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
+use bytes::Bytes;
 use moka::future::Cache;
-use serde_json::Value;
 
 use crate::config::AppConfig;
 use crate::db::DbPool;
@@ -51,6 +51,6 @@ pub struct AppState {
     pub config: AppConfig,
     pub db_pool: DbPool,
     pub job_manager: JobManager,
-    pub geojson_cache: Arc<Value>,
+    pub geojson_cache: Arc<Bytes>,
     pub cache: AppCache,
 }

@@ -34,6 +34,9 @@ pub fn init_pool(db_path: &Path) -> Result<DbPool, AppError> {
                 "PRAGMA busy_timeout = 30000;
                  PRAGMA foreign_keys = ON;
                  PRAGMA synchronous = NORMAL;
+                 PRAGMA mmap_size = 268435456;
+                 PRAGMA cache_size = -64000;
+                 PRAGMA temp_store = MEMORY;
                  CREATE TABLE IF NOT EXISTS tax_records (
                      year INTEGER NOT NULL,
                      month TEXT NOT NULL,
@@ -67,7 +70,10 @@ pub fn init_pool(db_path: &Path) -> Result<DbPool, AppError> {
         c.execute_batch(
             "PRAGMA busy_timeout = 30000;
              PRAGMA foreign_keys = ON;
-             PRAGMA synchronous = NORMAL;",
+             PRAGMA synchronous = NORMAL;
+             PRAGMA mmap_size = 268435456;
+             PRAGMA cache_size = -64000;
+             PRAGMA temp_store = MEMORY;",
         )
     });
 
