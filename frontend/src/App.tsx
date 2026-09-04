@@ -78,7 +78,7 @@ function App() {
     return categories[0]?.id || '';
   }, [categories, selectedCategory]);
 
-  // 4. Verileri çek (TanStack Query önbellek + anlık geçiş)
+  // 4. Verileri çek (TanStack Query önbellek)
   const {
     data: dataRes,
     isLoading: dataLoading,
@@ -88,20 +88,16 @@ function App() {
     queryKey: ['data', selectedYear, activeCategory, activeMonth],
     queryFn: ({ signal }) => fetchData(selectedYear!, activeCategory, activeMonth, signal),
     enabled: selectedYear !== null && !!activeCategory && !!activeMonth,
-    placeholderData: (prev) => prev,
   });
 
-  const summary = dataRes?.summary || null;
-  const records = useMemo(() => dataRes?.data || [], [dataRes]);
+  // Verinin gerçekten şu an seçili yıla ait olup olmadığını doğrula (eski yıl verisinin parlamasını önler)
+  const isDataFresh = !!dataRes && dataRes.year === selectedYear;
+  const summary = isDataFresh ? dataRes.summary : null;
+  const records = useMemo(() => (isDataFresh ? dataRes.data : []), [isDataFresh, dataRes]);
 
   const handleYearChange = (newYear: number) => {
     setSelectedYear(newYear);
     setSelectedMonth(''); // Yıl değiştiğinde ayı sıfırla ki yeni yılın son ayı seçilsin
-  };
-
-  const handleFilterChange = (newCat: string, newMonth: string) => {
-    setSelectedCategory(newCat);
-    setSelectedMonth(newMonth);
   };
 
   const filteredCategories = useMemo(() => {
@@ -142,10 +138,12 @@ function App() {
   const rawErrorMessage = activeError instanceof Error ? activeError.message : null;
   const error = rawErrorMessage && rawErrorMessage !== dismissedError ? rawErrorMessage : null;
 
-  // Yükleme durumları (flicker önleme)
-  const initialLoading = yearsLoading || geoJsonLoading || (configLoading && !configRes) || (dataLoading && !dataRes);
-  const isAnythingLoading = initialLoading || (dataFetching && !dataRes);
-  const isMapLoading = initialLoading || (dataFetching && !dataRes);
+  // Yükleme durumları
+  const isInitialLoading = yearsLoading || geoJsonLoading;
+  const isConfigWaiting = configLoading && !configRes;
+  const isDataLoading = dataLoading || isConfigWaiting || (dataFetching && !isDataFresh);
+  const isAnythingLoading = isInitialLoading || isDataLoading;
+  const isMapLoading = isInitialLoading || isDataLoading;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
@@ -208,7 +206,7 @@ function App() {
               {/* Year Select */}
               <div className="flex flex-col gap-2">
                 <label htmlFor="year-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
-                {initialLoading ? (
+                {isInitialLoading ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
@@ -230,14 +228,14 @@ function App() {
               {/* Month Select */}
               <div className="flex flex-col gap-2">
                 <label htmlFor="month-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
-                {initialLoading ? (
+                {isInitialLoading || isConfigWaiting ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
                     id="month-select"
                     aria-label="Analiz Ayı Seçin"
                     value={activeMonth}
-                    onChange={(e) => handleFilterChange(activeCategory, e.target.value)}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
                     className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
                   >
                     {months.map((m) => (
@@ -324,7 +322,7 @@ function App() {
                   className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
                 />
 
-                {initialLoading ? (
+                {isInitialLoading || isConfigWaiting ? (
                   <div className="space-y-2 mt-2">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="h-8 bg-slate-800/40 rounded-lg animate-pulse"></div>
@@ -333,12 +331,12 @@ function App() {
                 ) : (
                   <div className="max-h-[250px] overflow-y-auto border border-slate-800/60 rounded-xl bg-slate-950/40 p-1 flex flex-col gap-0.5 scrollbar-thin">
                     {filteredCategories.length === 0 ? (
-                      <div className="text-center py-4 text-xs text-slate-500">Aramaya uygun kategori bulunamadı.</div>
+                       <div className="text-center py-4 text-xs text-slate-500">Aramaya uygun kategori bulunamadı.</div>
                     ) : (
                       filteredCategories.map((cat) => (
                         <button
                           key={cat.id}
-                          onClick={() => handleFilterChange(cat.id, activeMonth)}
+                          onClick={() => setSelectedCategory(cat.id)}
                           title={cat.name}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${activeCategory === cat.id
                             ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
