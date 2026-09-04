@@ -60,8 +60,10 @@ function App() {
     queryKey: ['config', selectedYear],
     queryFn: ({ signal }) => fetchConfig(selectedYear!, signal),
     enabled: selectedYear !== null,
+    placeholderData: keepPreviousData,
   });
 
+  const isConfigFresh = !!configRes && configRes.year === selectedYear;
   const months = useMemo(() => configRes?.months || [], [configRes]);
   const categories = useMemo(() => configRes?.categories || [], [configRes]);
 
@@ -78,7 +80,7 @@ function App() {
     return categories[0]?.id || '';
   }, [categories, selectedCategory]);
 
-  // 4. Verileri çek (TanStack Query önbellek + kesintisiz geçiş)
+  // 4. Verileri çek (Filtre değişiminde eski verinin görünmemesi için placeholderData kullanılmaz)
   const {
     data: dataRes,
     isLoading: dataLoading,
@@ -87,12 +89,17 @@ function App() {
   } = useQuery({
     queryKey: ['data', selectedYear, activeCategory, activeMonth],
     queryFn: ({ signal }) => fetchData(selectedYear!, activeCategory, activeMonth, signal),
-    enabled: selectedYear !== null && !!activeCategory && !!activeMonth,
-    placeholderData: keepPreviousData,
+    enabled: selectedYear !== null && isConfigFresh && !!activeCategory && !!activeMonth,
   });
 
-  const summary = dataRes?.summary || null;
-  const records = useMemo(() => dataRes?.data || [], [dataRes]);
+  // Filtre değişimi ve veri yükleme kontrolü:
+  // Veri çekiliyorsa veya henüz gelmemişse veya config güncelleniyorsa veri yükleniyor kabul edilir
+  const isDataMatching = !dataLoading && !dataFetching && isConfigFresh && !!dataRes && dataRes.year === selectedYear;
+  const isDataLoading = !isDataMatching;
+
+  // Yeni veri yüklenene kadar eski veriyi GÖSTERME (var olan yükleniyor durumu gösterilir)
+  const summary = isDataLoading ? null : dataRes?.summary || null;
+  const records = useMemo(() => (isDataLoading ? [] : dataRes?.data || []), [isDataLoading, dataRes]);
 
   const handleYearChange = (newYear: number) => {
     setSelectedYear(newYear);
@@ -138,11 +145,12 @@ function App() {
   const error = rawErrorMessage && rawErrorMessage !== dismissedError ? rawErrorMessage : null;
 
   // Yükleme durumları:
-  // İlk açılış: Yıllar, GeoJSON, aktif yıl config veya ilk veri yüklenene kadar birleşik tek fazlı yükleme
-  const initialLoading = yearsLoading || geoJsonLoading || (configLoading && !configRes) || (dataLoading && !dataRes);
-  const isConfigWaiting = configLoading && !configRes;
-  const isAnythingLoading = initialLoading || (dataFetching && !dataRes);
-  const isMapLoading = initialLoading || (dataFetching && !dataRes);
+  // 1. Sayfa ilk açılış durumu (yalnızca ilk yüklemede sidebar skeleton gösterir, filtre değişiminde sidebar bozulmaz)
+  const isAppInitializing = yearsLoading || geoJsonLoading || (configLoading && !configRes);
+
+  // 2. Harita ve veri alanları için yükleme durumu (ilk açılışta veya filtre değişimi sonrası yeni veri gelene kadar aktif)
+  const isMapLoading = isDataLoading;
+  const isAnythingLoading = isDataLoading;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
@@ -159,7 +167,7 @@ function App() {
           <div>
             <h1 className="text-xl font-bold text-slate-100 m-0 tracking-tight flex items-center gap-2">
               Tahsilat & Tahakkuk Harita Analizi
-              {dataFetching && !initialLoading && (
+              {isDataLoading && !isAppInitializing && (
                 <span className="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-2 opacity-75" title="Veriler güncelleniyor..."></span>
               )}
             </h1>
@@ -208,7 +216,7 @@ function App() {
               {/* Year Select */}
               <div className="flex flex-col gap-2">
                 <label htmlFor="year-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
-                {initialLoading ? (
+                {isAppInitializing ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
@@ -230,7 +238,7 @@ function App() {
               {/* Month Select */}
               <div className="flex flex-col gap-2">
                 <label htmlFor="month-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
-                {initialLoading || isConfigWaiting ? (
+                {isAppInitializing ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
@@ -324,7 +332,7 @@ function App() {
                   className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
                 />
 
-                {initialLoading || isConfigWaiting ? (
+                {isAppInitializing ? (
                   <div className="space-y-2 mt-2">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="h-8 bg-slate-800/40 rounded-lg animate-pulse"></div>
