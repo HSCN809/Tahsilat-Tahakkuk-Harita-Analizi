@@ -167,9 +167,6 @@ function App() {
           <div>
             <h1 className="text-xl font-bold text-slate-100 m-0 tracking-tight flex items-center gap-2">
               Tahsilat & Tahakkuk Harita Analizi
-              {isDataLoading && !isAppInitializing && (
-                <span className="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-2 opacity-75" title="Veriler güncelleniyor..."></span>
-              )}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">Hazine ve Maliye Bakanlığı Vergi İstatistikleri Portalı</p>
           </div>
