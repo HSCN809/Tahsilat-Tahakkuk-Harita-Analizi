@@ -87,6 +87,7 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/years", get(handlers::data::get_years))
         .route("/api/config", get(handlers::data::get_config))
         .route("/api/data", get(handlers::data::get_data))
+        .route("/api/bootstrap", get(handlers::data::get_bootstrap))
         .route("/api/geojson", get(handlers::geojson::get_geojson))
         .route("/api/files", get(handlers::files::list_files))
         .route("/api/files/download", get(handlers::files::download_files))

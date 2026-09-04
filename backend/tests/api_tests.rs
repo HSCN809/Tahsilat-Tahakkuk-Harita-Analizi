@@ -519,3 +519,25 @@ async fn test_geojson_endpoint() {
     assert_eq!(body.as_ref(), b"{\"type\": \"FeatureCollection\", \"features\": []}");
 }
 
+#[tokio::test]
+async fn test_bootstrap_endpoint() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = setup_test_state(&tmp);
+    let app = create_app(state);
+
+    let resp = app
+        .oneshot(Request::builder().uri("/api/bootstrap").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert!(json.get("years").is_some());
+    assert_eq!(json["years"][0], 2025);
+    assert!(json.get("config").is_some());
+    assert_eq!(json["config"]["year"], 2025);
+    assert!(json.get("data").is_some());
+    assert_eq!(json["data"]["year"], 2025);
+}
+

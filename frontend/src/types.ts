@@ -46,6 +46,12 @@ export interface DataResponse {
   data: ProvinceRecord[];
 }
 
+export interface BootstrapResponse {
+  years: number[];
+  config: ConfigResponse | null;
+  data: DataResponse | null;
+}
+
 export interface RawFileInfo {
   id: string;
   name: string;

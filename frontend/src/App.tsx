@@ -1,16 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Layers, Calendar, MapPin, Download } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { Leaderboard } from './components/Leaderboard';
 import { ProvinceModal } from './components/ProvinceModal';
 import { DownloadModal } from './components/DownloadModal';
-import { fetchYears, fetchConfig, fetchData, fetchGeoJson } from './services/api';
+import { fetchYears, fetchConfig, fetchData, fetchGeoJson, fetchBootstrap } from './services/api';
 import { REGIONS, normalizeProvinceName } from './utils/provinces';
 import type { MapType, ModalMetric } from './types';
 
 function App() {
+  const queryClient = useQueryClient();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
@@ -22,7 +23,38 @@ function App() {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
 
-  // 1. Yılları çek (5 dk cache)
+  // 0. İlk açılış hızlandırması: Bootstrap tek ağ turunda (yıllar + son yıl config + ilk veri) indirir
+  const {
+    data: bootstrapData,
+    isLoading: bootstrapLoading,
+    error: bootstrapError,
+  } = useQuery({
+    queryKey: ['bootstrap'],
+    queryFn: ({ signal }) => fetchBootstrap(signal),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Bootstrap yanıtı geldiğinde TanStack Query önbelleklerini pre-populate et
+  useEffect(() => {
+    if (bootstrapData && selectedYear === null) {
+      const { years: bYears, config: bConfig, data: bData } = bootstrapData;
+      if (bYears && bYears.length > 0) {
+        queryClient.setQueryData(['years'], { years: bYears });
+        const latest = bYears[bYears.length - 1];
+        if (bConfig) {
+          queryClient.setQueryData(['config', latest], bConfig);
+          const defaultCat = bConfig.categories[0]?.id || '';
+          const defaultMonth = bConfig.months[bConfig.months.length - 1] || '';
+          if (bData && defaultCat && defaultMonth) {
+            queryClient.setQueryData(['data', latest, defaultCat, defaultMonth], bData);
+          }
+        }
+        setSelectedYear(latest);
+      }
+    }
+  }, [bootstrapData, selectedYear, queryClient]);
+
+  // 1. Yılları çek (Bootstrap ile gelmişse önbellekten anında 0 ms ile döner)
   const {
     data: yearsRes,
     isLoading: yearsLoading,
@@ -32,9 +64,9 @@ function App() {
     queryFn: ({ signal }) => fetchYears(signal),
   });
 
-  const years = useMemo(() => yearsRes?.years || [], [yearsRes]);
+  const years = useMemo(() => yearsRes?.years || bootstrapData?.years || [], [yearsRes, bootstrapData]);
 
-  // İlk yüklemede en güncel yılı seç
+  // İlk yüklemede en güncel yılı seç (fallback)
   useEffect(() => {
     if (years.length > 0 && selectedYear === null) {
       setSelectedYear(years[years.length - 1]);
@@ -140,13 +172,13 @@ function App() {
   }, [summary, selectedRegion, filteredRecords]);
 
   // Hata yönetimi
-  const activeError = yearsError || configError || dataError;
+  const activeError = bootstrapError || yearsError || configError || dataError;
   const rawErrorMessage = activeError instanceof Error ? activeError.message : null;
   const error = rawErrorMessage && rawErrorMessage !== dismissedError ? rawErrorMessage : null;
 
   // Yükleme durumları:
   // 1. Sayfa ilk açılış durumu (yalnızca ilk yüklemede sidebar skeleton gösterir, filtre değişiminde sidebar bozulmaz)
-  const isAppInitializing = yearsLoading || geoJsonLoading || (configLoading && !configRes);
+  const isAppInitializing = (bootstrapLoading && !bootstrapData) || yearsLoading || geoJsonLoading || (configLoading && !configRes);
 
   // 2. Harita ve veri alanları için yükleme durumu (ilk açılışta veya filtre değişimi sonrası yeni veri gelene kadar aktif)
   const isMapLoading = isDataLoading;

@@ -2,7 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 
 use crate::db;
-use crate::models::{ConfigQuery, ConfigResponse, DataQuery, DataResponse, YearsResponse};
+use crate::models::{BootstrapResponse, ConfigQuery, ConfigResponse, DataQuery, DataResponse, YearsResponse};
 use crate::security::{validate_year, AppError};
 use crate::state::AppState;
 
@@ -79,4 +79,89 @@ pub async fn get_data(
 
     state.cache.data.insert(cache_key, response.clone()).await;
     Ok(Json(response))
+}
+
+pub async fn get_bootstrap(
+    State(state): State<AppState>,
+) -> Result<Json<BootstrapResponse>, AppError> {
+    // 1. Yılları al (varsa cache, yoksa DB)
+    let years = if let Some(years) = state.cache.years.get(&()).await {
+        years
+    } else {
+        let pool = state.db_pool.clone();
+        let years = tokio::task::spawn_blocking(move || -> Result<Vec<i64>, AppError> {
+            let conn = pool
+                .get()
+                .map_err(|e| AppError::Internal(format!("Veritabanı bağlantısı alınamadı: {}", e)))?;
+            db::get_years(&conn)
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("Tokio spawn_blocking hatası: {}", e)))??;
+
+        state.cache.years.insert((), years.clone()).await;
+        years
+    };
+
+    if years.is_empty() {
+        return Ok(Json(BootstrapResponse {
+            years,
+            config: None,
+            data: None,
+        }));
+    }
+
+    let latest_year = *years.last().unwrap();
+
+    // 2. En güncel yılın config'ini al (varsa cache, yoksa DB)
+    let config = if let Some(config) = state.cache.config.get(&latest_year).await {
+        config
+    } else {
+        let pool = state.db_pool.clone();
+        let config = tokio::task::spawn_blocking(move || -> Result<ConfigResponse, AppError> {
+            let conn = pool
+                .get()
+                .map_err(|e| AppError::Internal(format!("Veritabanı bağlantısı alınamadı: {}", e)))?;
+            db::get_config(&conn, latest_year)
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("Tokio spawn_blocking hatası: {}", e)))??;
+
+        state.cache.config.insert(latest_year, config.clone()).await;
+        config
+    };
+
+    // 3. İlk varsayılan kategori ve son ayı belirle
+    let default_category = config.categories.first().map(|c| c.id.clone());
+    let default_month = config.months.last().cloned();
+
+    let data = if let (Some(category), Some(month)) = (default_category, default_month) {
+        let cache_key = (latest_year, category.clone(), Some(month.clone()));
+        let data = if let Some(data) = state.cache.data.get(&cache_key).await {
+            data
+        } else {
+            let pool = state.db_pool.clone();
+            let cat = category.clone();
+            let m = month.clone();
+            let data = tokio::task::spawn_blocking(move || -> Result<DataResponse, AppError> {
+                let conn = pool
+                    .get()
+                    .map_err(|e| AppError::Internal(format!("Veritabanı bağlantısı alınamadı: {}", e)))?;
+                db::get_data(&conn, latest_year, &cat, Some(&m))
+            })
+            .await
+            .map_err(|e| AppError::Internal(format!("Tokio spawn_blocking hatası: {}", e)))??;
+
+            state.cache.data.insert(cache_key, data.clone()).await;
+            data
+        };
+        Some(data)
+    } else {
+        None
+    };
+
+    Ok(Json(BootstrapResponse {
+        years,
+        config: Some(config),
+        data,
+    }))
 }

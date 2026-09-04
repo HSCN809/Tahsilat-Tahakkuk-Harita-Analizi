@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { YearsResponse, ConfigResponse, DataResponse, TurkeyGeoJSON, FilesResponse } from '../types';
+import type { YearsResponse, ConfigResponse, DataResponse, TurkeyGeoJSON, FilesResponse, BootstrapResponse } from '../types';
 
 // --- Zod runtime şemaları ---
 
@@ -85,6 +85,11 @@ async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
   }
 
   return response.json();
+}
+
+export async function fetchBootstrap(signal?: AbortSignal): Promise<BootstrapResponse> {
+  const json = await fetchJson('/api/bootstrap', signal);
+  return json as BootstrapResponse;
 }
 
 export async function fetchYears(signal?: AbortSignal): Promise<YearsResponse> {

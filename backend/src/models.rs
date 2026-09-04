@@ -54,6 +54,13 @@ pub struct DataResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BootstrapResponse {
+    pub years: Vec<i64>,
+    pub config: Option<ConfigResponse>,
+    pub data: Option<DataResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileItem {
     pub id: String,
     pub name: String,
