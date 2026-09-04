@@ -439,19 +439,49 @@ fn test_smart_peer_ip_extractor() {
 
     let extractor = SmartPeerIpExtractor;
 
-    // 1. X-Forwarded-For birden fazla IP ile (ilk IP seçilmeli)
+    // 1. X-Real-IP öncelikli olmalı (Nginx / ters proxy tarafından sağlanan güvenilir IP)
     let req1 = Request::builder()
+        .header("x-real-ip", "203.0.113.50")
+        .header("x-forwarded-for", "198.51.100.25, 192.0.2.1")
+        .body(())
+        .unwrap();
+    assert_eq!(extractor.extract(&req1).unwrap(), "203.0.113.50".parse::<IpAddr>().unwrap());
+
+    // 1b. X-Real-IP port içeriyorsa port ayıklanarak IP döndürülmeli
+    let req1b = Request::builder()
+        .header("x-real-ip", "203.0.113.50:8080")
+        .body(())
+        .unwrap();
+    assert_eq!(extractor.extract(&req1b).unwrap(), "203.0.113.50".parse::<IpAddr>().unwrap());
+
+    // 2. X-Forwarded-For birden fazla IP ile (IP spoofing engeli: son eklenen güvenilir proxy IP'si seçilmeli)
+    let req2 = Request::builder()
         .header("x-forwarded-for", "198.51.100.25, 203.0.113.195")
         .body(())
         .unwrap();
-    assert_eq!(extractor.extract(&req1).unwrap(), "198.51.100.25".parse::<IpAddr>().unwrap());
+    assert_eq!(extractor.extract(&req2).unwrap(), "203.0.113.195".parse::<IpAddr>().unwrap());
 
-    // 2. X-Real-IP
-    let req2 = Request::builder()
-        .header("x-real-ip", "203.0.113.50")
+    // 2b. X-Forwarded-For sondaki boşluk veya virgül durumunda güvenilir son geçerli IP seçilmeli
+    let req2b = Request::builder()
+        .header("x-forwarded-for", "198.51.100.25, 203.0.113.195,  ")
         .body(())
         .unwrap();
-    assert_eq!(extractor.extract(&req2).unwrap(), "203.0.113.50".parse::<IpAddr>().unwrap());
+    assert_eq!(extractor.extract(&req2b).unwrap(), "203.0.113.195".parse::<IpAddr>().unwrap());
+
+    // 2c. X-Forwarded-For port içeriyorsa (örn. 203.0.113.195:44321)
+    let req2c = Request::builder()
+        .header("x-forwarded-for", "198.51.100.25, 203.0.113.195:44321")
+        .body(())
+        .unwrap();
+    assert_eq!(extractor.extract(&req2c).unwrap(), "203.0.113.195".parse::<IpAddr>().unwrap());
+
+    // 2d. Çoklu X-Forwarded-For başlık satırı (ikinci/son başlığın son IP'si seçilmeli)
+    let req2d = Request::builder()
+        .header("x-forwarded-for", "198.51.100.25")
+        .header("x-forwarded-for", "203.0.113.195")
+        .body(())
+        .unwrap();
+    assert_eq!(extractor.extract(&req2d).unwrap(), "203.0.113.195".parse::<IpAddr>().unwrap());
 
     // 3. ConnectInfo extension
     let mut req3 = Request::builder().body(()).unwrap();
@@ -539,5 +569,113 @@ async fn test_bootstrap_endpoint() {
     assert_eq!(json["config"]["year"], 2025);
     assert!(json.get("data").is_some());
     assert_eq!(json["data"]["year"], 2025);
+}
+
+#[tokio::test]
+async fn test_cors_security_tightening() {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = setup_test_state(&tmp);
+    let app = create_app(state);
+
+    // 1. Güvenilir origin (localhost:5173 varsayılan güvenilir listede olmalı)
+    let resp_trusted = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/api/years")
+                .header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_trusted.status(), StatusCode::OK);
+    assert_eq!(
+        resp_trusted.headers().get("access-control-allow-origin").and_then(|v| v.to_str().ok()),
+        Some("http://localhost:5173")
+    );
+    // allow_credentials kaldırılmış olmalı (kimlik doğrulaması gerektirmeyen genel veri API'si)
+    assert!(resp_trusted.headers().get("access-control-allow-credentials").is_none());
+
+    // 2. Güvenilmeyen yabancı origin (reddedilmeli, Any/wildcard dönmemeli)
+    let resp_untrusted = app
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/api/years")
+                .header("Origin", "https://malicious-attacker.com")
+                .header("Access-Control-Request-Method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Güvenilmeyen köken için access-control-allow-origin başlığı döndürülmemeli
+    assert!(resp_untrusted.headers().get("access-control-allow-origin").is_none());
+
+    // 3. Konfigürasyonda wildcard ("*") tanımlansa bile Any açılmamalı, güvenilir kökenlere sıkılaştırılmalı
+    let mut state_wildcard = setup_test_state(&tmp);
+    state_wildcard.config.allowed_origins = vec!["*".to_string()];
+    let app_wildcard = create_app(state_wildcard);
+
+    let resp_wildcard_attack = app_wildcard
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/api/years")
+                .header("Origin", "https://malicious-attacker.com")
+                .header("Access-Control-Request-Method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // Wildcard ayarlı olsa bile saldırgan origin reddedilmeli
+    assert!(resp_wildcard_attack.headers().get("access-control-allow-origin").is_none());
+
+    let resp_wildcard_trusted = app_wildcard
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/api/years")
+                .header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // Wildcard ayarlı olduğunda varsayılan güvenilir origin listesine dönmeli
+    assert_eq!(
+        resp_wildcard_trusted.headers().get("access-control-allow-origin").and_then(|v| v.to_str().ok()),
+        Some("http://localhost:5173")
+    );
+
+    // 4. Konfigürasyonda trailing slash ("/") olan kökenler normalize edilmeli (örn. "http://localhost:5173/")
+    let mut state_slash = setup_test_state(&tmp);
+    state_slash.config.allowed_origins = vec!["http://localhost:5173/".to_string()];
+    let app_slash = create_app(state_slash);
+
+    let resp_slash = app_slash
+        .oneshot(
+            Request::builder()
+                .method("OPTIONS")
+                .uri("/api/years")
+                .header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp_slash.headers().get("access-control-allow-origin").and_then(|v| v.to_str().ok()),
+        Some("http://localhost:5173")
+    );
 }
 

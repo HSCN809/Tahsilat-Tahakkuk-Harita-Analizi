@@ -32,5 +32,12 @@ veriler/
 .claude/
 graphify-out/
 
+# Environment & secrets
+.env
+.env.prod
+.env.*
+!.env.example
+!.env.prod.example
+
 # Logs
 *.log

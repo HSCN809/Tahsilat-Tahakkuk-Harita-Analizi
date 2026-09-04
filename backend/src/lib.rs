@@ -15,33 +15,52 @@ use tower::ServiceBuilder;
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::GovernorLayer;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::security::SmartPeerIpExtractor;
 use crate::state::AppState;
 
+const DEFAULT_TRUSTED_ORIGINS: &[&str] = &[
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+];
+
 pub fn create_app(state: AppState) -> Router {
-    let mut cors = CorsLayer::new()
+    let mut valid_origins: Vec<HeaderValue> = state
+        .config
+        .allowed_origins
+        .iter()
+        .map(|o| o.trim().trim_end_matches('/'))
+        .filter(|o| !o.is_empty() && *o != "*")
+        .filter_map(|o| o.parse().ok())
+        .collect();
+
+    valid_origins.sort();
+    valid_origins.dedup();
+
+    let origins = if valid_origins.is_empty() {
+        DEFAULT_TRUSTED_ORIGINS
+            .iter()
+            .filter_map(|o| o.parse().ok())
+            .collect()
+    } else {
+        valid_origins
+    };
+
+    let cors = CorsLayer::new()
+        .allow_origin(origins)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([
             axum::http::header::AUTHORIZATION,
             axum::http::header::CONTENT_TYPE,
             axum::http::header::ACCEPT,
         ]);
-
-    if state.config.allowed_origins.is_empty() || state.config.allowed_origins.contains(&"*".to_string()) {
-        cors = cors.allow_origin(Any);
-    } else {
-        let origins: Vec<HeaderValue> = state
-            .config
-            .allowed_origins
-            .iter()
-            .filter_map(|o| o.parse().ok())
-            .collect();
-        cors = cors.allow_origin(origins).allow_credentials(true);
-    }
 
     // Temel rate limiting: İstemci başına saniyede 50 istek, 100 burst kapasitesi
     let governor_conf = Arc::new(
