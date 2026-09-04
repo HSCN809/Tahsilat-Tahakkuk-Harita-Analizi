@@ -73,7 +73,7 @@ pub fn create_app(state: AppState) -> Router {
         ))
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("content-security-policy"),
-            HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"),
+            HeaderValue::from_static("default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; frame-ancestors 'none';"),
         ))
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("permissions-policy"),
