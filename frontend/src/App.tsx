@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Layers, Calendar, MapPin, Download } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
@@ -78,7 +78,7 @@ function App() {
     return categories[0]?.id || '';
   }, [categories, selectedCategory]);
 
-  // 4. Verileri çek (TanStack Query önbellek)
+  // 4. Verileri çek (TanStack Query önbellek + kesintisiz geçiş)
   const {
     data: dataRes,
     isLoading: dataLoading,
@@ -88,12 +88,11 @@ function App() {
     queryKey: ['data', selectedYear, activeCategory, activeMonth],
     queryFn: ({ signal }) => fetchData(selectedYear!, activeCategory, activeMonth, signal),
     enabled: selectedYear !== null && !!activeCategory && !!activeMonth,
+    placeholderData: keepPreviousData,
   });
 
-  // Verinin gerçekten şu an seçili yıla ait olup olmadığını doğrula (eski yıl verisinin parlamasını önler)
-  const isDataFresh = !!dataRes && dataRes.year === selectedYear;
-  const summary = isDataFresh ? dataRes.summary : null;
-  const records = useMemo(() => (isDataFresh ? dataRes.data : []), [isDataFresh, dataRes]);
+  const summary = dataRes?.summary || null;
+  const records = useMemo(() => dataRes?.data || [], [dataRes]);
 
   const handleYearChange = (newYear: number) => {
     setSelectedYear(newYear);
@@ -138,12 +137,12 @@ function App() {
   const rawErrorMessage = activeError instanceof Error ? activeError.message : null;
   const error = rawErrorMessage && rawErrorMessage !== dismissedError ? rawErrorMessage : null;
 
-  // Yükleme durumları
-  const isInitialLoading = yearsLoading || geoJsonLoading;
+  // Yükleme durumları:
+  // İlk açılış: Yıllar, GeoJSON, aktif yıl config veya ilk veri yüklenene kadar birleşik tek fazlı yükleme
+  const initialLoading = yearsLoading || geoJsonLoading || (configLoading && !configRes) || (dataLoading && !dataRes);
   const isConfigWaiting = configLoading && !configRes;
-  const isDataLoading = dataLoading || isConfigWaiting || (dataFetching && !isDataFresh);
-  const isAnythingLoading = isInitialLoading || isDataLoading;
-  const isMapLoading = isInitialLoading || isDataLoading;
+  const isAnythingLoading = initialLoading || (dataFetching && !dataRes);
+  const isMapLoading = initialLoading || (dataFetching && !dataRes);
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
@@ -160,6 +159,9 @@ function App() {
           <div>
             <h1 className="text-xl font-bold text-slate-100 m-0 tracking-tight flex items-center gap-2">
               Tahsilat & Tahakkuk Harita Analizi
+              {dataFetching && !initialLoading && (
+                <span className="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-2 opacity-75" title="Veriler güncelleniyor..."></span>
+              )}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">Hazine ve Maliye Bakanlığı Vergi İstatistikleri Portalı</p>
           </div>
@@ -206,7 +208,7 @@ function App() {
               {/* Year Select */}
               <div className="flex flex-col gap-2">
                 <label htmlFor="year-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
-                {isInitialLoading ? (
+                {initialLoading ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
@@ -228,7 +230,7 @@ function App() {
               {/* Month Select */}
               <div className="flex flex-col gap-2">
                 <label htmlFor="month-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
-                {isInitialLoading || isConfigWaiting ? (
+                {initialLoading || isConfigWaiting ? (
                   <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
                 ) : (
                   <select
@@ -322,7 +324,7 @@ function App() {
                   className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
                 />
 
-                {isInitialLoading || isConfigWaiting ? (
+                {initialLoading || isConfigWaiting ? (
                   <div className="space-y-2 mt-2">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="h-8 bg-slate-800/40 rounded-lg animate-pulse"></div>

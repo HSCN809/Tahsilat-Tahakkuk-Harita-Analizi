@@ -34,8 +34,7 @@ pub fn init_pool(db_path: &Path) -> Result<DbPool, AppError> {
                 "PRAGMA busy_timeout = 30000;
                  PRAGMA foreign_keys = ON;
                  PRAGMA synchronous = NORMAL;
-                 PRAGMA mmap_size = 268435456;
-                 PRAGMA cache_size = -64000;
+                 PRAGMA cache_size = -16000;
                  PRAGMA temp_store = MEMORY;
                  CREATE TABLE IF NOT EXISTS tax_records (
                      year INTEGER NOT NULL,
@@ -71,14 +70,13 @@ pub fn init_pool(db_path: &Path) -> Result<DbPool, AppError> {
             "PRAGMA busy_timeout = 30000;
              PRAGMA foreign_keys = ON;
              PRAGMA synchronous = NORMAL;
-             PRAGMA mmap_size = 268435456;
-             PRAGMA cache_size = -64000;
+             PRAGMA cache_size = -16000;
              PRAGMA temp_store = MEMORY;",
         )
     });
 
     Pool::builder()
-        .max_size(16)
+        .max_size(8)
         .build(manager)
         .map_err(|e| AppError::Internal(format!("Veritabanı bağlantı havuzu açılamadı: {}", e)))
 }

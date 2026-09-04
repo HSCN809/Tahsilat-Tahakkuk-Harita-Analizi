@@ -138,10 +138,13 @@ def convert_file(xls_file, year, indir_konumu):
         province_folder_name = "_".join(cleaned_name.replace(".xlsx", "").split("_")[:-1])
         province_dir = indir_konumu / province_folder_name
         os.makedirs(province_dir, exist_ok=True)
-        try:
-            xls = pd.ExcelFile(xls_file, engine='calamine')
-        except Exception:
+        if str(xls_file).lower().endswith(".xls"):
             xls = pd.ExcelFile(xls_file, engine='xlrd')
+        else:
+            try:
+                xls = pd.ExcelFile(xls_file, engine='calamine')
+            except Exception:
+                xls = pd.ExcelFile(xls_file, engine='xlrd')
         sheet_names = xls.sheet_names
 
         valid_sheets_count = sum(1 for sh in sheet_names if normalize_month_name(sh) in MONTH_DISPLAY_NAMES)
