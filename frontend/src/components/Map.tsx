@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { geoMercator, geoPath } from 'd3-geo';
-import { formatCurrency } from '../utils/format';
+import { X } from 'lucide-react';
+import { formatCurrency, formatPercent, getRatioTone } from '../utils/format';
 import { REGIONS, normalizeProvinceName } from '../utils/provinces';
 import type { ProvinceRecord, TurkeyGeoJSON, MapType } from '../types';
 
@@ -9,9 +10,17 @@ interface TurkeyMapProps {
   records: ProvinceRecord[];
   mapType: MapType;
   selectedRegion: string;
+  selectedProvince: string | null;
+  loading?: boolean;
+  onMapTypeChange: (type: MapType) => void;
+  onSelectProvince: (normalizedProvince: string | null) => void;
 }
 
-const interpolateColor = (color1: [number, number, number], color2: [number, number, number], factor: number): string => {
+const interpolateColor = (
+  color1: [number, number, number],
+  color2: [number, number, number],
+  factor: number
+): string => {
   const f = Math.max(0, Math.min(1, factor));
   const r = Math.round(color1[0] + f * (color2[0] - color1[0]));
   const g = Math.round(color1[1] + f * (color2[1] - color1[1]));
@@ -19,10 +28,30 @@ const interpolateColor = (color1: [number, number, number], color2: [number, num
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, mapType, selectedRegion }) => {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string; record: ProvinceRecord | undefined; alignLeft: boolean } | null>(null);
+// Devlet İstatistik Yıllığı renk rampası: Hazine kırmızısı (#9E2A2B) -> sıcak okr (#C9A25E) -> Ege yeşili (#1B6B63)
+const COLOR_LOW: [number, number, number] = [158, 42, 43];
+const COLOR_MID: [number, number, number] = [201, 162, 94];
+const COLOR_HIGH: [number, number, number] = [27, 107, 99];
+
+const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
+  geoJsonData,
+  records,
+  mapType,
+  selectedRegion,
+  selectedProvince,
+  loading = false,
+  onMapTypeChange,
+  onSelectProvince,
+}) => {
+  const [tooltip, setTooltip] = useState<{
+    x: number;
+    y: number;
+    name: string;
+    record: ProvinceRecord | undefined;
+    alignLeft: boolean;
+    alignTop: boolean;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Bounds cache — getBoundingClientRect her fare hareketinde değil, sadece gerektiğinde çağrılır
   const cachedBoundsRef = useRef<DOMRect | null>(null);
 
   const getCachedBounds = useCallback((): DOMRect | null => {
@@ -36,7 +65,6 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     cachedBoundsRef.current = null;
   }, []);
 
-  // Pencere resize'ında bounds cache'i invalidate et
   useEffect(() => {
     window.addEventListener('resize', invalidateBounds);
     window.addEventListener('scroll', invalidateBounds, true);
@@ -57,10 +85,9 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     });
   }, [geoJsonData, selectedRegion]);
 
-  // Otomatik projeksiyon merkezi, ölçeği ve harita yüksekliğini d3-geo ile hesapla
   const { pathGenerator, calculatedHeight } = useMemo(() => {
     if (filteredFeatures.length === 0) {
-      return { pathGenerator: null, calculatedHeight: 450 };
+      return { pathGenerator: null, calculatedHeight: 390 };
     }
 
     const featureCollection = {
@@ -69,8 +96,8 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     };
 
     const width = 800;
-    const baseHeight = 380;
-    const padding = 20;
+    const baseHeight = 360;
+    const padding = 18;
 
     const proj = geoMercator();
     proj.fitExtent(
@@ -79,13 +106,13 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     );
 
     const scaleMultipliers: { [key: string]: number } = {
-      'Tüm Ülke': 1.05,
-      'Marmara': 1.2,
-      'Ege': 1.25,
+      'Tüm Ülke': 1.04,
+      'Marmara': 1.18,
+      'Ege': 1.22,
       'Akdeniz': 1.0,
-      'İç Anadolu': 1.3,
-      'Karadeniz': 1.25,
-      'Doğu Anadolu': 1.3,
+      'İç Anadolu': 1.25,
+      'Karadeniz': 1.22,
+      'Doğu Anadolu': 1.25,
       'Güneydoğu Anadolu': 1.0,
     };
     const multiplier = scaleMultipliers[selectedRegion] ?? 1.0;
@@ -94,22 +121,16 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
       const currentScale = proj.scale();
       const [tx, ty] = proj.translate();
       proj.scale(currentScale * multiplier);
-
-      // Haritanın merkez noktasını (400, 190) koruyarak kaymayı engellemek için koordinat farkını ölçekle çarpıyoruz
       const cx = width / 2;
       const cy = baseHeight / 2;
-      proj.translate([
-        cx + (tx - cx) * multiplier,
-        cy + (ty - cy) * multiplier,
-      ]);
+      proj.translate([cx + (tx - cx) * multiplier, cy + (ty - cy) * multiplier]);
     }
 
     const generator = geoPath().projection(proj);
     const [[, y0], [, y1]] = generator.bounds(featureCollection as any);
 
-    const paddingTotal = padding * 2 + 40;
-    const rawHeight = (y1 - y0) + paddingTotal;
-    const height = Math.max(280, Math.min(450, Math.round(rawHeight)));
+    const rawHeight = y1 - y0 + padding * 2 + 24;
+    const height = Math.max(290, Math.min(430, Math.round(rawHeight)));
 
     return { pathGenerator: generator, calculatedHeight: height };
   }, [filteredFeatures, selectedRegion]);
@@ -132,153 +153,242 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({ geoJsonData, records, ma
     return max || 1;
   }, [records, mapType]);
 
-  const getColor = useCallback((name: string) => {
-    const record = recordsMap.get(normalizeProvinceName(name));
-    if (!record) return '#1e293b';
+  const getColor = useCallback(
+    (name: string) => {
+      const record = recordsMap.get(normalizeProvinceName(name));
+      if (!record) return '#E5E0D4';
 
-    let factor = 0;
-    if (mapType === 'ratio') {
-      const ratio = record.ratio || 0;
-      factor = ratio / 100;
-    } else {
-      const val = mapType === 'tahsilat' ? record.collection : record.accrual;
-      if (!val || val <= 0) return '#1e293b';
-      factor = Math.log1p(val) / Math.log1p(maxVal);
-    }
+      let factor = 0;
+      if (mapType === 'ratio') {
+        const ratio = record.ratio ?? 0;
+        factor = ratio / 100;
+      } else {
+        const val = mapType === 'tahsilat' ? record.collection : record.accrual;
+        if (!val || val <= 0) return '#E5E0D4';
+        factor = Math.log1p(val) / Math.log1p(maxVal);
+      }
 
-    // Smooth gradient: Red [244, 63, 94] -> Yellow [234, 179, 8] -> Green [16, 185, 129]
-    if (factor < 0.5) {
-      return interpolateColor([244, 63, 94], [234, 179, 8], factor * 2);
-    } else {
-      return interpolateColor([234, 179, 8], [16, 185, 129], (factor - 0.5) * 2);
-    }
-  }, [recordsMap, mapType, maxVal]);
+      if (factor < 0.5) {
+        return interpolateColor(COLOR_LOW, COLOR_MID, factor * 2);
+      }
+      return interpolateColor(COLOR_MID, COLOR_HIGH, (factor - 0.5) * 2);
+    },
+    [recordsMap, mapType, maxVal]
+  );
 
-  const formatTooltipValue = (val: number | null | undefined) => {
-    return formatCurrency(val);
-  };
+  const selectedLabel = useMemo(() => {
+    if (!selectedProvince) return null;
+    const match = recordsMap.get(selectedProvince);
+    return match?.province ?? selectedProvince;
+  }, [selectedProvince, recordsMap]);
+
+  const mapTabs: { id: MapType; label: string; aria: string }[] = [
+    { id: 'tahakkuk', label: 'Tahakkuk', aria: 'Haritada Tahakkuk Tutarlarını Göster' },
+    { id: 'tahsilat', label: 'Tahsilat', aria: 'Haritada Tahsilat Tutarlarını Göster' },
+    { id: 'ratio', label: 'Oran (%)', aria: 'Haritada Tahsilat Oranını Göster' },
+  ];
 
   return (
-    <div className="w-full flex flex-col gap-4">
-      {/* Harita Kartı */}
+    <section
+      aria-label="Coğrafi Dağılım Haritası"
+      className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3.5"
+    >
+      {/* Harita Başlığı ve Gösterim Tipi Sekmeleri */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E242B] pb-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h2 className="text-base font-bold text-[#1E242B] tracking-tight">
+            {selectedRegion === 'Tüm Ülke' ? '81 İl Coğrafi Dağılımı' : `${selectedRegion} Bölgesi Dağılımı`}
+          </h2>
+          {selectedLabel && (
+            <button
+              type="button"
+              onClick={() => onSelectProvince(null)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-[#F9EDED] text-[#9E2A2B] border border-[#E6C5C5] rounded-[2px] hover:bg-[#F3DCDC] transition-colors duration-150 cursor-pointer"
+              title="Seçili ili kaldır"
+            >
+              <span>Seçili: {selectedLabel.toLocaleUpperCase('tr-TR')}</span>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Harita metrik seçimi"
+          className="inline-flex border border-[#C8C1B4] rounded-[3px] overflow-hidden bg-[#FAF9F6]"
+        >
+          {mapTabs.map((tab) => {
+            const active = mapType === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-label={tab.aria}
+                onClick={() => onMapTypeChange(tab.id)}
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer border-r last:border-r-0 border-[#D9D4C9] ${
+                  active
+                    ? 'bg-[#1E242B] text-white'
+                    : 'text-[#525A63] hover:text-[#1E242B] hover:bg-[#EFECE4]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Harita Tuvali */}
       <div
         ref={containerRef}
-        style={{ height: `${calculatedHeight}px` }}
-        className="relative w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 overflow-hidden flex items-center justify-center transition-all duration-300"
+        style={{ ['--map-h' as string]: `${calculatedHeight}px` }}
+        className="relative w-full aspect-[16/9] sm:aspect-auto sm:h-[var(--map-h)] bg-[#FCFBF8] border border-[#E5DFD2] rounded-[2px] overflow-hidden flex items-center justify-center"
         onMouseEnter={invalidateBounds}
         onScroll={invalidateBounds}
       >
         {tooltip && (
           <div
-            className="absolute z-50 bg-slate-950/90 backdrop-blur-md border border-slate-800 text-xs text-slate-100 rounded-xl p-3 shadow-2xl pointer-events-none flex flex-col gap-1 min-w-[150px] whitespace-nowrap"
+            className="absolute z-40 bg-white border border-[#1E242B] text-xs text-[#1E242B] rounded-[3px] p-3 shadow-md pointer-events-none flex flex-col gap-1 min-w-[175px] whitespace-nowrap"
             style={{
-              left: tooltip.alignLeft ? tooltip.x - 15 : tooltip.x + 15,
-              top: tooltip.y - 15,
-              transform: tooltip.alignLeft ? 'translateX(-100%)' : 'none',
+              left: tooltip.alignLeft ? tooltip.x - 14 : tooltip.x + 14,
+              top: tooltip.alignTop ? tooltip.y - 12 : Math.max(8, tooltip.y + 12),
+              transform: `translate(${tooltip.alignLeft ? '-100%' : '0'}, ${tooltip.alignTop ? '-100%' : '0'})`,
             }}
           >
-            <span className="font-bold text-sm text-slate-200 border-b border-slate-800 pb-1 mb-1 block">
-              {tooltip.name.toUpperCase()}
+            <span className="font-bold text-[13px] text-[#1E242B] border-b border-[#D9D4C9] pb-1 mb-0.5 block">
+              {tooltip.name.toLocaleUpperCase('tr-TR')}
             </span>
             {tooltip.record ? (
               <>
-                <div className="flex justify-between gap-4 mt-1">
-                  <span>Tahakkuk:</span>
-                  <span className="font-mono">{formatTooltipValue(tooltip.record.accrual)}</span>
+                <div className="flex justify-between gap-4">
+                  <span className="text-[#525A63]">Tahakkuk:</span>
+                  <span className="font-semibold tabular-nums">{formatCurrency(tooltip.record.accrual)}</span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Tahsilat:</span>
-                  <span className="font-mono">{formatTooltipValue(tooltip.record.collection)}</span>
+                  <span className="text-[#525A63]">Tahsilat:</span>
+                  <span className="font-semibold tabular-nums">{formatCurrency(tooltip.record.collection)}</span>
                 </div>
-                <div className="flex justify-between gap-4 text-purple-400 font-bold border-t border-slate-800/50 mt-1 pt-1">
+                <div className={`flex justify-between gap-4 border-t border-[#EAE5DA] mt-1 pt-1 font-bold ${getRatioTone(tooltip.record.ratio).textClass}`}>
                   <span>Oran:</span>
-                  <span>%{tooltip.record.ratio?.toFixed(2) || '0.00'}</span>
+                  <span className="tabular-nums">
+                    {formatPercent(tooltip.record.ratio ?? 0)}
+                  </span>
                 </div>
               </>
             ) : (
-              <span className="text-slate-500">Veri bulunamadı</span>
+              <span className="text-[#525A63]">Bu dönem için veri yok</span>
             )}
           </div>
         )}
 
-        {!geoJsonData || !pathGenerator ? (
-          <div className="text-slate-500 text-sm font-medium">Harita verisi bekleniyor...</div>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center overflow-hidden">
-            <svg
-              viewBox="0 0 800 380"
-              className="w-full h-full select-none"
-              style={{ width: '100%', height: '100%' }}
-              preserveAspectRatio="xMidYMid meet"
-            >
-              <g>
-                {filteredFeatures.map((geo) => {
-                  const d = pathGenerator(geo);
-                  if (!d) return null;
-                  const name = geo.properties.name;
-                  const record = recordsMap.get(normalizeProvinceName(name));
-                  return (
-                    <path
-                      key={name}
-                      d={d}
-                      fill={getColor(name)}
-                      stroke="#0f172a"
-                      strokeWidth={0.7}
-                      className="transition-all duration-200 outline-none hover:!fill-[#6366f1] hover:!stroke-[#f8fafc] hover:stroke-[1.2px] active:!fill-[#4338ca] cursor-pointer"
-                      onMouseMove={(e: React.MouseEvent<SVGPathElement>) => {
-                        const bounds = getCachedBounds();
-                        const x = e.clientX - (bounds?.left || 0);
-                        const y = e.clientY - (bounds?.top || 0);
-                        const containerWidth = bounds?.width || 0;
-                        const alignLeft = x > containerWidth / 2;
-
-                        setTooltip({ x, y, name, record, alignLeft });
-                      }}
-                      onMouseLeave={() => {
-                        invalidateBounds();
-                        setTooltip(null);
-                      }}
-                    />
-                  );
-                })}
-              </g>
-            </svg>
+        {!geoJsonData || !pathGenerator || loading ? (
+          <div className="w-full h-full p-6 flex flex-col items-center justify-center gap-3">
+            <div className="w-full h-full bg-[#EFECE4]/70 rounded-[2px] animate-pulse flex items-center justify-center">
+              <span className="text-xs font-semibold text-[#525A63]">Harita ve il verileri hazırlanıyor…</span>
+            </div>
           </div>
+        ) : (
+          <svg
+            viewBox="0 0 800 360"
+            className="w-full h-full select-none"
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label="Türkiye il bazında vergi haritası"
+          >
+            <g>
+              {filteredFeatures.map((geo) => {
+                const d = pathGenerator(geo);
+                if (!d) return null;
+                const name = geo.properties.name;
+                const normalized = normalizeProvinceName(name);
+                const record = recordsMap.get(normalized);
+                const isSelected = selectedProvince === normalized;
+                const isDimmed = Boolean(selectedProvince) && !isSelected;
+
+                const metricAria =
+                  record && mapType === 'ratio'
+                    ? formatPercent(record.ratio ?? 0)
+                    : record
+                      ? formatCurrency(mapType === 'tahsilat' ? record.collection : record.accrual)
+                      : 'veri yok';
+
+                return (
+                  <path
+                    key={name}
+                    d={d}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={isSelected}
+                    aria-label={`${name}: ${metricAria}. Detayları sabitlemek için seçin.`}
+                    fill={getColor(name)}
+                    fillOpacity={isDimmed ? 0.55 : 1}
+                    stroke={isSelected ? '#1E242B' : '#FFFFFF'}
+                    strokeWidth={isSelected ? 1.8 : 0.85}
+                    className="transition-opacity duration-150 outline-none hover:opacity-90 hover:stroke-[#1E242B] hover:stroke-[1.4px] focus-visible:stroke-[#9E2A2B] focus-visible:stroke-[1.8px] cursor-pointer"
+                    onClick={() => onSelectProvince(isSelected ? null : normalized)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelectProvince(isSelected ? null : normalized);
+                      }
+                    }}
+                    onMouseMove={(e: React.MouseEvent<SVGPathElement>) => {
+                      const bounds = getCachedBounds();
+                      const x = e.clientX - (bounds?.left || 0);
+                      const y = e.clientY - (bounds?.top || 0);
+                      const containerWidth = bounds?.width || 0;
+                      const containerHeight = bounds?.height || 0;
+                      const alignLeft = x > containerWidth / 2;
+                      const alignTop = y > containerHeight / 2;
+                      setTooltip({ x, y, name, record, alignLeft, alignTop });
+                    }}
+                    onMouseLeave={() => {
+                      invalidateBounds();
+                      setTooltip(null);
+                    }}
+                  />
+                );
+              })}
+            </g>
+          </svg>
         )}
       </div>
 
-      {/* Harita Dışındaki Yatay Renk Lejantı Barı */}
-      {geoJsonData && records.length > 0 && (
-        <div className="w-full bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-1.5 shadow-lg">
-          <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-            <span>
-              {mapType === 'ratio'
-                ? 'Tahsilat Oranı'
-                : mapType === 'tahsilat'
-                  ? 'Tahsilat Miktarı'
-                  : 'Tahakkuk Miktarı'}
+      {/* Alt Renk Ölçeği Lejantı */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-0.5 text-xs">
+        <span className="font-semibold text-[#525A63]">
+          {mapType === 'ratio'
+            ? 'Tahsilat Oranı Ölçeği'
+            : mapType === 'tahsilat'
+              ? 'Tahsilat Tutarı Ölçeği (log)'
+              : 'Tahakkuk Tutarı Ölçeği (log)'}
+        </span>
+
+        <div className="flex items-center gap-2.5 flex-1 max-w-md">
+          <span className="text-[11px] font-semibold text-[#525A63] tabular-nums shrink-0">
+            {mapType === 'ratio' ? '%0' : '0 ₺'}
+          </span>
+          <div
+            className="h-2.5 flex-1 rounded-[2px] border border-[#D9D4C9]"
+            style={{
+              background: 'linear-gradient(90deg, #9E2A2B 0%, #C9A25E 50%, #1B6B63 100%)',
+            }}
+          />
+          {mapType === 'ratio' ? (
+            <span className="text-[11px] font-semibold text-[#525A63] tabular-nums shrink-0">%100</span>
+          ) : (
+            <span
+              className="text-[11px] font-semibold text-[#525A63] tabular-nums max-w-[130px] truncate shrink-0"
+              title={formatCurrency(maxVal)}
+            >
+              {formatCurrency(maxVal)}
             </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-gradient-to-r from-[#f43f5e] via-[#eab308] to-[#10b981]"></div>
-          <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
-            {mapType === 'ratio' ? (
-              <>
-                <span>%0</span>
-                <span>%50</span>
-                <span>%100</span>
-              </>
-            ) : (
-              <>
-                <span>Min (0 ₺)</span>
-                <span className="max-w-[150px] truncate" title={formatCurrency(maxVal)}>
-                  {formatCurrency(maxVal)}
-                </span>
-              </>
-            )}
-          </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </section>
   );
 };
 

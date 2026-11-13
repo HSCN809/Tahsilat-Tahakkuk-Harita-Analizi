@@ -172,3 +172,6 @@ grafana_data/
 # SEO rehberi
 SEO_REHBERI.md
 docs/SEO_REHBERI.md
+
+.claude/
+.impeccable/

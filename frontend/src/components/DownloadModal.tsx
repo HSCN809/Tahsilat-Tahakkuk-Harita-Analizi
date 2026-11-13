@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { X, Search, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, Search, Download, FileSpreadsheet, Loader2, AlertTriangle } from 'lucide-react';
 import type { RawFileInfo } from '../types';
 import { fetchFiles, downloadFiles } from '../services/api';
 import { formatFileSize } from '../utils/format';
@@ -28,8 +28,22 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Yıl değiştiğinde o yılın ham dosyalarını çek ve tümünü seçili hale getir
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
+
   useEffect(() => {
     if (selectedYear === null) return;
 
@@ -56,12 +70,15 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     };
 
     load();
-    return () => { cancelled = true; controller.abort(); };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [selectedYear]);
 
   const filteredFiles = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return files.filter((f) => prettifyFileId(f.id).toLowerCase().includes(q));
+    const q = searchQuery.toLocaleLowerCase('tr-TR');
+    return files.filter((f) => prettifyFileId(f.id).toLocaleLowerCase('tr-TR').includes(q));
   }, [files, searchQuery]);
 
   const selectedSize = useMemo(
@@ -78,7 +95,8 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     });
   };
 
-  const allVisibleSelected = filteredFiles.length > 0 && filteredFiles.every((f) => selectedIds.has(f.id));
+  const allVisibleSelected =
+    filteredFiles.length > 0 && filteredFiles.every((f) => selectedIds.has(f.id));
 
   const toggleAll = () => {
     setSelectedIds((prev) => {
@@ -107,81 +125,101 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh]">
-
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="download-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E242B]/45"
+    >
+      <div className="relative w-full max-w-lg bg-white border border-[#1E242B] rounded-[4px] p-6 shadow-xl flex flex-col gap-4 max-h-[90vh]">
+        {/* Başlık */}
+        <div className="flex items-start justify-between border-b border-[#1E242B] pb-3.5 gap-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-100">Ham Veri İndir</h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Hazine ve Maliye Bakanlığı'ndan alınan orijinal .xls dosyaları (aylar sheet olarak içerir)
+            <h3 id="download-modal-title" className="text-lg font-bold text-[#1E242B]">
+              Ham Veri İndir (.xls)
+            </h3>
+            <p className="text-xs text-[#525A63] mt-0.5">
+              Hazine ve Maliye Bakanlığı kaynaklı orijinal Excel çalışma kitapları (aylar sayfa olarak yer alır)
             </p>
           </div>
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
             aria-label="Pencereyi Kapat"
-            className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+            className="p-1.5 hover:bg-[#EFECE4] rounded-[2px] text-[#525A63] hover:text-[#1E242B] transition-colors duration-150 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Year Select */}
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Veri Yılı</label>
+        {/* Veri Yılı */}
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="download-year-select"
+            className="text-[11px] font-bold text-[#525A63] uppercase tracking-[0.05em]"
+          >
+            Veri Yılı
+          </label>
           <select
+            id="download-year-select"
             aria-label="Veri Yılı Seçin"
             value={selectedYear ?? ''}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
+            className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-3 py-2 text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
           >
             {years.map((y) => (
-              <option key={y} value={y} className="bg-slate-950 text-slate-100">
+              <option key={y} value={y}>
                 {y} Yılı
               </option>
             ))}
           </select>
         </div>
 
-        {/* Search + Select All */}
+        {/* Arama ve Tümünü Seç */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
             <input
               type="text"
-              placeholder="İl adına göre filtrele..."
+              aria-label="Dosyaları il adına göre filtrele"
+              placeholder="İl adına göre filtrele…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950/60 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500/50 transition-all"
+              className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] pl-9 pr-3 py-2 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
             />
           </div>
           <button
+            type="button"
             onClick={toggleAll}
             disabled={filteredFiles.length === 0}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-800/50 hover:text-slate-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            className="px-3 py-2 text-xs font-semibold rounded-[4px] border border-[#C8C1B4] bg-[#FAF9F6] text-[#1E242B] hover:bg-[#EFECE4] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {allVisibleSelected ? 'Seçimi Bırak' : 'Tümünü Seç'}
           </button>
         </div>
 
-        {/* Error */}
+        {/* Hata */}
         {error && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs">
-            ⚠️ {error}
+          <div className="p-3 bg-[#F9EDED] border border-[#E6C5C5] text-[#9E2A2B] rounded-[4px] text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* File List */}
-        <div className="overflow-y-auto border border-slate-800/60 rounded-2xl bg-slate-950/40 p-1 flex flex-col gap-0.5 scrollbar-thin min-h-[200px] max-h-[320px]">
+        {/* Dosya Listesi */}
+        <div className="overflow-y-auto border border-[#D9D4C9] rounded-[2px] bg-[#FCFBF8] p-1 flex flex-col gap-0.5 min-h-[200px] max-h-[300px]">
           {loading ? (
             <div className="space-y-2 p-2">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-8 bg-slate-800/40 rounded-lg animate-pulse"></div>
+                <div key={i} className="h-8 bg-[#EFECE4] rounded-[2px] animate-pulse" />
               ))}
             </div>
           ) : filteredFiles.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-500">
+            <div className="text-center py-8 text-xs text-[#525A63]">
               {files.length === 0 ? 'Bu yıl için ham dosya bulunamadı.' : 'Aramaya uygun dosya bulunamadı.'}
             </div>
           ) : (
@@ -190,45 +228,50 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               return (
                 <label
                   key={file.id}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${checked
-                    ? 'bg-blue-600/10 text-blue-300 border border-blue-500/20'
-                    : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
-                    }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-[2px] text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                    checked
+                      ? 'bg-[#F9EDED] text-[#1E242B]'
+                      : 'text-[#525A63] hover:bg-[#EFECE4] hover:text-[#1E242B]'
+                  }`}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleFile(file.id)}
-                    className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer flex-shrink-0"
+                    className="w-3.5 h-3.5 accent-[#9E2A2B] cursor-pointer flex-shrink-0"
                   />
-                  <FileSpreadsheet className={`w-4 h-4 flex-shrink-0 ${checked ? 'text-blue-400' : 'text-slate-500'}`} />
+                  <FileSpreadsheet
+                    className={`w-4 h-4 flex-shrink-0 ${checked ? 'text-[#9E2A2B]' : 'text-[#525A63]'}`}
+                  />
                   <span className="truncate flex-1">{prettifyFileId(file.id)}</span>
-                  <span className="text-[10px] text-slate-500 font-mono flex-shrink-0">{formatFileSize(file.size)}</span>
+                  <span className="text-[11px] text-[#525A63] tabular-nums flex-shrink-0">
+                    {formatFileSize(file.size)}
+                  </span>
                 </label>
               );
             })
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-between items-center border-t border-slate-800 pt-3 gap-3">
-          <span className="text-xs text-slate-500">
+        {/* Alt Bilgi & İndir */}
+        <div className="flex justify-between items-center border-t border-[#D9D4C9] pt-3 gap-3">
+          <span className="text-xs text-[#525A63] tabular-nums">
             {selectedIds.size} dosya seçildi · {formatFileSize(selectedSize)}
           </span>
           <button
+            type="button"
             onClick={handleDownload}
             disabled={downloading || selectedIds.size === 0 || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+            className="flex items-center gap-2 px-4 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {downloading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Download className="w-4 h-4" />
             )}
-            {downloading ? 'İndiriliyor...' : 'Zip Olarak İndir'}
+            {downloading ? 'İndiriliyor…' : 'Zip Olarak İndir'}
           </button>
         </div>
-
       </div>
     </div>
   );

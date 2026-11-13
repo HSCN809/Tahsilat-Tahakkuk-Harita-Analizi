@@ -30,3 +30,19 @@ export const formatFileSize = (bytes: number): string => {
   }
   return `${bytes} B`;
 };
+
+export const formatPercent = (val: number | undefined | null): string => {
+  if (val === undefined || val === null || isNaN(val)) return '-%';
+  return `%${val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+export const getRatioTone = (
+  ratio: number | undefined | null
+): { textClass: string; bgClass: string } => {
+  if (ratio === undefined || ratio === null || isNaN(ratio)) {
+    return { textClass: 'text-[#1E242B]', bgClass: 'bg-[#525A63]' };
+  }
+  if (ratio >= 75) return { textClass: 'text-[#1B6B63]', bgClass: 'bg-[#1B6B63]' };
+  if (ratio >= 50) return { textClass: 'text-[#8A6518]', bgClass: 'bg-[#8A6518]' };
+  return { textClass: 'text-[#9E2A2B]', bgClass: 'bg-[#9E2A2B]' };
+};

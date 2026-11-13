@@ -1,83 +1,81 @@
 import React from 'react';
-import { Coins, TrendingUp, Percent } from 'lucide-react';
-import { formatCurrency } from '../utils/format';
-import type { Summary, ModalMetric } from '../types';
+import { ArrowDownWideNarrow } from 'lucide-react';
+import { formatCurrency, formatPercent, getRatioTone } from '../utils/format';
+import type { Summary, SortColumn } from '../types';
 
 interface StatsCardsProps {
   stats: Summary | null;
   loading: boolean;
-  onCardClick?: (metric: ModalMetric) => void;
+  activeSortColumn: SortColumn;
+  onMetricClick?: (metric: SortColumn) => void;
 }
 
+const StatsCardsComponent: React.FC<StatsCardsProps> = ({
+  stats,
+  loading,
+  activeSortColumn,
+  onMetricClick,
+}) => {
+  const items: {
+    key: SortColumn;
+    label: string;
+    value: string;
+    valueClass?: string;
+    accentTopClass: string;
+  }[] = [
+    {
+      key: 'accrual',
+      label: 'Toplam Tahakkuk',
+      value: formatCurrency(stats?.total_accrual),
+      accentTopClass: activeSortColumn === 'accrual' ? 'border-t-2 border-t-[#1E242B]' : '',
+    },
+    {
+      key: 'collection',
+      label: 'Toplam Tahsilat',
+      value: formatCurrency(stats?.total_collection),
+      accentTopClass: activeSortColumn === 'collection' ? 'border-t-2 border-t-[#1E242B]' : '',
+    },
+    {
+      key: 'ratio',
+      label: 'Tahsilat / Tahakkuk Oranı',
+      value: stats ? formatPercent(stats.overall_ratio) : '-%',
+      valueClass: getRatioTone(stats?.overall_ratio).textClass,
+      accentTopClass: activeSortColumn === 'ratio' ? 'border-t-2 border-t-[#1B6B63]' : '',
+    },
+  ];
 
-const StatsCardsComponent: React.FC<StatsCardsProps> = ({ stats, loading, onCardClick }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-      {/* Card 1: Accrual */}
-      <div 
-        onClick={() => onCardClick?.('accrual')}
-        className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 flex items-center justify-between group transition-all duration-300 hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)] cursor-pointer hover:scale-[1.02]"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all duration-500"></div>
-        <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahakkuk</p>
-          <h3 className="text-[18px] font-bold mt-0.5 text-slate-100 tracking-tight">
-            {loading ? (
-              <span className="inline-block w-24 h-6 bg-slate-850 rounded animate-pulse"></span>
-            ) : (
-              formatCurrency(stats?.total_accrual)
-            )}
-          </h3>
-        </div>
-        <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl group-hover:scale-115 transition-all duration-300">
-          <Coins className="w-6 h-6" />
-        </div>
-      </div>
-
-      {/* Card 2: Collection */}
-      <div 
-        onClick={() => onCardClick?.('collection')}
-        className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 flex items-center justify-between group transition-all duration-300 hover:border-emerald-500/50 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)] cursor-pointer hover:scale-[1.02]"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all duration-500"></div>
-        <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Toplam Tahsilat</p>
-          <h3 className="text-[18px] font-bold mt-0.5 text-slate-100 tracking-tight">
-            {loading ? (
-              <span className="inline-block w-24 h-6 bg-slate-850 rounded animate-pulse"></span>
-            ) : (
-              formatCurrency(stats?.total_collection)
-            )}
-          </h3>
-        </div>
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl group-hover:scale-115 transition-all duration-300">
-          <TrendingUp className="w-6 h-6" />
-        </div>
-      </div>
-
-      {/* Card 3: Ratio */}
-      <div 
-        onClick={() => onCardClick?.('ratio')}
-        className="relative overflow-hidden bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-5 flex items-center justify-between group transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.1)] cursor-pointer hover:scale-[1.02]"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all duration-500"></div>
-        <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tahsilat Oranı</p>
-          <h3 className="text-[18px] font-bold mt-0.5 text-purple-400 tracking-tight">
-            {loading ? (
-              <span className="inline-block w-24 h-6 bg-slate-850 rounded animate-pulse"></span>
-            ) : stats ? (
-              `%${stats.overall_ratio.toFixed(2)}`
-            ) : (
-              '-%'
-            )}
-          </h3>
-        </div>
-        <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl group-hover:scale-115 transition-all duration-300">
-          <Percent className="w-6 h-6" />
-        </div>
-      </div>
-    </div>
+    <section
+      aria-label="Dönem Özet Göstergeleri"
+      className="bg-white border border-[#D9D4C9] grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#D9D4C9]"
+    >
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onMetricClick?.(item.key)}
+          className={`group text-left px-5 py-3.5 transition-colors duration-150 hover:bg-[#FCFBF8] cursor-pointer flex items-baseline justify-between gap-4 ${item.accentTopClass}`}
+          title="İl kütüğünü bu sütuna göre sırala"
+        >
+          <div className="min-w-0">
+            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-[#525A63]">
+              {item.label}
+            </span>
+            <div className={`mt-1 text-2xl font-bold tracking-[-0.02em] tabular-nums ${item.valueClass ?? 'text-[#1E242B]'}`}>
+              {loading ? (
+                <span className="inline-block w-36 h-7 bg-[#EFECE4] rounded-[2px] animate-pulse align-middle" />
+              ) : (
+                item.value
+              )}
+            </div>
+          </div>
+          <span className="text-[11px] font-semibold text-[#525A63] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 inline-flex items-center gap-1 shrink-0">
+            <ArrowDownWideNarrow className="w-3.5 h-3.5" />
+            Sırala
+          </span>
+        </button>
+      ))}
+    </section>
   );
 };
 

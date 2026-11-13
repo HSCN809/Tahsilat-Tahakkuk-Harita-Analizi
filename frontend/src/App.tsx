@@ -1,14 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Layers, Calendar, MapPin, Download } from 'lucide-react';
+import { Download, ChevronDown, Search, AlertTriangle, Check } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
+import { ProvinceInspector } from './components/ProvinceInspector';
 import { Leaderboard } from './components/Leaderboard';
-import { ProvinceModal } from './components/ProvinceModal';
+import { ProvinceLedger } from './components/ProvinceLedger';
 import { DownloadModal } from './components/DownloadModal';
 import { fetchYears, fetchConfig, fetchData, fetchGeoJson, fetchBootstrap } from './services/api';
 import { REGIONS, normalizeProvinceName } from './utils/provinces';
-import type { MapType, ModalMetric } from './types';
+import type { MapType, SortColumn, SortDirection } from './types';
 
 function App() {
   const queryClient = useQueryClient();
@@ -16,14 +17,19 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [searchCategory, setSearchCategory] = useState<string>('');
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState<boolean>(false);
   const [selectedRegion, setSelectedRegion] = useState<string>('Tüm Ülke');
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
   const [mapType, setMapType] = useState<MapType>('ratio');
 
-  const [activeModalMetric, setActiveModalMetric] = useState<ModalMetric | null>(null);
+  const [ledgerSortColumn, setLedgerSortColumn] = useState<SortColumn>('ratio');
+  const [ledgerSortDirection, setLedgerSortDirection] = useState<SortDirection>('desc');
+
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
 
-  // 0. İlk açılış hızlandırması: Bootstrap tek ağ turunda (yıllar + son yıl config + ilk veri) indirir
+  // İlk açılış hızlandırması: Bootstrap tek ağ turunda (yıllar + son yıl config + ilk veri) indirir
   const {
     data: bootstrapData,
     isLoading: bootstrapLoading,
@@ -34,7 +40,6 @@ function App() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Bootstrap yanıtı geldiğinde TanStack Query önbelleklerini pre-populate et
   useEffect(() => {
     if (bootstrapData && selectedYear === null) {
       const { years: bYears, config: bConfig, data: bData } = bootstrapData;
@@ -54,7 +59,6 @@ function App() {
     }
   }, [bootstrapData, selectedYear, queryClient]);
 
-  // 1. Yılları çek (Bootstrap ile gelmişse önbellekten anında 0 ms ile döner)
   const {
     data: yearsRes,
     isLoading: yearsLoading,
@@ -66,14 +70,12 @@ function App() {
 
   const years = useMemo(() => yearsRes?.years || bootstrapData?.years || [], [yearsRes, bootstrapData]);
 
-  // İlk yüklemede en güncel yılı seç (fallback)
   useEffect(() => {
     if (years.length > 0 && selectedYear === null) {
       setSelectedYear(years[years.length - 1]);
     }
   }, [years, selectedYear]);
 
-  // 2. GeoJSON harita verisini çek (bellekte sonsuz sakla)
   const {
     data: geoJsonData,
     isLoading: geoJsonLoading,
@@ -83,7 +85,6 @@ function App() {
     staleTime: Infinity,
   });
 
-  // 3. Seçilen yıla ait config (aylar ve kategoriler)
   const {
     data: configRes,
     isLoading: configLoading,
@@ -99,7 +100,6 @@ function App() {
   const months = useMemo(() => configRes?.months || [], [configRes]);
   const categories = useMemo(() => configRes?.categories || [], [configRes]);
 
-  // Aktif ay ve kategori çözümlemesi (seçim yoksa veya yeni yılda mevcut değilse varsayılana düşer)
   const activeMonth = useMemo(() => {
     if (months.length === 0) return '';
     if (selectedMonth && months.includes(selectedMonth)) return selectedMonth;
@@ -112,7 +112,10 @@ function App() {
     return categories[0]?.id || '';
   }, [categories, selectedCategory]);
 
-  // 4. Verileri çek (Filtre değişiminde eski verinin görünmemesi için placeholderData kullanılmaz)
+  const activeCategoryName = useMemo(() => {
+    return categories.find((c) => c.id === activeCategory)?.name || 'Kalem seçin';
+  }, [categories, activeCategory]);
+
   const {
     data: dataRes,
     isLoading: dataLoading,
@@ -124,23 +127,52 @@ function App() {
     enabled: selectedYear !== null && isConfigFresh && !!activeCategory && !!activeMonth,
   });
 
-  // Filtre değişimi ve veri yükleme kontrolü:
-  // Veri çekiliyorsa veya henüz gelmemişse veya config güncelleniyorsa veri yükleniyor kabul edilir
   const isDataMatching = !dataLoading && !dataFetching && isConfigFresh && !!dataRes && dataRes.year === selectedYear;
   const isDataLoading = !isDataMatching;
 
-  // Yeni veri yüklenene kadar eski veriyi GÖSTERME (var olan yükleniyor durumu gösterilir)
   const summary = isDataLoading ? null : dataRes?.summary || null;
   const records = useMemo(() => (isDataLoading ? [] : dataRes?.data || []), [isDataLoading, dataRes]);
 
+  // Kategori açılır menüsü dışına tıklanınca veya Escape'e basılınca kapat
+  useEffect(() => {
+    if (!categoryMenuOpen) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
+        setCategoryMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCategoryMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [categoryMenuOpen]);
+
   const handleYearChange = (newYear: number) => {
     setSelectedYear(newYear);
-    setSelectedMonth(''); // Yıl değiştiğinde ayı sıfırla ki yeni yılın son ayı seçilsin
+    setSelectedMonth('');
+  };
+
+  const handleRegionChange = (newRegion: string) => {
+    setSelectedRegion(newRegion);
+    if (
+      selectedProvince &&
+      newRegion !== 'Tüm Ülke' &&
+      !REGIONS[newRegion]?.includes(selectedProvince)
+    ) {
+      setSelectedProvince(null);
+    }
   };
 
   const filteredCategories = useMemo(() => {
+    const q = searchCategory.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return categories;
     return categories.filter((cat) =>
-      cat.name.toLowerCase().includes(searchCategory.toLowerCase())
+      cat.name.toLocaleLowerCase('tr-TR').includes(q)
     );
   }, [categories, searchCategory]);
 
@@ -171,282 +203,327 @@ function App() {
     };
   }, [summary, selectedRegion, filteredRecords]);
 
-  // Hata yönetimi
+  const handleMetricClick = (metric: SortColumn) => {
+    setLedgerSortColumn(metric);
+    setLedgerSortDirection('desc');
+    const el = document.getElementById('il-kutugu');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const activeError = bootstrapError || yearsError || configError || dataError;
   const rawErrorMessage = activeError instanceof Error ? activeError.message : null;
   const error = rawErrorMessage && rawErrorMessage !== dismissedError ? rawErrorMessage : null;
 
-  // Yükleme durumları:
-  // 1. Sayfa ilk açılış durumu (yalnızca ilk yüklemede sidebar skeleton gösterir, filtre değişiminde sidebar bozulmaz)
-  const isAppInitializing = (bootstrapLoading && !bootstrapData) || yearsLoading || geoJsonLoading || (configLoading && !configRes);
-
-  // 2. Harita ve veri alanları için yükleme durumu (ilk açılışta veya filtre değişimi sonrası yeni veri gelene kadar aktif)
-  const isMapLoading = isDataLoading;
-  const isAnythingLoading = isDataLoading;
+  const isAppInitializing =
+    (bootstrapLoading && !bootstrapData) || yearsLoading || geoJsonLoading || (configLoading && !configRes);
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col relative overflow-x-hidden">
-      {/* Background gradients */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px] pointer-events-none"></div>
-
-      {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-600/10 border border-blue-500/20 text-blue-500 rounded-xl">
-            <Layers className="w-6 h-6" />
+    <div className="min-h-screen bg-[#F7F5F0] text-[#1E242B] flex flex-col">
+      {/* Üst Kurumsal Başlık */}
+      <header className="bg-white border-b-2 border-[#1E242B]">
+        <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-7 py-3.5 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 36 36"
+              className="w-9 h-9 shrink-0"
+              fill="none"
+            >
+              <rect x="0.5" y="0.5" width="35" height="35" rx="3" fill="#FAF7F0" stroke="#1E242B" />
+              <rect x="7" y="19" width="5" height="10" fill="#9E2A2B" />
+              <rect x="15.5" y="13" width="5" height="16" fill="#C9A25E" />
+              <rect x="24" y="8" width="5" height="21" fill="#1B6B63" />
+            </svg>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold text-[#1E242B] tracking-tight leading-snug">
+                Tahsilat &amp; Tahakkuk Harita Analizi
+              </h1>
+              <p className="text-xs text-[#525A63] mt-0.5 leading-snug">
+                T.C. Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü Verileri
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-100 m-0 tracking-tight flex items-center gap-2">
-              Tahsilat & Tahakkuk Harita Analizi
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">Hazine ve Maliye Bakanlığı Vergi İstatistikleri Portalı</p>
+
+          <div className="flex items-center gap-3 ml-auto">
+            {selectedYear && activeMonth && (
+              <span className="hidden sm:inline-block text-xs font-bold uppercase tracking-[0.04em] text-[#9E2A2B] tabular-nums">
+                {selectedYear} · {activeMonth.toLocaleUpperCase('tr-TR')} KESİTİ
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setDownloadModalOpen(true)}
+              aria-label="Ham verileri indir"
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              <span>Ham .xls İndir</span>
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Workspace */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto p-6 flex flex-col gap-6">
+      {/* Yatay Filtre Çubuğu */}
+      <section
+        aria-label="Veri Filtreleri"
+        className="bg-white border-b border-[#D9D4C9] sticky top-0 z-30"
+      >
+        <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-7 py-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
+          {/* Yıl */}
+          <div className="lg:col-span-2 flex items-center gap-2">
+            <label htmlFor="year-select" className="w-11 sm:w-auto text-xs font-semibold text-[#525A63] shrink-0">
+              Yıl
+            </label>
+            {isAppInitializing ? (
+              <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] animate-pulse" />
+            ) : (
+              <select
+                id="year-select"
+                aria-label="Analiz Yılı Seçin"
+                value={selectedYear || ''}
+                onChange={(e) => handleYearChange(Number(e.target.value))}
+                className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer tabular-nums"
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Ay */}
+          <div className="lg:col-span-2 flex items-center gap-2">
+            <label htmlFor="month-select" className="w-11 sm:w-auto text-xs font-semibold text-[#525A63] shrink-0">
+              Ay
+            </label>
+            {isAppInitializing ? (
+              <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] animate-pulse" />
+            ) : (
+              <select
+                id="month-select"
+                aria-label="Analiz Ayı Seçin"
+                value={activeMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+              >
+                {months.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Bölge */}
+          <div className="lg:col-span-3 flex items-center gap-2">
+            <label htmlFor="region-select" className="w-11 sm:w-auto text-xs font-semibold text-[#525A63] shrink-0">
+              Bölge
+            </label>
+            <select
+              id="region-select"
+              aria-label="Analiz Bölgesi Seçin"
+              value={selectedRegion}
+              onChange={(e) => handleRegionChange(e.target.value)}
+              className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+            >
+              <option value="Tüm Ülke">Tüm Ülke (81 İl)</option>
+              {Object.keys(REGIONS).map((reg) => (
+                <option key={reg} value={reg}>
+                  {reg} Bölgesi
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Aranabilir Gelir Kalemi Seçici */}
+          <div className="lg:col-span-5 relative" ref={categoryMenuRef}>
+            <div className="flex items-center gap-2">
+              <label htmlFor="category-trigger" className="w-11 sm:w-auto text-xs font-semibold text-[#525A63] shrink-0">
+                Kalem
+              </label>
+              {isAppInitializing ? (
+                <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] animate-pulse" />
+              ) : (
+                <button
+                  id="category-trigger"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={categoryMenuOpen}
+                  aria-label="Gelir kalemi veya vergi türü seçin"
+                  onClick={() => setCategoryMenuOpen((prev) => !prev)}
+                  className="flex-1 min-w-0 bg-[#FAF9F6] border border-[#C8C1B4] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer"
+                >
+                  <span className="truncate">{activeCategoryName}</span>
+                  <span className="inline-flex items-center gap-1.5 shrink-0">
+                    {categories.length > 0 && (
+                      <span className="text-[11px] font-semibold text-[#525A63] tabular-nums">
+                        ({categories.length})
+                      </span>
+                    )}
+                    <ChevronDown
+                      className={`w-4 h-4 text-[#525A63] transition-transform duration-150 ${
+                        categoryMenuOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {categoryMenuOpen && (
+              <div className="absolute left-0 right-0 mt-1.5 bg-white border border-[#1E242B] rounded-[4px] shadow-lg z-50 p-2 flex flex-col gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525A63]" />
+                  <input
+                    type="text"
+                    autoFocus
+                    aria-label="Vergi türü veya gelir kalemi ara"
+                    placeholder="Vergi türü veya gelir kalemi ara…"
+                    value={searchCategory}
+                    onChange={(e) => setSearchCategory(e.target.value)}
+                    className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[3px] pl-8 pr-2.5 py-1.5 text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
+                  />
+                </div>
+                <div role="listbox" className="max-h-64 overflow-y-auto divide-y divide-[#F0ECE2]">
+                  {filteredCategories.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-[#525A63]">
+                      Aramaya uygun kalem bulunamadı.
+                    </div>
+                  ) : (
+                    filteredCategories.map((cat) => {
+                      const active = activeCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => {
+                            setSelectedCategory(cat.id);
+                            setCategoryMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 text-xs flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${
+                            active
+                              ? 'bg-[#F9EDED] text-[#9E2A2B] font-bold'
+                              : 'text-[#1E242B] hover:bg-[#FCFBF8]'
+                          }`}
+                        >
+                          <span className="truncate">{cat.name}</span>
+                          {active && <Check className="w-3.5 h-3.5 shrink-0 text-[#9E2A2B]" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Ana Çalışma Alanı */}
+      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-7 py-5 flex flex-col gap-5">
         {error && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-between text-sm">
-            <span>⚠️ {error}</span>
+          <div
+            role="alert"
+            className="p-3.5 bg-[#F9EDED] border border-[#E6C5C5] text-[#9E2A2B] rounded-[4px] flex items-center justify-between gap-4 text-sm"
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
             <button
+              type="button"
               onClick={() => setDismissedError(rawErrorMessage)}
-              className="text-xs font-semibold underline hover:text-rose-300 cursor-pointer"
+              className="text-xs font-bold underline hover:text-[#822021] cursor-pointer shrink-0"
             >
               Kapat
             </button>
           </div>
         )}
 
-        {/* Outer Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* 1. Birleşik Cetvelli Özet Şeridi */}
+        <StatsCards
+          stats={calculatedSummary}
+          loading={isDataLoading}
+          activeSortColumn={ledgerSortColumn}
+          onMetricClick={handleMetricClick}
+        />
 
-          {/* Left Panel: Sidebar (Filters) */}
-          <div className="lg:col-span-3 flex flex-col gap-6">
-
-            {/* Filter Section */}
-            <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex flex-col gap-5">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-400" />
-                  Filtre Seçenekleri
-                </h2>
-                <button
-                  onClick={() => setDownloadModalOpen(true)}
-                  title="Ham veri indir"
-                  aria-label="Ham verileri indir"
-                  className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-blue-400 transition-all cursor-pointer"
-                >
-                  <Download className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Year Select */}
-              <div className="flex flex-col gap-2">
-                <label htmlFor="year-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Yılı</label>
-                {isAppInitializing ? (
-                  <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
-                ) : (
-                  <select
-                    id="year-select"
-                    aria-label="Analiz Yılı Seçin"
-                    value={selectedYear || ''}
-                    onChange={(e) => handleYearChange(Number(e.target.value))}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
-                  >
-                    {years.map((y) => (
-                      <option key={y} value={y} className="bg-slate-950 text-slate-100">
-                        {y} Yılı
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Month Select */}
-              <div className="flex flex-col gap-2">
-                <label htmlFor="month-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Ayı</label>
-                {isAppInitializing ? (
-                  <div className="h-10 bg-slate-800/40 rounded-xl animate-pulse"></div>
-                ) : (
-                  <select
-                    id="month-select"
-                    aria-label="Analiz Ayı Seçin"
-                    value={activeMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
-                  >
-                    {months.map((m) => (
-                      <option key={m} value={m} className="bg-slate-950 text-slate-100">
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Region Select */}
-              <div className="flex flex-col gap-2">
-                <label htmlFor="region-select" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Analiz Bölgesi</label>
-                <select
-                  id="region-select"
-                  aria-label="Analiz Bölgesi Seçin"
-                  value={selectedRegion}
-                  onChange={(e) => setSelectedRegion(e.target.value)}
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition-all duration-300 cursor-pointer"
-                >
-                  <option value="Tüm Ülke" className="bg-slate-950 text-slate-100">Tüm Ülke</option>
-                  {Object.keys(REGIONS).map((reg) => (
-                    <option key={reg} value={reg} className="bg-slate-950 text-slate-100">
-                      {reg} Bölgesi
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Map Type toggle */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Harita Gösterim Tipi</label>
-                <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-slate-800 rounded-xl">
-                  <button
-                    onClick={() => setMapType('tahakkuk')}
-                    aria-label="Haritada Tahakkuk Tutarlarını Göster"
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahakkuk'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    Tahakkuk
-                  </button>
-                  <button
-                    onClick={() => setMapType('tahsilat')}
-                    aria-label="Haritada Tahsilat Tutarlarını Göster"
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'tahsilat'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    Tahsilat
-                  </button>
-                  <button
-                    onClick={() => setMapType('ratio')}
-                    aria-label="Haritada Tahsilat Oranını Göster"
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer ${mapType === 'ratio'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    Oran (%)
-                  </button>
-                </div>
-              </div>
-
-              {/* Category Search & Select */}
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <label htmlFor="category-search" className="text-xs font-semibold text-slate-400 uppercase tracking-wider">GELİR KALEMİ / VERGİ TÜRÜ</label>
-                  {categories.length > 0 && (
-                    <span className="text-[10px] text-slate-500 font-mono">Toplam: {categories.length}</span>
-                  )}
-                </div>
-
-                <input
-                  type="text"
-                  id="category-search"
-                  aria-label="Vergi türü veya gelir kalemi ara"
-                  placeholder="Vergi türü ara..."
-                  value={searchCategory}
-                  onChange={(e) => setSearchCategory(e.target.value)}
-                  className="w-full bg-slate-950/40 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all duration-300"
-                />
-
-                {isAppInitializing ? (
-                  <div className="space-y-2 mt-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="h-8 bg-slate-800/40 rounded-lg animate-pulse"></div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="max-h-[250px] overflow-y-auto border border-slate-800/60 rounded-xl bg-slate-950/40 p-1 flex flex-col gap-0.5 scrollbar-thin">
-                    {filteredCategories.length === 0 ? (
-                       <div className="text-center py-4 text-xs text-slate-500">Aramaya uygun kategori bulunamadı.</div>
-                    ) : (
-                      filteredCategories.map((cat) => (
-                        <button
-                          key={cat.id}
-                          onClick={() => setSelectedCategory(cat.id)}
-                          title={cat.name}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center justify-between cursor-pointer ${activeCategory === cat.id
-                            ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-                            : 'text-slate-400 hover:bg-slate-800/30 hover:text-slate-200 border border-transparent'
-                            }`}
-                        >
-                          <span className="truncate pr-2">{cat.name}</span>
-                          <MapPin className={`w-3.5 h-3.5 flex-shrink-0 opacity-50 ${activeCategory === cat.id ? 'opacity-100' : ''}`} />
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+        {/* 2. Asimetrik 8:4 Harita ve İl İnceleme/Sıralama Izgarası */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className="lg:col-span-8">
+            <TurkeyMap
+              geoJsonData={geoJsonData ?? null}
+              records={filteredRecords}
+              mapType={mapType}
+              selectedRegion={selectedRegion}
+              selectedProvince={selectedProvince}
+              loading={isDataLoading}
+              onMapTypeChange={setMapType}
+              onSelectProvince={setSelectedProvince}
+            />
           </div>
 
-          {/* Middle Panel: Map & Stats Dashboard */}
-          <div className="lg:col-span-6 flex flex-col gap-6">
-            <StatsCards
-              stats={calculatedSummary}
-              loading={isAnythingLoading}
-              onCardClick={(metric) => {
-                setActiveModalMetric(metric);
-              }}
+          <div className="lg:col-span-4 flex flex-col gap-5">
+            <ProvinceInspector
+              selectedProvince={selectedProvince}
+              allRecords={records}
+              nationalRatio={summary?.overall_ratio ?? null}
+              loading={isDataLoading}
+              onSelectProvince={setSelectedProvince}
             />
 
-            {/* Map Visualizer Container */}
-            <div className="relative">
-              {isMapLoading && (
-                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-30 rounded-2xl">
-                  <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm text-slate-400 font-medium animate-pulse">Harita ve veriler yükleniyor...</span>
-                </div>
-              )}
-
-              <TurkeyMap
-                geoJsonData={geoJsonData ?? null}
-                records={filteredRecords}
-                mapType={mapType}
-                selectedRegion={selectedRegion}
-              />
-            </div>
+            <Leaderboard
+              data={filteredRecords}
+              loading={isDataLoading}
+              selectedProvince={selectedProvince}
+              onSelectProvince={setSelectedProvince}
+            />
           </div>
-
-          {/* Right Panel: Leaderboards */}
-          <div className="lg:col-span-3 flex flex-col gap-6">
-            <Leaderboard data={filteredRecords} loading={isAnythingLoading} />
-          </div>
-
         </div>
-      </main>
 
-      <footer className="border-t border-slate-900 bg-slate-950/40 py-6 text-center text-xs text-slate-500 font-mono mt-12">
-        Tahsilat Tahakkuk Harita Analizi © 2026. Tüm hakları saklıdır.
-      </footer>
-
-      {/* 81 İl Detay Modalı */}
-      {activeModalMetric && (
-        <ProvinceModal
-          metric={activeModalMetric}
+        {/* 3. İl Bazlı Tam Dağılım Kütüğü */}
+        <ProvinceLedger
           records={filteredRecords}
+          loading={isDataLoading}
           selectedYear={selectedYear}
           selectedMonth={activeMonth}
           categories={categories}
           selectedCategory={activeCategory}
-          onClose={() => setActiveModalMetric(null)}
+          selectedRegion={selectedRegion}
+          selectedProvince={selectedProvince}
+          sortColumn={ledgerSortColumn}
+          sortDirection={ledgerSortDirection}
+          onSortChange={(col, dir) => {
+            setLedgerSortColumn(col);
+            setLedgerSortDirection(dir);
+          }}
+          onSelectProvince={setSelectedProvince}
         />
-      )}
+      </main>
 
-      {/* Ham Veri İndirme Modalı */}
+      {/* Kaynak ve Telif Alt Bilgisi */}
+      <footer className="border-t border-[#D9D4C9] bg-[#EFECE4]/60 py-5 px-4 sm:px-7 mt-4">
+        <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#525A63]">
+          <span>
+            Kaynak:{' '}
+            <a
+              href="https://muhasebat.hmb.gov.tr/genel-butce-gelirlerinin-iller-itibariyle-tahakkuk-ve-tahsilati-2004-2026"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-[#C8C1B4] underline-offset-2 hover:text-[#1E242B]"
+            >
+              T.C. Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü
+            </a>
+          </span>
+          <span>Tahsilat &amp; Tahakkuk Harita Analizi © 2026</span>
+        </div>
+      </footer>
+
       {downloadModalOpen && (
         <DownloadModal
           years={years}

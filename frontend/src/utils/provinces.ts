@@ -63,3 +63,16 @@ export const normalizeProvinceName = (name: string): string => {
 
   return normalized;
 };
+
+/**
+ * Verilen il adına karşılık gelen coğrafi bölgeyi döndürür.
+ */
+export const findRegionForProvince = (provinceName: string): string | null => {
+  const normalized = normalizeProvinceName(provinceName);
+  for (const [region, provinces] of Object.entries(REGIONS)) {
+    if (provinces.includes(normalized)) {
+      return region;
+    }
+  }
+  return null;
+};

@@ -1,18 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatPercent } from '../utils/format';
+import { normalizeProvinceName } from '../utils/provinces';
 import type { ProvinceRecord } from '../types';
 
 interface LeaderboardProps {
   data: ProvinceRecord[];
   loading: boolean;
+  selectedProvince: string | null;
+  onSelectProvince: (normalized: string | null) => void;
 }
 
+const LeaderboardComponent: React.FC<LeaderboardProps> = ({
+  data,
+  loading,
+  selectedProvince,
+  onSelectProvince,
+}) => {
+  const [activeTab, setActiveTab] = useState<'top' | 'bottom'>('top');
 
-const LeaderboardComponent: React.FC<LeaderboardProps> = ({ data, loading }) => {
-  // Filter ve sort işlemlerini sadece data değiştiğinde hesapla
   const { topProvinces, bottomProvinces } = useMemo(() => {
-    const validData = data.filter((item) => item.ratio !== null && item.ratio !== undefined) as (ProvinceRecord & { ratio: number })[];
+    const validData = data.filter(
+      (item) => item.ratio !== null && item.ratio !== undefined
+    ) as (ProvinceRecord & { ratio: number })[];
 
     return {
       topProvinces: [...validData].sort((a, b) => b.ratio - a.ratio).slice(0, 5),
@@ -20,96 +30,125 @@ const LeaderboardComponent: React.FC<LeaderboardProps> = ({ data, loading }) => 
     };
   }, [data]);
 
+  const rows = activeTab === 'top' ? topProvinces : bottomProvinces;
+
   return (
-    <div className="flex flex-col gap-6 w-full">
-      {/* Top 5 */}
-      <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6">
-        <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2 mb-4">
-          <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
-            <ArrowUpRight className="w-4 h-4" />
-          </span>
-          Tahsilat Oranı En Yüksek İller
-        </h3>
-        
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-10 bg-slate-800/40 rounded-lg animate-pulse"></div>
-            ))}
-          </div>
-        ) : topProvinces.length === 0 ? (
-          <p className="text-slate-500 text-sm py-4 text-center">Veri yok</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="text-slate-400 border-b border-slate-800">
-                  <th className="pb-2 font-medium">İl</th>
-                  <th className="pb-2 font-medium text-right">Tahsilat</th>
-                  <th className="pb-2 font-medium text-right">Oran</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProvinces.map((item, idx) => (
-                  <tr key={item.province} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/20">
-                    <td className="py-2.5 font-medium text-slate-200">
-                      <span className="inline-block w-5 text-slate-500 text-xs">{idx + 1}.</span>
-                      {item.province.toUpperCase()}
-                    </td>
-                    <td className="py-2.5 text-right text-slate-300 font-mono">{formatCurrency(item.collection)}</td>
-                    <td className="py-2.5 text-right font-semibold text-emerald-400 font-mono">%{item.ratio.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+    <section
+      aria-label="İl Performans Sıralaması"
+      className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3"
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-[#1E242B] pb-2.5">
+        <h2 className="text-base font-bold text-[#1E242B] flex items-center gap-1.5">
+          {activeTab === 'top' ? (
+            <ArrowUpRight className="w-4 h-4 text-[#1B6B63]" />
+          ) : (
+            <ArrowDownRight className="w-4 h-4 text-[#9E2A2B]" />
+          )}
+          <span>Oran Sıralaması</span>
+        </h2>
+
+        <div
+          role="tablist"
+          aria-label="Sıralama yönü"
+          className="inline-flex border border-[#C8C1B4] rounded-[3px] overflow-hidden bg-[#FAF9F6]"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'top'}
+            onClick={() => setActiveTab('top')}
+            className={`px-2.5 py-1 text-xs font-semibold transition-colors duration-150 cursor-pointer border-r border-[#D9D4C9] ${
+              activeTab === 'top'
+                ? 'bg-[#1B6B63] text-white'
+                : 'text-[#525A63] hover:text-[#1E242B]'
+            }`}
+          >
+            En Yüksek 5
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'bottom'}
+            onClick={() => setActiveTab('bottom')}
+            className={`px-2.5 py-1 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+              activeTab === 'bottom'
+                ? 'bg-[#9E2A2B] text-white'
+                : 'text-[#525A63] hover:text-[#1E242B]'
+            }`}
+          >
+            En Düşük 5
+          </button>
+        </div>
       </div>
 
-      {/* Bottom 5 */}
-      <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6">
-        <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2 mb-4">
-          <span className="p-1.5 bg-rose-500/10 text-rose-400 rounded-lg">
-            <ArrowDownRight className="w-4 h-4" />
-          </span>
-          Tahsilat Oranı En Düşük İller
-        </h3>
-
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-10 bg-slate-800/40 rounded-lg animate-pulse"></div>
-            ))}
-          </div>
-        ) : bottomProvinces.length === 0 ? (
-          <p className="text-slate-500 text-sm py-4 text-center">Veri yok</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="text-slate-400 border-b border-slate-800">
-                  <th className="pb-2 font-medium">İl</th>
-                  <th className="pb-2 font-medium text-right">Tahsilat</th>
-                  <th className="pb-2 font-medium text-right">Oran</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bottomProvinces.map((item, idx) => (
-                  <tr key={item.province} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/20">
-                    <td className="py-2.5 font-medium text-slate-200">
-                      <span className="inline-block w-5 text-slate-500 text-xs">{idx + 1}.</span>
-                      {item.province.toUpperCase()}
+      {loading ? (
+        <div className="space-y-2.5">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-9 bg-[#EFECE4] rounded-[2px] animate-pulse" />
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-[#525A63] text-xs py-6 text-center">
+          Seçili filtre için il verisi bulunamadı.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] text-left border-collapse tabular-nums">
+            <thead>
+              <tr className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#525A63] border-b border-[#1E242B]">
+                <th className="pb-2 pr-2">İl</th>
+                <th className="pb-2 px-2 text-right">Tahsilat</th>
+                <th className="pb-2 pl-2 text-right">Oran</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EAE5DA]">
+              {rows.map((item, idx) => {
+                const normalized = normalizeProvinceName(item.province);
+                const isSelected = selectedProvince === normalized;
+                return (
+                  <tr
+                    key={item.province}
+                    onClick={() => onSelectProvince(isSelected ? null : normalized)}
+                    className={`cursor-pointer transition-colors duration-150 ${
+                      isSelected
+                        ? 'bg-[#F9EDED]'
+                        : 'hover:bg-[#FCFBF8]'
+                    }`}
+                  >
+                    <td className="py-2.5 pr-2 font-semibold text-[#1E242B]">
+                      <button
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectProvince(isSelected ? null : normalized);
+                        }}
+                        className="text-left cursor-pointer hover:underline rounded-[2px]"
+                      >
+                        <span className="inline-block w-5 text-[#525A63] font-normal">
+                          {idx + 1}.
+                        </span>
+                        {item.province.toLocaleUpperCase('tr-TR')}
+                      </button>
                     </td>
-                    <td className="py-2.5 text-right text-slate-300 font-mono">{formatCurrency(item.collection)}</td>
-                    <td className="py-2.5 text-right font-semibold text-rose-400 font-mono">%{item.ratio.toFixed(2)}</td>
+                    <td className="py-2.5 px-2 text-right text-[#525A63]">
+                      {formatCurrency(item.collection)}
+                    </td>
+                    <td
+                      className={`py-2.5 pl-2 text-right font-bold ${
+                        activeTab === 'top' ? 'text-[#1B6B63]' : 'text-[#9E2A2B]'
+                      }`}
+                    >
+                      {formatPercent(item.ratio)}
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 };
 

@@ -1,45 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --bg-paper: #F7F5F0;
+  --bg-plate: #FFFFFF;
+  --bg-inset: #FCFBF8;
+  --bg-muted: #EFECE4;
+  --ink-primary: #1E242B;
+  --ink-secondary: #525A63;
+  --rule-hairline: #D9D4C9;
+  --rule-datum: #1E242B;
+  --accent-crimson: #9E2A2B;
+  --accent-crimson-hover: #822021;
+  --accent-crimson-soft: #F9EDED;
+  --accent-teal: #1B6B63;
+  --accent-teal-soft: #E9F3F1;
+  --accent-ochre: #8A6518;
+  --accent-ochre-map: #C9A25E;
 }
 
 body {
-  background-color: #0b0f19;
-  color: #f3f4f6;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-paper);
+  color: var(--ink-primary);
+  font-family: 'Source Sans 3', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  caret-color: var(--accent-crimson);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar for a premium look */
+::selection {
+  background-color: var(--accent-crimson);
+  color: #FFFFFF;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-crimson);
+  outline-offset: 2px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sayfa ve tablo kaydırma çubukları arşiv paletine uyumlu */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #C8C1B4 var(--bg-paper);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0b0f19;
+  background: var(--bg-paper);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+  background: #C8C1B4;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+  background: var(--ink-secondary);
 }
 
-/* Disable the default index layout constraint */
 #root {
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 !important;
-  text-align: left !important;
-  border-inline: none !important;
-  min-height: 100vh !important;
-  display: block !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  min-height: 100vh;
+  display: block;
 }
