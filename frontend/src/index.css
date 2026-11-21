@@ -66,11 +66,22 @@ body {
   }
 }
 
+.map-province-path,
+.map-province-path:focus,
 .map-province-path:focus-visible {
   outline: none;
+}
+
+.map-focus-halo {
+  stroke: #FFFFFF;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.map-focus-ring {
   stroke: var(--ink-primary);
-  stroke-width: 2.5px;
-  filter: drop-shadow(0 0 1.5px #FFFFFF) drop-shadow(0 0 1.5px #FFFFFF);
+  stroke-width: 2px;
+  stroke-linejoin: round;
 }
 
 .forced-colors-data {
@@ -78,10 +89,12 @@ body {
 }
 
 @media (forced-colors: active) {
-  .map-province-path:focus-visible {
+  .map-focus-halo {
+    stroke: Canvas;
+  }
+
+  .map-focus-ring {
     stroke: Highlight;
-    stroke-width: 2.5px;
-    filter: none;
   }
 
   [aria-pressed="true"],

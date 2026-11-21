@@ -51,6 +51,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
     alignLeft: boolean;
     alignTop: boolean;
   } | null>(null);
+  const [focusedKeyboardProvince, setFocusedKeyboardProvince] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cachedBoundsRef = useRef<DOMRect | null>(null);
 
@@ -309,8 +310,13 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
             role="group"
             aria-label="Türkiye il bazında vergi haritası"
           >
-            <g>
-              {filteredFeatures.map((geo) => {
+            {(() => {
+              let selectedPathD: string | null = null;
+              let focusedPathD: string | null = null;
+              let hoveredPathD: string | null = null;
+              const hoveredNormalized = tooltip ? normalizeProvinceName(tooltip.name) : null;
+
+              const basePaths = filteredFeatures.map((geo) => {
                 const d = pathGenerator(geo);
                 if (!d) return null;
                 const name = geo.properties.name;
@@ -318,6 +324,10 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                 const record = recordsMap.get(normalized);
                 const isSelected = selectedProvince === normalized;
                 const isDimmed = Boolean(selectedProvince) && !isSelected;
+
+                if (isSelected) selectedPathD = d;
+                if (focusedKeyboardProvince === normalized) focusedPathD = d;
+                if (hoveredNormalized === normalized && !isSelected) hoveredPathD = d;
 
                 const metricAria =
                   record && mapType === 'ratio'
@@ -339,9 +349,9 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     }
                     fill={getColor(name)}
                     fillOpacity={isDimmed ? 0.55 : 1}
-                    stroke={isSelected ? '#1E242B' : '#FFFFFF'}
-                    strokeWidth={isSelected ? 1.8 : 0.85}
-                    className="map-province-path transition-opacity duration-150 hover:opacity-90 hover:stroke-[#1E242B] hover:stroke-[1.4px] cursor-pointer"
+                    stroke="#FFFFFF"
+                    strokeWidth={0.85}
+                    className="map-province-path transition-opacity duration-150 hover:opacity-90 cursor-pointer"
                     onClick={() => onSelectProvince(isSelected ? null : normalized)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -359,6 +369,9 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                       }
                     }}
                     onFocus={(e: React.FocusEvent<SVGPathElement>) => {
+                      if (e.currentTarget.matches(':focus-visible')) {
+                        setFocusedKeyboardProvince(normalized);
+                      }
                       const bounds = getCachedBounds();
                       if (!bounds) return;
                       const pathRect = e.currentTarget.getBoundingClientRect();
@@ -370,7 +383,10 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                       const y = alignTop ? pathRect.top - bounds.top : pathRect.bottom - bounds.top;
                       setTooltip({ x, y, name, record, alignLeft, alignTop });
                     }}
-                    onBlur={() => setTooltip(null)}
+                    onBlur={() => {
+                      setFocusedKeyboardProvince(null);
+                      setTooltip(null);
+                    }}
                     onMouseMove={(e: React.MouseEvent<SVGPathElement>) => {
                       const bounds = getCachedBounds();
                       const x = e.clientX - (bounds?.left || 0);
@@ -387,8 +403,54 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     }}
                   />
                 );
-              })}
-            </g>
+              });
+
+              return (
+                <>
+                  <g>{basePaths}</g>
+                  {hoveredPathD && (
+                    <path
+                      d={hoveredPathD}
+                      fill="none"
+                      stroke="#1E242B"
+                      strokeWidth={1.4}
+                      strokeLinejoin="round"
+                      pointerEvents="none"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {selectedPathD && (
+                    <path
+                      d={selectedPathD}
+                      fill="none"
+                      stroke="#1E242B"
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                      pointerEvents="none"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {focusedPathD && (
+                    <>
+                      <path
+                        d={focusedPathD}
+                        fill="none"
+                        className="map-focus-halo"
+                        pointerEvents="none"
+                        aria-hidden="true"
+                      />
+                      <path
+                        d={focusedPathD}
+                        fill="none"
+                        className="map-focus-ring"
+                        pointerEvents="none"
+                        aria-hidden="true"
+                      />
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </svg>
         )}
       </div>
