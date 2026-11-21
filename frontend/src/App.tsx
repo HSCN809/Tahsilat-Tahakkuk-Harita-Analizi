@@ -207,6 +207,15 @@ function App() {
     return records.filter((r) => allowed.includes(normalizeProvinceName(r.province)));
   }, [records, selectedRegion]);
 
+  const visibleProvinceIds = useMemo(
+    () => filteredRecords.map((r) => normalizeProvinceName(r.province)),
+    [filteredRecords]
+  );
+
+  const handleSelectAllProvinces = useCallback(() => {
+    setSelectedProvinces(visibleProvinceIds);
+  }, [visibleProvinceIds]);
+
   const calculatedSummary = useMemo(() => {
     if (!summary) return null;
     if (selectedRegion === 'Tüm Ülke') return summary;
@@ -530,8 +539,10 @@ function App() {
                 selectedProvinces={selectedProvinces}
                 allRecords={records}
                 nationalRatio={summary?.overall_ratio ?? null}
+                totalSelectableCount={visibleProvinceIds.length}
                 loading={isDataLoading}
                 onRemoveProvince={handleRemoveProvince}
+                onSelectAllProvinces={handleSelectAllProvinces}
                 onClearProvinces={handleClearProvinces}
               />
             </div>

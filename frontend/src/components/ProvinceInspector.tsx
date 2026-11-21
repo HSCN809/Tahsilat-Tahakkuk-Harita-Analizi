@@ -8,8 +8,10 @@ interface ProvinceInspectorProps {
   selectedProvinces: string[];
   allRecords: ProvinceRecord[];
   nationalRatio: number | null;
+  totalSelectableCount: number;
   loading: boolean;
   onRemoveProvince: (normalized: string) => void;
+  onSelectAllProvinces: () => void;
   onClearProvinces: () => void;
 }
 
@@ -42,8 +44,10 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
   selectedProvinces,
   allRecords,
   nationalRatio,
+  totalSelectableCount,
   loading,
   onRemoveProvince,
+  onSelectAllProvinces,
   onClearProvinces,
 }) => {
   const { recordMap, nationalRankMap, nationalTotal, regionStatsMap } = useMemo(() => {
@@ -120,6 +124,8 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
     return items;
   }, [selectedProvinces, allRecords.length, recordMap, nationalRankMap, nationalTotal, regionStatsMap]);
 
+  const allSelected = totalSelectableCount > 0 && inspections.length >= totalSelectableCount;
+
   if (loading) {
     return (
       <section className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3">
@@ -136,9 +142,19 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
         aria-label="İl İnceleme ve Kıyaslama"
         className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3"
       >
-        <div className="flex items-center justify-between border-b border-[#1E242B] pb-2.5">
-          <h2 className="text-base font-bold text-[#1E242B]">İl İnceleme &amp; Kıyaslama</h2>
-          <MapPin className="w-4 h-4 text-[#9E2A2B]" />
+        <div className="flex items-center justify-between gap-2 border-b border-[#1E242B] pb-2.5">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-[#9E2A2B] shrink-0" />
+            <h2 className="text-base font-bold text-[#1E242B]">İl İnceleme &amp; Kıyaslama</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onSelectAllProvinces}
+            disabled={totalSelectableCount === 0}
+            className="px-2.5 py-1 text-xs font-semibold text-[#1E242B] bg-[#FAF9F6] hover:bg-[#EFECE4] border border-[#857E72] rounded-[3px] transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Hepsini Seç
+          </button>
         </div>
         <p className="text-xs text-[#525A63] leading-relaxed">
           Haritadan veya aşağıdaki il kütüğünden bir ya da daha fazla il seçin; seçilen iller hem birbirleriyle hem de bölge ve Türkiye ortalamalarıyla yan yana kıyaslanır.
@@ -179,14 +195,24 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
               {regionalRank && regionalTotal > 0 ? ` · Bölge #${regionalRank}/${regionalTotal}` : ''}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => onRemoveProvince(normalized)}
-            aria-label="Sabitlenen ili temizle"
-            className="p-1 text-[#525A63] hover:text-[#1E242B] hover:bg-[#EFECE4] rounded-[2px] transition-colors duration-150 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={onSelectAllProvinces}
+              disabled={allSelected}
+              className="px-2.5 py-1 text-xs font-semibold text-[#1E242B] bg-[#FAF9F6] hover:bg-[#EFECE4] border border-[#857E72] rounded-[3px] transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Hepsini Seç
+            </button>
+            <button
+              type="button"
+              onClick={() => onRemoveProvince(normalized)}
+              aria-label="Sabitlenen ili temizle"
+              className="p-1 text-[#525A63] hover:text-[#1E242B] hover:bg-[#EFECE4] rounded-[2px] transition-colors duration-150 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Tahakkuk ve Tahsilat Satırı */}
@@ -275,13 +301,23 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
         <h2 className="text-base font-bold text-[#1E242B] tabular-nums">
           İl Kıyaslama ({inspections.length} İl)
         </h2>
-        <button
-          type="button"
-          onClick={onClearProvinces}
-          className="px-2.5 py-1 text-xs font-semibold text-[#1E242B] bg-[#FAF9F6] hover:bg-[#EFECE4] border border-[#857E72] rounded-[3px] transition-colors duration-150 cursor-pointer shrink-0"
-        >
-          Temizle
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onSelectAllProvinces}
+            disabled={allSelected}
+            className="px-2.5 py-1 text-xs font-semibold text-[#1E242B] bg-[#FAF9F6] hover:bg-[#EFECE4] border border-[#857E72] rounded-[3px] transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Hepsini Seç
+          </button>
+          <button
+            type="button"
+            onClick={onClearProvinces}
+            className="px-2.5 py-1 text-xs font-semibold text-[#1E242B] bg-[#FAF9F6] hover:bg-[#EFECE4] border border-[#857E72] rounded-[3px] transition-colors duration-150 cursor-pointer whitespace-nowrap"
+          >
+            Temizle
+          </button>
+        </div>
       </div>
 
       {/* Seçilen İller Kıyaslama Listesi */}
