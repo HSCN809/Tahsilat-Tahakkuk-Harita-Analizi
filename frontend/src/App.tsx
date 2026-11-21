@@ -259,18 +259,13 @@ function App() {
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            {selectedYear && activeMonth && (
-              <span className="hidden sm:inline-block text-xs font-bold uppercase tracking-[0.04em] text-[#9E2A2B] tabular-nums">
-                {selectedYear} · {activeMonth.toLocaleUpperCase('tr-TR')} KESİTİ
-              </span>
-            )}
             <button
               type="button"
               onClick={() => setDownloadModalOpen(true)}
               className="inline-flex items-center gap-2 px-3.5 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer shrink-0"
             >
               <Download className="w-4 h-4" />
-              <span>Ham .xls İndir</span>
+              <span>Resmi Verileri İndir (Excel)</span>
             </button>
           </div>
         </div>
@@ -379,9 +374,8 @@ function App() {
                       </span>
                     )}
                     <ChevronDown
-                      className={`w-4 h-4 text-[#525A63] motion-safe:transition-transform motion-safe:duration-150 ${
-                        categoryMenuOpen ? 'rotate-180' : ''
-                      }`}
+                      className={`w-4 h-4 text-[#525A63] motion-safe:transition-transform motion-safe:duration-150 ${categoryMenuOpen ? 'rotate-180' : ''
+                        }`}
                     />
                   </span>
                 </button>
@@ -454,11 +448,10 @@ function App() {
                               setSelectedCategory(cat.id);
                               closeCategoryMenu(true);
                             }}
-                            className={`w-full text-left px-2.5 py-2 text-xs flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${
-                              active
-                                ? 'bg-[#F9EDED] text-[#9E2A2B] font-bold'
-                                : 'text-[#1E242B] hover:bg-[#FCFBF8]'
-                            }`}
+                            className={`w-full text-left px-2.5 py-2 text-xs flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${active
+                              ? 'bg-[#F9EDED] text-[#9E2A2B] font-bold'
+                              : 'text-[#1E242B] hover:bg-[#FCFBF8]'
+                              }`}
                           >
                             <span className="truncate">{cat.name}</span>
                             {active && <Check className="w-3.5 h-3.5 shrink-0 text-[#9E2A2B]" />}
