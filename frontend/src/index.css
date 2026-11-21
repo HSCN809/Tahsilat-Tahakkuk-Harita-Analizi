@@ -123,3 +123,79 @@ dialog::backdrop {
   overflow: hidden;
   overscroll-behavior: contain;
 }
+
+@supports (appearance: base-select) {
+  .archival-select,
+  .archival-select::picker(select) {
+    appearance: base-select;
+  }
+
+  .archival-select {
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .archival-select::picker-icon {
+    color: var(--ink-secondary);
+    margin-inline-start: auto;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .archival-select::picker-icon {
+      transition: rotate 150ms ease;
+    }
+  }
+
+  .archival-select:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  .archival-select::picker(select) {
+    background-color: var(--bg-plate);
+    border: 1px solid var(--ink-primary);
+    border-radius: 4px;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    padding: 0.5rem;
+    margin-block-start: 2px;
+    min-inline-size: anchor-size(width);
+    max-block-size: 16rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .archival-select option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 400;
+    color: var(--ink-primary);
+    background-color: transparent;
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .archival-select option + option {
+    border-top: 1px solid #F0ECE2;
+  }
+
+  .archival-select option:hover {
+    background-color: var(--bg-inset);
+  }
+
+  .archival-select option:checked {
+    background-color: var(--accent-crimson-soft);
+    color: var(--accent-crimson);
+    font-weight: 700;
+  }
+
+  .archival-select option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: var(--accent-crimson);
+  }
+}

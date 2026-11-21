@@ -180,10 +180,10 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           </label>
           <select
             id="download-year-select"
-            aria-label="Veri Yılı Seçin"
+            name="downloadYear"
             value={selectedYear ?? ''}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] px-3 py-2 text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+            className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-2 text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
           >
             {years.map((y) => (
               <option key={y} value={y}>
