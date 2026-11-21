@@ -28,21 +28,37 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    closeButtonRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('keydown', handleKey);
-      previouslyFocused?.focus();
-    };
-  }, [onClose]);
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    if (!('closedBy' in HTMLDialogElement.prototype)) {
+      const isOutside = (e: PointerEvent) => {
+        const r = dialog.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      };
+      let pressedOutside = false;
+      const onPointerDown = (e: PointerEvent) => {
+        pressedOutside = isOutside(e);
+      };
+      const onPointerUp = (e: PointerEvent) => {
+        if (pressedOutside && isOutside(e)) dialog.close();
+        pressedOutside = false;
+      };
+      dialog.addEventListener('pointerdown', onPointerDown);
+      dialog.addEventListener('pointerup', onPointerUp);
+      return () => {
+        dialog.removeEventListener('pointerdown', onPointerDown);
+        dialog.removeEventListener('pointerup', onPointerUp);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedYear === null) return;
@@ -125,30 +141,28 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-labelledby="download-modal-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E242B]/45"
+      onClose={onClose}
+      {...({ closedby: 'any' } as Record<string, string>)}
+      className="m-auto w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] bg-white border border-[#1E242B] rounded-[4px] p-0 shadow-xl text-[#1E242B] backdrop:bg-[#1E242B]/45"
     >
-      <div className="relative w-full max-w-lg bg-white border border-[#1E242B] rounded-[4px] p-6 shadow-xl flex flex-col gap-4 max-h-[90vh]">
+      <div className="p-6 flex flex-col gap-4 max-h-[90dvh]">
         {/* Başlık */}
         <div className="flex items-start justify-between border-b border-[#1E242B] pb-3.5 gap-4">
           <div>
-            <h3 id="download-modal-title" className="text-lg font-bold text-[#1E242B]">
+            <h2 id="download-modal-title" className="text-lg font-bold text-[#1E242B]">
               Ham Veri İndir (.xls)
-            </h3>
+            </h2>
             <p className="text-xs text-[#525A63] mt-0.5">
               Hazine ve Maliye Bakanlığı kaynaklı orijinal Excel çalışma kitapları (aylar sayfa olarak yer alır)
             </p>
           </div>
           <button
-            ref={closeButtonRef}
             type="button"
-            onClick={onClose}
+            autoFocus
+            onClick={() => dialogRef.current?.close()}
             aria-label="Pencereyi Kapat"
             className="p-1.5 hover:bg-[#EFECE4] rounded-[2px] text-[#525A63] hover:text-[#1E242B] transition-colors duration-150 cursor-pointer"
           >
@@ -182,7 +196,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         {/* Arama ve Tümünü Seç */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
             <input
               type="text"
               aria-label="Dosyaları il adına göre filtrele"
@@ -204,14 +218,17 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
         {/* Hata */}
         {error && (
-          <div className="p-3 bg-[#F9EDED] border border-[#E6C5C5] text-[#9E2A2B] rounded-[4px] text-xs flex items-center gap-2">
+          <div
+            role="alert"
+            className="p-3 bg-[#F9EDED] border border-[#E6C5C5] text-[#9E2A2B] rounded-[4px] text-xs flex items-center gap-2"
+          >
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Dosya Listesi */}
-        <div className="overflow-y-auto border border-[#D9D4C9] rounded-[2px] bg-[#FCFBF8] p-1 flex flex-col gap-0.5 min-h-[200px] max-h-[300px]">
+        <div className="overflow-y-auto overscroll-contain border border-[#D9D4C9] rounded-[2px] bg-[#FCFBF8] p-1 flex flex-col gap-0.5 min-h-0 flex-1 max-h-[300px]">
           {loading ? (
             <div className="space-y-2 p-2">
               {[...Array(6)].map((_, i) => (
@@ -273,6 +290,6 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };
