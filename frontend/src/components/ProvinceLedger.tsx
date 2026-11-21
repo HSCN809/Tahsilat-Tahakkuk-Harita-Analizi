@@ -12,11 +12,11 @@ interface ProvinceLedgerProps {
   categories: Category[];
   selectedCategory: string;
   selectedRegion: string;
-  selectedProvince: string | null;
+  selectedProvinces: string[];
   sortColumn: SortColumn;
   sortDirection: SortDirection;
   onSortChange: (col: SortColumn, dir: SortDirection) => void;
-  onSelectProvince: (normalized: string | null) => void;
+  onToggleProvince: (normalized: string) => void;
 }
 
 const trCollator = new Intl.Collator('tr-TR', { numeric: true, sensitivity: 'base' });
@@ -36,14 +36,15 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
   categories,
   selectedCategory,
   selectedRegion,
-  selectedProvince,
+  selectedProvinces,
   sortColumn,
   sortDirection,
   onSortChange,
-  onSelectProvince,
+  onToggleProvince,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortAnnouncement, setSortAnnouncement] = useState('');
+  const selectedSet = useMemo(() => new Set(selectedProvinces), [selectedProvinces]);
 
   const handleSort = (column: SortColumn) => {
     const nextDir: SortDirection =
@@ -211,14 +212,14 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
             ) : (
               sortedRecords.map((record, index) => {
                 const normalized = normalizeProvinceName(record.province);
-                const isSelected = selectedProvince === normalized;
+                const isSelected = selectedSet.has(normalized);
                 const region = findRegionForProvince(record.province) ?? '—';
                 const ratioTone = getRatioTone(record.ratio).textClass;
 
                 return (
                   <tr
                     key={record.province}
-                    onClick={() => onSelectProvince(isSelected ? null : normalized)}
+                    onClick={() => onToggleProvince(normalized)}
                     className={`cursor-pointer transition-colors duration-150 ${
                       isSelected ? 'bg-[#F9EDED]' : 'hover:bg-[#FCFBF8]'
                     }`}
@@ -230,7 +231,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
                         aria-pressed={isSelected}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onSelectProvince(isSelected ? null : normalized);
+                          onToggleProvince(normalized);
                         }}
                         className="text-left cursor-pointer hover:underline rounded-[2px]"
                       >

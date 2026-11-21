@@ -10,10 +10,11 @@ interface TurkeyMapProps {
   records: ProvinceRecord[];
   mapType: MapType;
   selectedRegion: string;
-  selectedProvince: string | null;
+  selectedProvinces: string[];
   loading?: boolean;
   onMapTypeChange: (type: MapType) => void;
-  onSelectProvince: (normalizedProvince: string | null) => void;
+  onToggleProvince: (normalizedProvince: string) => void;
+  onClearProvinces: () => void;
 }
 
 const interpolateColor = (
@@ -38,10 +39,11 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
   records,
   mapType,
   selectedRegion,
-  selectedProvince,
+  selectedProvinces,
   loading = false,
   onMapTypeChange,
-  onSelectProvince,
+  onToggleProvince,
+  onClearProvinces,
 }) => {
   const [tooltip, setTooltip] = useState<{
     x: number;
@@ -186,11 +188,17 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
     [recordsMap, mapType, maxVal]
   );
 
-  const selectedLabel = useMemo(() => {
-    if (!selectedProvince) return null;
-    const match = recordsMap.get(selectedProvince);
-    return match?.province ?? selectedProvince;
-  }, [selectedProvince, recordsMap]);
+  const selectedSet = useMemo(() => new Set(selectedProvinces), [selectedProvinces]);
+
+  const selectionBadgeLabel = useMemo(() => {
+    if (selectedProvinces.length === 0) return null;
+    if (selectedProvinces.length === 1) {
+      const first = selectedProvinces[0];
+      const match = recordsMap.get(first);
+      return `Seçili: ${(match?.province ?? first).toLocaleUpperCase('tr-TR')}`;
+    }
+    return `${selectedProvinces.length} il kıyaslanıyor`;
+  }, [selectedProvinces, recordsMap]);
 
   const mapTabs: { id: MapType; label: string }[] = [
     { id: 'tahakkuk', label: 'Tahakkuk' },
@@ -209,14 +217,14 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
           <h2 className="text-base font-bold text-[#1E242B] tracking-tight">
             {selectedRegion === 'Tüm Ülke' ? '81 İl Coğrafi Dağılımı' : `${selectedRegion} Bölgesi Dağılımı`}
           </h2>
-          {selectedLabel && (
+          {selectionBadgeLabel && (
             <button
               type="button"
-              onClick={() => onSelectProvince(null)}
+              onClick={onClearProvinces}
               className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-[#F9EDED] text-[#9E2A2B] border border-[#E6C5C5] rounded-[2px] hover:bg-[#F3DCDC] transition-colors duration-150 cursor-pointer"
-              title="Seçili ili kaldır"
+              title={selectedProvinces.length > 1 ? 'Tüm seçimleri temizle' : 'Seçili ili kaldır'}
             >
-              <span>Seçili: {selectedLabel.toLocaleUpperCase('tr-TR')}</span>
+              <span>{selectionBadgeLabel}</span>
               <X className="w-3.5 h-3.5" />
             </button>
           )}
@@ -311,7 +319,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
             aria-label="Türkiye il bazında vergi haritası"
           >
             {(() => {
-              let selectedPathD: string | null = null;
+              const selectedPathDs: string[] = [];
               let focusedPathD: string | null = null;
               let hoveredPathD: string | null = null;
               const hoveredNormalized = tooltip ? normalizeProvinceName(tooltip.name) : null;
@@ -322,10 +330,10 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                 const name = geo.properties.name;
                 const normalized = normalizeProvinceName(name);
                 const record = recordsMap.get(normalized);
-                const isSelected = selectedProvince === normalized;
-                const isDimmed = Boolean(selectedProvince) && !isSelected;
+                const isSelected = selectedSet.has(normalized);
+                const isDimmed = selectedSet.size > 0 && !isSelected;
 
-                if (isSelected) selectedPathD = d;
+                if (isSelected) selectedPathDs.push(d);
                 if (focusedKeyboardProvince === normalized) focusedPathD = d;
                 if (hoveredNormalized === normalized && !isSelected) hoveredPathD = d;
 
@@ -352,11 +360,11 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     stroke="#FFFFFF"
                     strokeWidth={0.85}
                     className="map-province-path transition-opacity duration-150 hover:opacity-90 cursor-pointer"
-                    onClick={() => onSelectProvince(isSelected ? null : normalized)}
+                    onClick={() => onToggleProvince(normalized)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        onSelectProvince(isSelected ? null : normalized);
+                        onToggleProvince(normalized);
                       } else if (e.key === ' ') {
                         e.preventDefault();
                       } else if (e.key === 'Escape') {
@@ -365,7 +373,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     }}
                     onKeyUp={(e) => {
                       if (e.key === ' ') {
-                        onSelectProvince(isSelected ? null : normalized);
+                        onToggleProvince(normalized);
                       }
                     }}
                     onFocus={(e: React.FocusEvent<SVGPathElement>) => {
@@ -419,9 +427,10 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                       aria-hidden="true"
                     />
                   )}
-                  {selectedPathD && (
+                  {selectedPathDs.map((d, idx) => (
                     <path
-                      d={selectedPathD}
+                      key={idx}
+                      d={d}
                       fill="none"
                       stroke="#1E242B"
                       strokeWidth={2}
@@ -429,7 +438,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                       pointerEvents="none"
                       aria-hidden="true"
                     />
-                  )}
+                  ))}
                   {focusedPathD && (
                     <>
                       <path

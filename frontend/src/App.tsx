@@ -4,7 +4,6 @@ import { Download, ChevronDown, Search, AlertTriangle, Check } from 'lucide-reac
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { ProvinceInspector } from './components/ProvinceInspector';
-import { Leaderboard } from './components/Leaderboard';
 import { ProvinceLedger } from './components/ProvinceLedger';
 import { DownloadModal } from './components/DownloadModal';
 import { fetchYears, fetchConfig, fetchData, fetchGeoJson, fetchBootstrap } from './services/api';
@@ -19,7 +18,7 @@ function App() {
   const [searchCategory, setSearchCategory] = useState<string>('');
   const [categoryMenuOpen, setCategoryMenuOpen] = useState<boolean>(false);
   const [selectedRegion, setSelectedRegion] = useState<string>('Tüm Ülke');
-  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
+  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [mapType, setMapType] = useState<MapType>('ratio');
 
   const [ledgerSortColumn, setLedgerSortColumn] = useState<SortColumn>('ratio');
@@ -172,14 +171,27 @@ function App() {
 
   const handleRegionChange = (newRegion: string) => {
     setSelectedRegion(newRegion);
-    if (
-      selectedProvince &&
-      newRegion !== 'Tüm Ülke' &&
-      !REGIONS[newRegion]?.includes(selectedProvince)
-    ) {
-      setSelectedProvince(null);
+    if (newRegion !== 'Tüm Ülke') {
+      const allowed = REGIONS[newRegion] || [];
+      setSelectedProvinces((prev) => prev.filter((p) => allowed.includes(p)));
     }
   };
+
+  const handleToggleProvince = useCallback((normalized: string) => {
+    setSelectedProvinces((prev) =>
+      prev.includes(normalized)
+        ? prev.filter((p) => p !== normalized)
+        : [...prev, normalized]
+    );
+  }, []);
+
+  const handleRemoveProvince = useCallback((normalized: string) => {
+    setSelectedProvinces((prev) => prev.filter((p) => p !== normalized));
+  }, []);
+
+  const handleClearProvinces = useCallback(() => {
+    setSelectedProvinces([]);
+  }, []);
 
   const filteredCategories = useMemo(() => {
     const q = searchCategory.trim().toLocaleLowerCase('tr-TR');
@@ -496,7 +508,7 @@ function App() {
           onMetricClick={handleMetricClick}
         />
 
-        {/* 2. Asimetrik 8:4 Harita ve İl İnceleme/Sıralama Izgarası */}
+        {/* 2. Asimetrik 8:4 Harita ve İl İnceleme/Kıyaslama Izgarası */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           <div className="lg:col-span-8">
             <TurkeyMap
@@ -504,27 +516,22 @@ function App() {
               records={filteredRecords}
               mapType={mapType}
               selectedRegion={selectedRegion}
-              selectedProvince={selectedProvince}
+              selectedProvinces={selectedProvinces}
               loading={isDataLoading}
               onMapTypeChange={setMapType}
-              onSelectProvince={setSelectedProvince}
+              onToggleProvince={handleToggleProvince}
+              onClearProvinces={handleClearProvinces}
             />
           </div>
 
           <div className="lg:col-span-4 flex flex-col gap-5">
             <ProvinceInspector
-              selectedProvince={selectedProvince}
+              selectedProvinces={selectedProvinces}
               allRecords={records}
               nationalRatio={summary?.overall_ratio ?? null}
               loading={isDataLoading}
-              onSelectProvince={setSelectedProvince}
-            />
-
-            <Leaderboard
-              data={filteredRecords}
-              loading={isDataLoading}
-              selectedProvince={selectedProvince}
-              onSelectProvince={setSelectedProvince}
+              onRemoveProvince={handleRemoveProvince}
+              onClearProvinces={handleClearProvinces}
             />
           </div>
         </div>
@@ -538,14 +545,14 @@ function App() {
           categories={categories}
           selectedCategory={activeCategory}
           selectedRegion={selectedRegion}
-          selectedProvince={selectedProvince}
+          selectedProvinces={selectedProvinces}
           sortColumn={ledgerSortColumn}
           sortDirection={ledgerSortDirection}
           onSortChange={(col, dir) => {
             setLedgerSortColumn(col);
             setLedgerSortDirection(dir);
           }}
-          onSelectProvince={setSelectedProvince}
+          onToggleProvince={handleToggleProvince}
         />
       </main>
 
