@@ -183,7 +183,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             aria-label="Veri Yılı Seçin"
             value={selectedYear ?? ''}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-3 py-2 text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+            className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] px-3 py-2 text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
           >
             {years.map((y) => (
               <option key={y} value={y}>
@@ -203,14 +203,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               placeholder="İl adına göre filtrele…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] pl-9 pr-3 py-2 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
+              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] pl-9 pr-3 py-2 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
             />
           </div>
           <button
             type="button"
             onClick={toggleAll}
             disabled={filteredFiles.length === 0}
-            className="px-3 py-2 text-xs font-semibold rounded-[4px] border border-[#C8C1B4] bg-[#FAF9F6] text-[#1E242B] hover:bg-[#EFECE4] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            className="px-3 py-2 text-xs font-semibold rounded-[4px] border border-[#857E72] bg-[#FAF9F6] text-[#1E242B] hover:bg-[#EFECE4] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {allVisibleSelected ? 'Seçimi Bırak' : 'Tümünü Seç'}
           </button>
@@ -232,7 +232,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           {loading ? (
             <div className="space-y-2 p-2">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-8 bg-[#EFECE4] rounded-[2px] animate-pulse" />
+                <div key={i} className="h-8 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
               ))}
             </div>
           ) : filteredFiles.length === 0 ? (
@@ -282,7 +282,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             className="flex items-center gap-2 px-4 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {downloading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 motion-safe:animate-spin" />
             ) : (
               <Download className="w-4 h-4" />
             )}

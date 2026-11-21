@@ -107,9 +107,9 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
   if (loading) {
     return (
       <section className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3">
-        <div className="h-5 w-40 bg-[#EFECE4] rounded-[2px] animate-pulse" />
-        <div className="h-16 bg-[#EFECE4] rounded-[2px] animate-pulse" />
-        <div className="h-12 bg-[#EFECE4] rounded-[2px] animate-pulse" />
+        <div className="h-5 w-40 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
+        <div className="h-16 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
+        <div className="h-12 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
       </section>
     );
   }
@@ -134,7 +134,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
                 key={item.province}
                 type="button"
                 onClick={() => onSelectProvince(normalizeProvinceName(item.province))}
-                className="px-2.5 py-1 text-xs font-semibold bg-[#FCFBF8] hover:bg-[#EFECE4] text-[#1E242B] border border-[#D9D4C9] rounded-[3px] transition-colors duration-150 cursor-pointer"
+                className="px-2.5 py-1 text-xs font-semibold bg-[#FCFBF8] hover:bg-[#EFECE4] text-[#1E242B] border border-[#857E72] rounded-[3px] transition-colors duration-150 cursor-pointer"
               >
                 {item.province.toLocaleUpperCase('tr-TR')}
               </button>
@@ -207,7 +207,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
               </div>
               <div className="h-2 bg-[#EFECE4] rounded-[2px] overflow-hidden">
                 <div
-                  className={`h-full transition-all duration-200 ${provTone.bgClass}`}
+                  className={`comparison-bar-fill h-full motion-safe:transition-all motion-safe:duration-200 ${provTone.bgClass}`}
                   style={{ width: `${Math.max(0, Math.min(100, provRatio))}%` }}
                 />
               </div>
@@ -226,7 +226,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
             </div>
             <div className="h-1.5 bg-[#EFECE4] rounded-[2px] overflow-hidden">
               <div
-                className="h-full bg-[#C9A25E] transition-all duration-200"
+                className="comparison-bar-fill h-full bg-[#8A6518] motion-safe:transition-all motion-safe:duration-200"
                 style={{ width: `${Math.max(0, Math.min(100, regionalAvgRatio))}%` }}
               />
             </div>
@@ -244,7 +244,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
             </div>
             <div className="h-1.5 bg-[#EFECE4] rounded-[2px] overflow-hidden">
               <div
-                className="h-full bg-[#1E242B] transition-all duration-200"
+                className="comparison-bar-fill h-full bg-[#1E242B] motion-safe:transition-all motion-safe:duration-200"
                 style={{ width: `${Math.max(0, Math.min(100, nationalRatio))}%` }}
               />
             </div>

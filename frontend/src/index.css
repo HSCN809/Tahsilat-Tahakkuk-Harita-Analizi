@@ -17,6 +17,8 @@
   --accent-teal-soft: #E9F3F1;
   --accent-ochre: #8A6518;
   --accent-ochre-map: #C9A25E;
+  --border-control: #857E72;
+  --scrollbar-thumb: #7A7367;
 }
 
 body {
@@ -44,28 +46,54 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Sayfa ve tablo kaydırma çubukları arşiv paletine uyumlu */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #C8C1B4 var(--bg-paper);
+/* Sayfa ve tablo kaydırma çubukları arşiv paletine uyumlu (>= 3:1 kontrast, varsayılan kalınlık) */
+:root {
+  scrollbar-color: var(--scrollbar-thumb) var(--bg-paper);
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar-track {
+    background: var(--bg-paper);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-secondary);
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-paper);
+.map-province-path:focus-visible {
+  outline: none;
+  stroke: var(--ink-primary);
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 1.5px #FFFFFF) drop-shadow(0 0 1.5px #FFFFFF);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #C8C1B4;
-  border-radius: 2px;
+.forced-colors-data {
+  forced-color-adjust: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-secondary);
+@media (forced-colors: active) {
+  .map-province-path:focus-visible {
+    stroke: Highlight;
+    stroke-width: 2.5px;
+    filter: none;
+  }
+
+  [aria-pressed="true"],
+  [aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .comparison-bar-fill {
+    background-color: Highlight;
+    border: 1px solid CanvasText;
+  }
 }
 
 #root {

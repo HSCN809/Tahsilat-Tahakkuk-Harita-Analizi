@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Download, ChevronDown, Search, AlertTriangle, Check } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
@@ -28,6 +28,9 @@ function App() {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const categorySearchRef = useRef<HTMLInputElement>(null);
+  const categoryOptionRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // İlk açılış hızlandırması: Bootstrap tek ağ turunda (yıllar + son yıl config + ilk veri) indirir
   const {
@@ -133,16 +136,26 @@ function App() {
   const summary = isDataLoading ? null : dataRes?.summary || null;
   const records = useMemo(() => (isDataLoading ? [] : dataRes?.data || []), [isDataLoading, dataRes]);
 
+  const closeCategoryMenu = useCallback((returnFocus: boolean) => {
+    setCategoryMenuOpen(false);
+    if (returnFocus) {
+      requestAnimationFrame(() => categoryTriggerRef.current?.focus());
+    }
+  }, []);
+
   // Kategori açılır menüsü dışına tıklanınca veya Escape'e basılınca kapat
   useEffect(() => {
     if (!categoryMenuOpen) return;
     const handlePointerDown = (e: MouseEvent) => {
       if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
-        setCategoryMenuOpen(false);
+        closeCategoryMenu(false);
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCategoryMenuOpen(false);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeCategoryMenu(true);
+      }
     };
     document.addEventListener('mousedown', handlePointerDown);
     window.addEventListener('keydown', handleKeyDown);
@@ -150,7 +163,7 @@ function App() {
       document.removeEventListener('mousedown', handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [categoryMenuOpen]);
+  }, [categoryMenuOpen, closeCategoryMenu]);
 
   const handleYearChange = (newYear: number) => {
     setSelectedYear(newYear);
@@ -207,7 +220,8 @@ function App() {
     setLedgerSortColumn(metric);
     setLedgerSortDirection('desc');
     const el = document.getElementById('il-kutugu');
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el?.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
   };
 
   const activeError = bootstrapError || yearsError || configError || dataError;
@@ -253,7 +267,6 @@ function App() {
             <button
               type="button"
               onClick={() => setDownloadModalOpen(true)}
-              aria-label="Ham verileri indir"
               className="inline-flex items-center gap-2 px-3.5 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer shrink-0"
             >
               <Download className="w-4 h-4" />
@@ -275,14 +288,13 @@ function App() {
               Yıl
             </label>
             {isAppInitializing ? (
-              <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] animate-pulse" />
+              <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] motion-safe:animate-pulse" />
             ) : (
               <select
                 id="year-select"
-                aria-label="Analiz Yılı Seçin"
                 value={selectedYear || ''}
                 onChange={(e) => handleYearChange(Number(e.target.value))}
-                className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer tabular-nums"
+                className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer tabular-nums"
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
@@ -299,14 +311,13 @@ function App() {
               Ay
             </label>
             {isAppInitializing ? (
-              <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] animate-pulse" />
+              <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] motion-safe:animate-pulse" />
             ) : (
               <select
                 id="month-select"
-                aria-label="Analiz Ayı Seçin"
                 value={activeMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+                className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
               >
                 {months.map((m) => (
                   <option key={m} value={m}>
@@ -324,10 +335,9 @@ function App() {
             </label>
             <select
               id="region-select"
-              aria-label="Analiz Bölgesi Seçin"
               value={selectedRegion}
               onChange={(e) => handleRegionChange(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
             >
               <option value="Tüm Ülke">Tüm Ülke (81 İl)</option>
               {Object.keys(REGIONS).map((reg) => (
@@ -341,22 +351,24 @@ function App() {
           {/* Aranabilir Gelir Kalemi Seçici */}
           <div className="lg:col-span-5 relative" ref={categoryMenuRef}>
             <div className="flex items-center gap-2">
-              <label htmlFor="category-trigger" className="w-11 sm:w-auto text-xs font-semibold text-[#525A63] shrink-0">
+              <label id="category-label" htmlFor="category-trigger" className="w-11 sm:w-auto text-xs font-semibold text-[#525A63] shrink-0">
                 Kalem
               </label>
               {isAppInitializing ? (
-                <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] animate-pulse" />
+                <div className="h-9 flex-1 bg-[#EFECE4] rounded-[4px] motion-safe:animate-pulse" />
               ) : (
                 <button
+                  ref={categoryTriggerRef}
                   id="category-trigger"
                   type="button"
                   aria-haspopup="listbox"
                   aria-expanded={categoryMenuOpen}
-                  aria-label="Gelir kalemi veya vergi türü seçin"
+                  aria-controls="category-listbox"
+                  aria-labelledby="category-label category-value"
                   onClick={() => setCategoryMenuOpen((prev) => !prev)}
-                  className="flex-1 min-w-0 bg-[#FAF9F6] border border-[#C8C1B4] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer"
+                  className="flex-1 min-w-0 bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer"
                 >
-                  <span className="truncate">{activeCategoryName}</span>
+                  <span id="category-value" className="truncate">{activeCategoryName}</span>
                   <span className="inline-flex items-center gap-1.5 shrink-0">
                     {categories.length > 0 && (
                       <span className="text-[11px] font-semibold text-[#525A63] tabular-nums">
@@ -364,7 +376,7 @@ function App() {
                       </span>
                     )}
                     <ChevronDown
-                      className={`w-4 h-4 text-[#525A63] transition-transform duration-150 ${
+                      className={`w-4 h-4 text-[#525A63] motion-safe:transition-transform motion-safe:duration-150 ${
                         categoryMenuOpen ? 'rotate-180' : ''
                       }`}
                     />
@@ -374,36 +386,71 @@ function App() {
             </div>
 
             {categoryMenuOpen && (
-              <div className="absolute left-0 right-0 mt-1.5 bg-white border border-[#1E242B] rounded-[4px] shadow-lg z-50 p-2 flex flex-col gap-2">
+              <div
+                onKeyDown={(e) => {
+                  const optionCount = filteredCategories.length;
+                  if (optionCount === 0) return;
+                  const activeEl = document.activeElement;
+                  const currentIdx = categoryOptionRefs.current.findIndex((el) => el === activeEl);
+
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (activeEl === categorySearchRef.current || currentIdx === -1) {
+                      categoryOptionRefs.current[0]?.focus();
+                    } else {
+                      const nextIdx = Math.min(optionCount - 1, currentIdx + 1);
+                      categoryOptionRefs.current[nextIdx]?.focus();
+                    }
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (currentIdx === 0) {
+                      categorySearchRef.current?.focus();
+                    } else if (currentIdx > 0) {
+                      categoryOptionRefs.current[currentIdx - 1]?.focus();
+                    }
+                  } else if (e.key === 'Home' && currentIdx >= 0) {
+                    e.preventDefault();
+                    categoryOptionRefs.current[0]?.focus();
+                  } else if (e.key === 'End' && currentIdx >= 0) {
+                    e.preventDefault();
+                    categoryOptionRefs.current[optionCount - 1]?.focus();
+                  }
+                }}
+                className="absolute left-0 right-0 mt-1.5 bg-white border border-[#1E242B] rounded-[4px] shadow-lg z-50 p-2 flex flex-col gap-2"
+              >
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525A63]" />
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525A63]" />
                   <input
+                    ref={categorySearchRef}
                     type="text"
                     autoFocus
                     aria-label="Vergi türü veya gelir kalemi ara"
                     placeholder="Vergi türü veya gelir kalemi ara…"
                     value={searchCategory}
                     onChange={(e) => setSearchCategory(e.target.value)}
-                    className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[3px] pl-8 pr-2.5 py-1.5 text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
+                    className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[3px] pl-8 pr-2.5 py-1.5 text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
                   />
                 </div>
-                <div role="listbox" className="max-h-64 overflow-y-auto divide-y divide-[#F0ECE2]">
+                <div id="category-listbox" role="listbox" aria-label="Gelir kalemleri" className="max-h-64 overflow-y-auto divide-y divide-[#F0ECE2]">
                   {filteredCategories.length === 0 ? (
                     <div className="py-4 text-center text-xs text-[#525A63]">
                       Aramaya uygun kalem bulunamadı.
                     </div>
                   ) : (
-                    filteredCategories.map((cat) => {
+                    filteredCategories.map((cat, idx) => {
                       const active = activeCategory === cat.id;
                       return (
                         <button
                           key={cat.id}
+                          ref={(el) => {
+                            categoryOptionRefs.current[idx] = el;
+                          }}
                           type="button"
                           role="option"
                           aria-selected={active}
                           onClick={() => {
                             setSelectedCategory(cat.id);
-                            setCategoryMenuOpen(false);
+                            closeCategoryMenu(true);
                           }}
                           className={`w-full text-left px-2.5 py-2 text-xs flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${
                             active

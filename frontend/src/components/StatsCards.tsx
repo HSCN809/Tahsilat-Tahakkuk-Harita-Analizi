@@ -63,7 +63,7 @@ const StatsCardsComponent: React.FC<StatsCardsProps> = ({
             </span>
             <div className={`mt-1 text-2xl font-bold tracking-[-0.02em] tabular-nums ${item.valueClass ?? 'text-[#1E242B]'}`}>
               {loading ? (
-                <span className="inline-block w-36 h-7 bg-[#EFECE4] rounded-[2px] animate-pulse align-middle" />
+                <span className="inline-block w-36 h-7 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse align-middle" />
               ) : (
                 item.value
               )}

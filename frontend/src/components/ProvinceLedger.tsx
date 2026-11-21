@@ -19,6 +19,15 @@ interface ProvinceLedgerProps {
   onSelectProvince: (normalized: string | null) => void;
 }
 
+const trCollator = new Intl.Collator('tr-TR', { numeric: true, sensitivity: 'base' });
+
+const SORT_LABELS: Record<SortColumn, string> = {
+  province: 'İl',
+  accrual: 'Tahakkuk',
+  collection: 'Tahsilat',
+  ratio: 'Oran (%)',
+};
+
 export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
   records,
   loading,
@@ -34,13 +43,17 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
   onSelectProvince,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortAnnouncement, setSortAnnouncement] = useState('');
 
   const handleSort = (column: SortColumn) => {
-    if (sortColumn === column) {
-      onSortChange(column, sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      onSortChange(column, column === 'province' ? 'asc' : 'desc');
-    }
+    const nextDir: SortDirection =
+      sortColumn === column
+        ? (sortDirection === 'asc' ? 'desc' : 'asc')
+        : (column === 'province' ? 'asc' : 'desc');
+    onSortChange(column, nextDir);
+    setSortAnnouncement(
+      `${SORT_LABELS[column]} sütununa göre ${nextDir === 'asc' ? 'artan' : 'azalan'} sıralandı.`
+    );
   };
 
   const renderSortIcon = (column: SortColumn) => {
@@ -58,13 +71,11 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
       ? records.filter((r) => r.province.toLocaleLowerCase('tr-TR').includes(q))
       : records;
 
-    return [...filtered].sort((a, b) => {
+    return filtered.toSorted((a, b) => {
       if (sortColumn === 'province') {
-        const valA = a.province.toLocaleLowerCase('tr-TR');
-        const valB = b.province.toLocaleLowerCase('tr-TR');
         return sortDirection === 'asc'
-          ? valA.localeCompare(valB, 'tr')
-          : valB.localeCompare(valA, 'tr');
+          ? trCollator.compare(a.province, b.province)
+          : trCollator.compare(b.province, a.province);
       }
       const valA = a[sortColumn] ?? 0;
       const valB = b[sortColumn] ?? 0;
@@ -93,14 +104,14 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
 
         <div className="flex items-center gap-3">
           <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
             <input
               type="text"
               aria-label="Kütükte il ara"
               placeholder="İl adına göre filtrele…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#C8C1B4] rounded-[4px] pl-9 pr-3 py-1.5 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
+              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] pl-9 pr-3 py-1.5 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
             />
           </div>
           <span className="text-xs font-semibold text-[#525A63] tabular-nums shrink-0">
@@ -109,48 +120,71 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-[#D9D4C9] rounded-[2px]">
+      <div role="status" aria-live="polite" className="sr-only">
+        {sortAnnouncement}
+      </div>
+
+      <div tabIndex={0} role="region" aria-labelledby="ledger-caption" className="overflow-x-auto border border-[#D9D4C9] rounded-[2px]">
         <table className="w-full text-xs sm:text-sm text-left border-collapse tabular-nums">
+          <caption id="ledger-caption" className="sr-only">
+            İl bazlı tahakkuk, tahsilat ve tahsilat oranı kütüğü
+          </caption>
           <thead className="bg-[#FAF9F6] text-[#525A63] border-b border-[#1E242B]">
             <tr className="text-[11px] font-bold uppercase tracking-[0.04em]">
-              <th className="py-2.5 px-2 sm:px-3 text-center w-10 sm:w-14">Sıra</th>
-              <th className="py-2.5 px-2 sm:px-3">
+              <th scope="col" className="py-2.5 px-2 sm:px-3 text-center w-10 sm:w-14">Sıra</th>
+              <th
+                scope="col"
+                aria-sort={sortColumn === 'province' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
+                className="p-0"
+              >
                 <button
                   type="button"
                   onClick={() => handleSort('province')}
-                  className="font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer"
+                  className="w-full min-h-6 py-2.5 px-2 sm:px-3 inline-flex items-center font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer"
                 >
                   İl {renderSortIcon('province')}
                 </button>
               </th>
-              <th className="py-2.5 px-3 hidden md:table-cell">Bölge</th>
-              <th className="py-2.5 px-3 text-right hidden sm:table-cell">
+              <th scope="col" className="py-2.5 px-3 hidden md:table-cell">Bölge</th>
+              <th
+                scope="col"
+                aria-sort={sortColumn === 'accrual' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
+                className="p-0 text-right hidden sm:table-cell"
+              >
                 <button
                   type="button"
                   onClick={() => handleSort('accrual')}
-                  className={`font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer ${
+                  className={`w-full min-h-6 py-2.5 px-3 inline-flex items-center justify-end font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer ${
                     sortColumn === 'accrual' ? 'text-[#1E242B]' : ''
                   }`}
                 >
                   Tahakkuk {renderSortIcon('accrual')}
                 </button>
               </th>
-              <th className="py-2.5 px-2 sm:px-3 text-right">
+              <th
+                scope="col"
+                aria-sort={sortColumn === 'collection' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
+                className="p-0 text-right"
+              >
                 <button
                   type="button"
                   onClick={() => handleSort('collection')}
-                  className={`font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer ${
+                  className={`w-full min-h-6 py-2.5 px-2 sm:px-3 inline-flex items-center justify-end font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer ${
                     sortColumn === 'collection' ? 'text-[#1E242B]' : ''
                   }`}
                 >
                   Tahsilat {renderSortIcon('collection')}
                 </button>
               </th>
-              <th className="py-2.5 px-2 sm:px-3 text-right">
+              <th
+                scope="col"
+                aria-sort={sortColumn === 'ratio' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
+                className="p-0 text-right"
+              >
                 <button
                   type="button"
                   onClick={() => handleSort('ratio')}
-                  className={`font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer ${
+                  className={`w-full min-h-6 py-2.5 px-2 sm:px-3 inline-flex items-center justify-end font-bold uppercase tracking-[0.04em] hover:text-[#1E242B] cursor-pointer ${
                     sortColumn === 'ratio' ? 'text-[#9E2A2B]' : ''
                   }`}
                 >
@@ -164,7 +198,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
               [...Array(8)].map((_, i) => (
                 <tr key={i}>
                   <td colSpan={6} className="py-2.5 px-3">
-                    <div className="h-5 bg-[#EFECE4] rounded-[2px] animate-pulse" />
+                    <div className="h-5 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
                   </td>
                 </tr>
               ))

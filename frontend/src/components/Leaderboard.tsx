@@ -48,14 +48,13 @@ const LeaderboardComponent: React.FC<LeaderboardProps> = ({
         </h2>
 
         <div
-          role="tablist"
+          role="group"
           aria-label="Sıralama yönü"
-          className="inline-flex border border-[#C8C1B4] rounded-[3px] overflow-hidden bg-[#FAF9F6]"
+          className="inline-flex border border-[#857E72] rounded-[3px] overflow-hidden bg-[#FAF9F6]"
         >
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'top'}
+            aria-pressed={activeTab === 'top'}
             onClick={() => setActiveTab('top')}
             className={`px-2.5 py-1 text-xs font-semibold transition-colors duration-150 cursor-pointer border-r border-[#D9D4C9] ${
               activeTab === 'top'
@@ -67,8 +66,7 @@ const LeaderboardComponent: React.FC<LeaderboardProps> = ({
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'bottom'}
+            aria-pressed={activeTab === 'bottom'}
             onClick={() => setActiveTab('bottom')}
             className={`px-2.5 py-1 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
               activeTab === 'bottom'
@@ -84,7 +82,7 @@ const LeaderboardComponent: React.FC<LeaderboardProps> = ({
       {loading ? (
         <div className="space-y-2.5">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-9 bg-[#EFECE4] rounded-[2px] animate-pulse" />
+            <div key={i} className="h-9 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
           ))}
         </div>
       ) : rows.length === 0 ? (
@@ -92,13 +90,16 @@ const LeaderboardComponent: React.FC<LeaderboardProps> = ({
           Seçili filtre için il verisi bulunamadı.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div tabIndex={0} role="region" aria-labelledby="leaderboard-caption" className="overflow-x-auto">
           <table className="w-full text-[13px] text-left border-collapse tabular-nums">
+            <caption id="leaderboard-caption" className="sr-only">
+              {activeTab === 'top' ? 'Tahsilat oranı en yüksek 5 il' : 'Tahsilat oranı en düşük 5 il'}
+            </caption>
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#525A63] border-b border-[#1E242B]">
-                <th className="pb-2 pr-2">İl</th>
-                <th className="pb-2 px-2 text-right">Tahsilat</th>
-                <th className="pb-2 pl-2 text-right">Oran</th>
+                <th scope="col" className="pb-2 pr-2">İl</th>
+                <th scope="col" className="pb-2 px-2 text-right">Tahsilat</th>
+                <th scope="col" className="pb-2 pl-2 text-right">Oran</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EAE5DA]">

@@ -74,6 +74,15 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
     };
   }, [invalidateBounds]);
 
+  useEffect(() => {
+    if (!tooltip) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTooltip(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tooltip]);
+
   const filteredFeatures = useMemo(() => {
     if (!geoJsonData) return [];
     const features = geoJsonData.features || [];
@@ -182,10 +191,10 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
     return match?.province ?? selectedProvince;
   }, [selectedProvince, recordsMap]);
 
-  const mapTabs: { id: MapType; label: string; aria: string }[] = [
-    { id: 'tahakkuk', label: 'Tahakkuk', aria: 'Haritada Tahakkuk Tutarlarını Göster' },
-    { id: 'tahsilat', label: 'Tahsilat', aria: 'Haritada Tahsilat Tutarlarını Göster' },
-    { id: 'ratio', label: 'Oran (%)', aria: 'Haritada Tahsilat Oranını Göster' },
+  const mapTabs: { id: MapType; label: string }[] = [
+    { id: 'tahakkuk', label: 'Tahakkuk' },
+    { id: 'tahsilat', label: 'Tahsilat' },
+    { id: 'ratio', label: 'Oran (%)' },
   ];
 
   return (
@@ -213,9 +222,9 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
         </div>
 
         <div
-          role="tablist"
+          role="group"
           aria-label="Harita metrik seçimi"
-          className="inline-flex border border-[#C8C1B4] rounded-[3px] overflow-hidden bg-[#FAF9F6]"
+          className="inline-flex border border-[#857E72] rounded-[3px] overflow-hidden bg-[#FAF9F6]"
         >
           {mapTabs.map((tab) => {
             const active = mapType === tab.id;
@@ -223,9 +232,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
               <button
                 key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                aria-label={tab.aria}
+                aria-pressed={active}
                 onClick={() => onMapTypeChange(tab.id)}
                 className={`px-3 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer border-r last:border-r-0 border-[#D9D4C9] ${
                   active
@@ -241,15 +248,20 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
       </div>
 
       {/* Harita Tuvali */}
+      <p id="map-interaction-hint" className="sr-only">
+        Bir ilin detaylarını sabitlemek için seçin.
+      </p>
       <div
         ref={containerRef}
         style={{ ['--map-h' as string]: `${calculatedHeight}px` }}
-        className="relative w-full aspect-[16/9] sm:aspect-auto sm:h-[var(--map-h)] bg-[#FCFBF8] border border-[#E5DFD2] rounded-[2px] overflow-hidden flex items-center justify-center"
+        className="relative w-full aspect-[16/9] sm:aspect-auto sm:h-[var(--map-h)] bg-[#FCFBF8] border border-[#E5DFD2] rounded-[2px] overflow-visible flex items-center justify-center"
         onMouseEnter={invalidateBounds}
         onScroll={invalidateBounds}
       >
         {tooltip && (
           <div
+            id="map-province-tooltip"
+            role="tooltip"
             className="absolute z-40 bg-white border border-[#1E242B] text-xs text-[#1E242B] rounded-[3px] p-3 shadow-md pointer-events-none flex flex-col gap-1 min-w-[175px] whitespace-nowrap"
             style={{
               left: tooltip.alignLeft ? tooltip.x - 14 : tooltip.x + 14,
@@ -285,16 +297,16 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
 
         {!geoJsonData || !pathGenerator || loading ? (
           <div className="w-full h-full p-6 flex flex-col items-center justify-center gap-3">
-            <div className="w-full h-full bg-[#EFECE4]/70 rounded-[2px] animate-pulse flex items-center justify-center">
+            <div className="w-full h-full bg-[#EFECE4]/70 rounded-[2px] motion-safe:animate-pulse flex items-center justify-center">
               <span className="text-xs font-semibold text-[#525A63]">Harita ve il verileri hazırlanıyor…</span>
             </div>
           </div>
         ) : (
           <svg
             viewBox="0 0 800 360"
-            className="w-full h-full select-none"
+            className="w-full h-full select-none forced-colors-data"
             preserveAspectRatio="xMidYMid meet"
-            role="img"
+            role="group"
             aria-label="Türkiye il bazında vergi haritası"
           >
             <g>
@@ -321,19 +333,44 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     tabIndex={0}
                     role="button"
                     aria-pressed={isSelected}
-                    aria-label={`${name}: ${metricAria}. Detayları sabitlemek için seçin.`}
+                    aria-label={`${name}: ${metricAria}`}
+                    aria-describedby={
+                      tooltip?.name === name ? 'map-province-tooltip map-interaction-hint' : 'map-interaction-hint'
+                    }
                     fill={getColor(name)}
                     fillOpacity={isDimmed ? 0.55 : 1}
                     stroke={isSelected ? '#1E242B' : '#FFFFFF'}
                     strokeWidth={isSelected ? 1.8 : 0.85}
-                    className="transition-opacity duration-150 outline-none hover:opacity-90 hover:stroke-[#1E242B] hover:stroke-[1.4px] focus-visible:stroke-[#9E2A2B] focus-visible:stroke-[1.8px] cursor-pointer"
+                    className="map-province-path transition-opacity duration-150 hover:opacity-90 hover:stroke-[#1E242B] hover:stroke-[1.4px] cursor-pointer"
                     onClick={() => onSelectProvince(isSelected ? null : normalized)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === 'Enter') {
                         e.preventDefault();
+                        onSelectProvince(isSelected ? null : normalized);
+                      } else if (e.key === ' ') {
+                        e.preventDefault();
+                      } else if (e.key === 'Escape') {
+                        setTooltip(null);
+                      }
+                    }}
+                    onKeyUp={(e) => {
+                      if (e.key === ' ') {
                         onSelectProvince(isSelected ? null : normalized);
                       }
                     }}
+                    onFocus={(e: React.FocusEvent<SVGPathElement>) => {
+                      const bounds = getCachedBounds();
+                      if (!bounds) return;
+                      const pathRect = e.currentTarget.getBoundingClientRect();
+                      const centerX = pathRect.left + pathRect.width / 2 - bounds.left;
+                      const centerY = pathRect.top + pathRect.height / 2 - bounds.top;
+                      const alignLeft = centerX > bounds.width / 2;
+                      const alignTop = centerY > bounds.height / 2;
+                      const x = alignLeft ? pathRect.left - bounds.left : pathRect.right - bounds.left;
+                      const y = alignTop ? pathRect.top - bounds.top : pathRect.bottom - bounds.top;
+                      setTooltip({ x, y, name, record, alignLeft, alignTop });
+                    }}
+                    onBlur={() => setTooltip(null)}
                     onMouseMove={(e: React.MouseEvent<SVGPathElement>) => {
                       const bounds = getCachedBounds();
                       const x = e.clientX - (bounds?.left || 0);
@@ -371,7 +408,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
             {mapType === 'ratio' ? '%0' : '0 ₺'}
           </span>
           <div
-            className="h-2.5 flex-1 rounded-[2px] border border-[#D9D4C9]"
+            className="forced-colors-data h-2.5 flex-1 rounded-[2px] border border-[#D9D4C9]"
             style={{
               background: 'linear-gradient(90deg, #9E2A2B 0%, #C9A25E 50%, #1B6B63 100%)',
             }}
