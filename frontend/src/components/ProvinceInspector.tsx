@@ -166,7 +166,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
     return (
       <section
         aria-label="Seçili İl Kıyaslama Paneli"
-        className="bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5"
+        className="bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5 min-h-0 max-h-full overflow-y-auto"
       >
         <div className="flex items-start justify-between gap-2 border-b border-[#D9D4C9] pb-3">
           <div>
@@ -269,23 +269,12 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
   return (
     <section
       aria-label="Çoklu İl Kıyaslama Paneli"
-      className="bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5"
+      className="bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5 min-h-0 max-h-full"
     >
-      <div className="flex items-start justify-between gap-2 border-b border-[#1E242B] pb-2.5">
-        <div>
-          <h2 className="text-base font-bold text-[#1E242B] tabular-nums">
-            İl Kıyaslama ({inspections.length} İl)
-          </h2>
-          {nationalRatio !== null && (
-            <p className="text-[11px] text-[#525A63] mt-0.5 tabular-nums flex items-center gap-1.5">
-              <span aria-hidden="true" className="inline-block w-0.5 h-3 bg-[#1E242B]/80" />
-              <span>
-                Türkiye Ortalaması:{' '}
-                <strong className="font-semibold text-[#1E242B]">{formatPercent(nationalRatio)}</strong>
-              </span>
-            </p>
-          )}
-        </div>
+      <div className="flex items-center justify-between gap-2 border-b border-[#1E242B] pb-2.5">
+        <h2 className="text-base font-bold text-[#1E242B] tabular-nums">
+          İl Kıyaslama ({inspections.length} İl)
+        </h2>
         <button
           type="button"
           onClick={onClearProvinces}
@@ -296,7 +285,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
       </div>
 
       {/* Seçilen İller Kıyaslama Listesi */}
-      <ul className="divide-y divide-[#EAE5DA] max-h-[460px] overflow-y-auto overscroll-contain pr-0.5">
+      <ul className="divide-y divide-[#EAE5DA] min-h-0 flex-1 max-h-[360px] lg:max-h-none overflow-y-auto overscroll-contain pr-0.5">
         {inspections.map((item) => {
           const provRatio = item.record.ratio ?? 0;
           const provTone = getRatioTone(provRatio);

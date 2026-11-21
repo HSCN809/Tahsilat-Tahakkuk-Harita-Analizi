@@ -509,7 +509,7 @@ function App() {
         />
 
         {/* 2. Asimetrik 8:4 Harita ve İl İnceleme/Kıyaslama Izgarası */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start lg:items-stretch">
           <div className="lg:col-span-8">
             <TurkeyMap
               geoJsonData={geoJsonData ?? null}
@@ -524,15 +524,17 @@ function App() {
             />
           </div>
 
-          <div className="lg:col-span-4 flex flex-col gap-5">
-            <ProvinceInspector
-              selectedProvinces={selectedProvinces}
-              allRecords={records}
-              nationalRatio={summary?.overall_ratio ?? null}
-              loading={isDataLoading}
-              onRemoveProvince={handleRemoveProvince}
-              onClearProvinces={handleClearProvinces}
-            />
+          <div className="lg:col-span-4 lg:relative">
+            <div className="lg:absolute lg:inset-x-0 lg:top-0 lg:max-h-full flex flex-col">
+              <ProvinceInspector
+                selectedProvinces={selectedProvinces}
+                allRecords={records}
+                nationalRatio={summary?.overall_ratio ?? null}
+                loading={isDataLoading}
+                onRemoveProvince={handleRemoveProvince}
+                onClearProvinces={handleClearProvinces}
+              />
+            </div>
           </div>
         </div>
 
