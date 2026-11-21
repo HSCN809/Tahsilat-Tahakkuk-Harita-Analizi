@@ -371,7 +371,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-x-3 text-[11px] tabular-nums">
+              <div className="grid grid-cols-2 gap-x-3 text-xs tabular-nums">
                 <div className="flex justify-between gap-1 text-[#525A63]">
                   <span>Tahakkuk:</span>
                   <span className="font-semibold text-[#1E242B]">{formatCurrency(item.record.accrual)}</span>
@@ -383,7 +383,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
               </div>
 
               {(regDelta || natDelta) && (
-                <div className="flex flex-col gap-0.5 text-[11px] tabular-nums pt-0.5 text-[#525A63]">
+                <div className="flex flex-col gap-1 text-[0.8125rem] leading-snug tabular-nums pt-0.5 text-[#525A63]">
                   {regDelta && item.regionName && item.regionalAvgRatio !== null && (
                     <div className="flex items-center justify-between gap-2">
                       <span>
