@@ -13,7 +13,7 @@ interface TurkeyMapProps {
   selectedProvinces: string[];
   loading?: boolean;
   onMapTypeChange: (type: MapType) => void;
-  onToggleProvince: (normalizedProvince: string) => void;
+  onSelectProvince: (normalizedProvince: string, multi: boolean) => void;
   onClearProvinces: () => void;
 }
 
@@ -42,7 +42,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
   selectedProvinces,
   loading = false,
   onMapTypeChange,
-  onToggleProvince,
+  onSelectProvince,
   onClearProvinces,
 }) => {
   const [tooltip, setTooltip] = useState<{
@@ -220,11 +220,13 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
             <button
               type="button"
               onClick={onClearProvinces}
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold bg-[#F9EDED] text-[#9E2A2B] border border-[#E6C5C5] rounded-[2px] hover:bg-[#F3DCDC] transition-colors duration-150 cursor-pointer"
-              title={selectedProvinces.length > 1 ? 'Tüm seçimleri temizle' : 'Seçili ili kaldır'}
+              className="inline-flex items-center gap-1.5 min-h-6 px-2.5 py-0.5 text-xs font-semibold bg-[#F9EDED] text-[#9E2A2B] border border-[#E6C5C5] rounded-[2px] hover:bg-[#F3DCDC] transition-colors duration-150 cursor-pointer"
             >
+              <span className="sr-only">
+                {selectedProvinces.length > 1 ? 'Tüm seçimleri temizle: ' : 'Seçili ili kaldır: '}
+              </span>
               <span>{selectionBadgeLabel}</span>
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -359,11 +361,11 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     stroke="#FFFFFF"
                     strokeWidth={0.85}
                     className="map-province-path transition-opacity duration-150 hover:opacity-90 cursor-pointer"
-                    onClick={() => onToggleProvince(normalized)}
+                    onClick={(e) => onSelectProvince(normalized, e.ctrlKey || e.metaKey)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        onToggleProvince(normalized);
+                        onSelectProvince(normalized, e.ctrlKey || e.metaKey);
                       } else if (e.key === ' ') {
                         e.preventDefault();
                       } else if (e.key === 'Escape') {
@@ -372,7 +374,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
                     }}
                     onKeyUp={(e) => {
                       if (e.key === ' ') {
-                        onToggleProvince(normalized);
+                        onSelectProvince(normalized, e.ctrlKey || e.metaKey);
                       }
                     }}
                     onFocus={(e: React.FocusEvent<SVGPathElement>) => {
@@ -486,10 +488,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
           {mapType === 'ratio' ? (
             <span className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums shrink-0">%100</span>
           ) : (
-            <span
-              className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums max-w-[130px] truncate shrink-0"
-              title={formatCurrency(maxVal)}
-            >
+            <span className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums whitespace-nowrap shrink-0">
               {formatCurrency(maxVal)}
             </span>
           )}

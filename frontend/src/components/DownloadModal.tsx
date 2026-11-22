@@ -251,38 +251,41 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               {files.length === 0 ? 'Bu yıl için ham dosya bulunamadı.' : 'Aramaya uygun dosya bulunamadı.'}
             </div>
           ) : (
-            <fieldset className="border-0 p-0 m-0 flex flex-col gap-0.5">
+            <fieldset className="border-0 p-0 m-0">
               <legend className="sr-only">İndirilecek il dosyaları</legend>
-              {filteredFiles.map((file) => {
-                const checked = selectedIds.has(file.id);
-                const checkboxId = `download-file-${file.id}`;
-                return (
-                  <label
-                    key={file.id}
-                    htmlFor={checkboxId}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-[2px] text-xs font-semibold transition-colors duration-150 cursor-pointer ${
-                      checked
-                        ? 'bg-[#F9EDED] text-[#1E242B]'
-                        : 'text-[#525A63] hover:bg-[#EFECE4] hover:text-[#1E242B]'
-                    }`}
-                  >
-                    <input
-                      id={checkboxId}
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleFile(file.id)}
-                      className="w-3.5 h-3.5 accent-[#9E2A2B] cursor-pointer flex-shrink-0"
-                    />
-                    <FileSpreadsheet
-                      className={`w-4 h-4 flex-shrink-0 ${checked ? 'text-[#9E2A2B]' : 'text-[#525A63]'}`}
-                    />
-                    <span className="truncate flex-1">{prettifyFileId(file.id)}</span>
-                    <span className="text-[0.6875rem] text-[#525A63] tabular-nums flex-shrink-0">
-                      {formatFileSize(file.size)}
-                    </span>
-                  </label>
-                );
-              })}
+              <ul className="flex flex-col gap-0.5 list-none m-0 p-0">
+                {filteredFiles.map((file) => {
+                  const checked = selectedIds.has(file.id);
+                  const checkboxId = `download-file-${file.id}`;
+                  return (
+                    <li key={file.id}>
+                      <label
+                        htmlFor={checkboxId}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-[2px] text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                          checked
+                            ? 'bg-[#F9EDED] text-[#1E242B]'
+                            : 'text-[#525A63] hover:bg-[#EFECE4] hover:text-[#1E242B]'
+                        }`}
+                      >
+                        <input
+                          id={checkboxId}
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleFile(file.id)}
+                          className="w-3.5 h-3.5 accent-[#9E2A2B] cursor-pointer flex-shrink-0"
+                        />
+                        <FileSpreadsheet
+                          className={`w-4 h-4 flex-shrink-0 ${checked ? 'text-[#9E2A2B]' : 'text-[#525A63]'}`}
+                        />
+                        <span className="truncate flex-1">{prettifyFileId(file.id)}</span>
+                        <span className="text-[0.6875rem] text-[#525A63] tabular-nums flex-shrink-0">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
             </fieldset>
           )}
         </div>

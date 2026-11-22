@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Download, ChevronDown, Search, AlertTriangle, Check } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
@@ -12,6 +12,12 @@ const DownloadModal = lazy(() =>
 );
 import { REGIONS, normalizeProvinceName } from './utils/provinces';
 import type { MapType, SortColumn, SortDirection } from './types';
+
+const supportsAnchoredPopover =
+  typeof HTMLElement !== 'undefined' &&
+  Object.hasOwn(HTMLElement.prototype, 'popover') &&
+  typeof CSS !== 'undefined' &&
+  CSS.supports('position-area: block-end');
 
 function App() {
   const queryClient = useQueryClient();
@@ -30,6 +36,7 @@ function App() {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+  const categoryPopoverRef = useRef<HTMLDivElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const categorySearchRef = useRef<HTMLInputElement>(null);
   const categoryOptionRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -139,15 +146,20 @@ function App() {
   const records = useMemo(() => (isDataLoading ? [] : dataRes?.data || []), [isDataLoading, dataRes]);
 
   const closeCategoryMenu = useCallback((returnFocus: boolean) => {
-    setCategoryMenuOpen(false);
+    if (supportsAnchoredPopover && categoryPopoverRef.current?.matches(':popover-open')) {
+      categoryPopoverRef.current.hidePopover();
+    } else {
+      setCategoryMenuOpen(false);
+    }
     if (returnFocus) {
       requestAnimationFrame(() => categoryTriggerRef.current?.focus());
     }
   }, []);
 
-  // Kategori açılır menüsü dışına tıklanınca veya Escape'e basılınca kapat
+  // Yedek menü (Popover/Anchor desteklemeyen tarayıcılar): dış tıklama veya Escape'te kapat
   useEffect(() => {
-    if (!categoryMenuOpen) return;
+    if (!categoryMenuOpen || supportsAnchoredPopover) return;
+    requestAnimationFrame(() => categorySearchRef.current?.focus());
     const handlePointerDown = (e: MouseEvent) => {
       if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
         closeCategoryMenu(false);
@@ -180,12 +192,18 @@ function App() {
     }
   };
 
-  const handleToggleProvince = useCallback((normalized: string) => {
-    setSelectedProvinces((prev) =>
-      prev.includes(normalized)
-        ? prev.filter((p) => p !== normalized)
-        : [...prev, normalized]
-    );
+  const handleSelectProvince = useCallback((normalized: string, multi: boolean) => {
+    setSelectedProvinces((prev) => {
+      if (multi) {
+        return prev.includes(normalized)
+          ? prev.filter((p) => p !== normalized)
+          : [...prev, normalized];
+      }
+      if (prev.length === 1 && prev[0] === normalized) {
+        return [];
+      }
+      return [normalized];
+    });
   }, []);
 
   const handleRemoveProvince = useCallback((normalized: string) => {
@@ -389,12 +407,15 @@ function App() {
                   ref={categoryTriggerRef}
                   id="category-trigger"
                   type="button"
+                  popoverTarget={supportsAnchoredPopover ? 'category-popover' : undefined}
                   aria-haspopup="listbox"
                   aria-expanded={categoryMenuOpen}
                   aria-controls="category-listbox"
                   aria-labelledby="category-label category-value"
-                  onClick={() => setCategoryMenuOpen((prev) => !prev)}
-                  className="w-full min-w-0 bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-base sm:text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer"
+                  onClick={supportsAnchoredPopover ? undefined : () => setCategoryMenuOpen((prev) => !prev)}
+                  className={`w-full min-w-0 bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-base sm:text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${
+                    supportsAnchoredPopover ? 'category-trigger-anchor' : ''
+                  }`}
                 >
                   <span id="category-value" className="truncate">{activeCategoryName}</span>
                   <span className="inline-flex items-center gap-1.5 shrink-0">
@@ -411,94 +432,128 @@ function App() {
                 </button>
               )}
 
-              {categoryMenuOpen && (
-                <div
-                  onKeyDown={(e) => {
-                    const optionCount = filteredCategories.length;
-                    if (optionCount === 0) return;
-                    const activeEl = document.activeElement;
-                    const currentIdx = categoryOptionRefs.current.findIndex((el) => el === activeEl);
+              {(() => {
+                const showAnchored = !isAppInitializing && supportsAnchoredPopover;
+                const showFallback = !isAppInitializing && !supportsAnchoredPopover && categoryMenuOpen;
+                if (!showAnchored && !showFallback) return null;
 
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      if (activeEl === categorySearchRef.current || currentIdx === -1) {
-                        categoryOptionRefs.current[0]?.focus();
-                      } else {
-                        const nextIdx = Math.min(optionCount - 1, currentIdx + 1);
-                        categoryOptionRefs.current[nextIdx]?.focus();
-                      }
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      if (currentIdx === 0) {
-                        categorySearchRef.current?.focus();
-                      } else if (currentIdx > 0) {
-                        categoryOptionRefs.current[currentIdx - 1]?.focus();
-                      }
-                    } else if (e.key === 'Home' && currentIdx >= 0) {
-                      e.preventDefault();
+                const handleCategoryKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+                  const optionCount = filteredCategories.length;
+                  if (optionCount === 0) return;
+                  const activeEl = document.activeElement;
+                  const currentIdx = categoryOptionRefs.current.findIndex((el) => el === activeEl);
+
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (activeEl === categorySearchRef.current || currentIdx === -1) {
                       categoryOptionRefs.current[0]?.focus();
-                    } else if (e.key === 'End' && currentIdx >= 0) {
-                      e.preventDefault();
-                      categoryOptionRefs.current[optionCount - 1]?.focus();
+                    } else {
+                      const nextIdx = Math.min(optionCount - 1, currentIdx + 1);
+                      categoryOptionRefs.current[nextIdx]?.focus();
                     }
-                  }}
-                  className="absolute left-0 right-0 top-full mt-0.5 bg-white border border-[#1E242B] rounded-[4px] shadow-lg z-50 p-2 flex flex-col gap-2"
-                >
-                  <div className="relative">
-                    <label htmlFor="category-search" className="sr-only">
-                      Vergi türü veya gelir kalemi ara
-                    </label>
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525A63]" />
-                    <input
-                      ref={categorySearchRef}
-                      id="category-search"
-                      name="categorySearch"
-                      type="search"
-                      autoFocus
-                      autoCorrect="off"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      placeholder="Vergi türü veya gelir kalemi ara…"
-                      value={searchCategory}
-                      onChange={(e) => setSearchCategory(e.target.value)}
-                      className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[3px] pl-8 pr-2.5 py-1.5 text-base sm:text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
-                    />
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (currentIdx === 0) {
+                      categorySearchRef.current?.focus();
+                    } else if (currentIdx > 0) {
+                      categoryOptionRefs.current[currentIdx - 1]?.focus();
+                    }
+                  } else if (e.key === 'Home' && currentIdx >= 0) {
+                    e.preventDefault();
+                    categoryOptionRefs.current[0]?.focus();
+                  } else if (e.key === 'End' && currentIdx >= 0) {
+                    e.preventDefault();
+                    categoryOptionRefs.current[optionCount - 1]?.focus();
+                  }
+                };
+
+                const panelContent = (
+                  <>
+                    <div className="relative">
+                      <label htmlFor="category-search" className="sr-only">
+                        Vergi türü veya gelir kalemi ara
+                      </label>
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525A63]" />
+                      <input
+                        ref={categorySearchRef}
+                        id="category-search"
+                        name="categorySearch"
+                        type="search"
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        placeholder="Vergi türü veya gelir kalemi ara…"
+                        value={searchCategory}
+                        onChange={(e) => setSearchCategory(e.target.value)}
+                        className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[3px] pl-8 pr-2.5 py-1.5 text-base sm:text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
+                      />
+                    </div>
+                    <div id="category-listbox" role="listbox" aria-label="Gelir kalemleri" className="max-h-64 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] divide-y divide-[#F0ECE2]">
+                      {filteredCategories.length === 0 ? (
+                        <div className="py-4 text-center text-xs text-[#525A63]">
+                          Aramaya uygun kalem bulunamadı.
+                        </div>
+                      ) : (
+                        filteredCategories.map((cat, idx) => {
+                          const active = activeCategory === cat.id;
+                          return (
+                            <button
+                              key={cat.id}
+                              ref={(el) => {
+                                categoryOptionRefs.current[idx] = el;
+                              }}
+                              type="button"
+                              role="option"
+                              aria-selected={active}
+                              onClick={() => {
+                                setSelectedCategory(cat.id);
+                                closeCategoryMenu(true);
+                              }}
+                              className={`w-full text-left px-2.5 py-2 text-xs flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${active
+                                ? 'bg-[#F9EDED] text-[#9E2A2B] font-bold'
+                                : 'text-[#1E242B] hover:bg-[#FCFBF8]'
+                                }`}
+                            >
+                              <span className="truncate">{cat.name}</span>
+                              {active && <Check className="w-3.5 h-3.5 shrink-0 text-[#9E2A2B]" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                );
+
+                if (showAnchored) {
+                  return (
+                    <div
+                      id="category-popover"
+                      ref={categoryPopoverRef}
+                      popover="auto"
+                      onToggle={(e) => {
+                        const isOpen = (e.nativeEvent as ToggleEvent).newState === 'open';
+                        setCategoryMenuOpen(isOpen);
+                        if (isOpen) {
+                          requestAnimationFrame(() => categorySearchRef.current?.focus());
+                        }
+                      }}
+                      onKeyDown={handleCategoryKeyDown}
+                      className="category-popover bg-white border border-[#1E242B] rounded-[4px] shadow-lg p-2 flex flex-col gap-2"
+                    >
+                      {panelContent}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    onKeyDown={handleCategoryKeyDown}
+                    className="absolute left-0 right-0 top-full mt-0.5 bg-white border border-[#1E242B] rounded-[4px] shadow-lg z-50 p-2 flex flex-col gap-2"
+                  >
+                    {panelContent}
                   </div>
-                  <div id="category-listbox" role="listbox" aria-label="Gelir kalemleri" className="max-h-64 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] divide-y divide-[#F0ECE2]">
-                    {filteredCategories.length === 0 ? (
-                      <div className="py-4 text-center text-xs text-[#525A63]">
-                        Aramaya uygun kalem bulunamadı.
-                      </div>
-                    ) : (
-                      filteredCategories.map((cat, idx) => {
-                        const active = activeCategory === cat.id;
-                        return (
-                          <button
-                            key={cat.id}
-                            ref={(el) => {
-                              categoryOptionRefs.current[idx] = el;
-                            }}
-                            type="button"
-                            role="option"
-                            aria-selected={active}
-                            onClick={() => {
-                              setSelectedCategory(cat.id);
-                              closeCategoryMenu(true);
-                            }}
-                            className={`w-full text-left px-2.5 py-2 text-xs flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer ${active
-                              ? 'bg-[#F9EDED] text-[#9E2A2B] font-bold'
-                              : 'text-[#1E242B] hover:bg-[#FCFBF8]'
-                              }`}
-                          >
-                            <span className="truncate">{cat.name}</span>
-                            {active && <Check className="w-3.5 h-3.5 shrink-0 text-[#9E2A2B]" />}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -544,7 +599,7 @@ function App() {
               selectedProvinces={selectedProvinces}
               loading={isDataLoading}
               onMapTypeChange={setMapType}
-              onToggleProvince={handleToggleProvince}
+              onSelectProvince={handleSelectProvince}
               onClearProvinces={handleClearProvinces}
             />
           </div>
@@ -581,7 +636,7 @@ function App() {
             setLedgerSortColumn(col);
             setLedgerSortDirection(dir);
           }}
-          onToggleProvince={handleToggleProvince}
+          onSelectProvince={handleSelectProvince}
         />
       </main>
 

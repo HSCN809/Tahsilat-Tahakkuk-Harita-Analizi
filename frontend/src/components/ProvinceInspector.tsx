@@ -157,7 +157,11 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
           </button>
         </div>
         <p className="text-xs text-[#525A63] leading-relaxed">
-          Haritadan veya aşağıdaki il kütüğünden bir ya da daha fazla il seçin; seçilen iller hem birbirleriyle hem de bölge ve Türkiye ortalamalarıyla yan yana kıyaslanır.
+          Tekil inceleme için haritadan veya aşağıdaki il kütüğünden bir il seçin. Çoklu il kıyaslaması için{' '}
+          <kbd className="px-1 py-0.5 text-[0.6875rem] font-semibold bg-[#F3EFE6] border border-[#D9D4C9] rounded-[2px] text-[#1E242B]">
+            Ctrl
+          </kbd>{' '}
+          + tıklama yapın.
         </p>
       </section>
     );
@@ -285,7 +289,11 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
         </div>
 
         <p className="text-[0.6875rem] text-[#525A63] border-t border-[#EAE5DA] pt-2.5">
-          Kıyaslamak için haritadan veya kütükten başka bir il daha seçin.
+          Kıyaslamak üzere başka bir il eklemek için{' '}
+          <kbd className="px-1 py-0.5 text-[0.625rem] font-semibold bg-[#F3EFE6] border border-[#D9D4C9] rounded-[2px] text-[#1E242B]">
+            Ctrl
+          </kbd>{' '}
+          + tıklama yapın.
         </p>
       </section>
     );
@@ -412,6 +420,14 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
           );
         })}
       </ul>
+
+      <p className="text-[0.6875rem] text-[#525A63] border-t border-[#EAE5DA] pt-2.5 shrink-0">
+        İl ekleyip çıkarmak için{' '}
+        <kbd className="px-1 py-0.5 text-[0.625rem] font-semibold bg-[#F3EFE6] border border-[#D9D4C9] rounded-[2px] text-[#1E242B]">
+          Ctrl
+        </kbd>{' '}
+        + tıklama yapın.
+      </p>
     </section>
   );
 };

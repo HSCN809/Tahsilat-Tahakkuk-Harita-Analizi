@@ -16,7 +16,7 @@ interface ProvinceLedgerProps {
   sortColumn: SortColumn;
   sortDirection: SortDirection;
   onSortChange: (col: SortColumn, dir: SortDirection) => void;
-  onToggleProvince: (normalized: string) => void;
+  onSelectProvince: (normalized: string, multi: boolean) => void;
 }
 
 const trCollator = new Intl.Collator('tr-TR', { numeric: true, sensitivity: 'base' });
@@ -40,7 +40,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
   sortColumn,
   sortDirection,
   onSortChange,
-  onToggleProvince,
+  onSelectProvince,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortAnnouncement, setSortAnnouncement] = useState('');
@@ -91,7 +91,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
     <section
       id="il-kutugu"
       aria-busy={loading}
-      className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-4"
+      className="ledger-deferred bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-4"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#1E242B] pb-3">
         <div>
@@ -228,7 +228,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
                 return (
                   <tr
                     key={record.province}
-                    onClick={() => onToggleProvince(normalized)}
+                    onClick={(e) => onSelectProvince(normalized, e.ctrlKey || e.metaKey)}
                     className={`cursor-pointer transition-colors duration-150 ${
                       isSelected ? 'bg-[#F9EDED]' : 'hover:bg-[#FCFBF8]'
                     }`}
@@ -240,7 +240,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
                         aria-pressed={isSelected}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onToggleProvince(normalized);
+                          onSelectProvince(normalized, e.ctrlKey || e.metaKey);
                         }}
                         className="text-left cursor-pointer hover:underline rounded-[2px]"
                       >
