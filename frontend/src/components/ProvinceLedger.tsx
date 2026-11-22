@@ -90,7 +90,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
   return (
     <section
       id="il-kutugu"
-      aria-label="İl Bazlı Tam Dağılım Kütüğü"
+      aria-busy={loading}
       className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-4"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#1E242B] pb-3">
@@ -103,23 +103,32 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <search className="flex items-center gap-3">
           <div className="relative w-full md:w-64">
+            <label htmlFor="ledger-province-search" className="sr-only">
+              Kütükte il ara
+            </label>
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
             <input
-              type="text"
-              aria-label="Kütükte il ara"
+              id="ledger-province-search"
+              name="provinceSearch"
+              type="search"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="İl adına göre filtrele…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] pl-9 pr-3 py-1.5 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
+              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] pl-9 pr-3 py-1.5 text-base sm:text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
             />
           </div>
           <span className="text-xs font-semibold text-[#525A63] tabular-nums shrink-0">
             {sortedRecords.length} il
           </span>
-        </div>
+        </search>
       </div>
+
+      {loading && <progress aria-label="İl kütüğü yükleniyor" className="sr-only" />}
 
       <div role="status" aria-live="polite" className="sr-only">
         {sortAnnouncement}
@@ -131,7 +140,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
             İl bazlı tahakkuk, tahsilat ve tahsilat oranı kütüğü
           </caption>
           <thead className="bg-[#FAF9F6] text-[#525A63] border-b border-[#1E242B]">
-            <tr className="text-[11px] font-bold uppercase tracking-[0.04em]">
+            <tr className="text-[0.6875rem] font-bold uppercase tracking-[0.04em]">
               <th scope="col" className="py-2.5 px-2 sm:px-3 text-center w-10 sm:w-14">Sıra</th>
               <th
                 scope="col"
@@ -237,7 +246,7 @@ export const ProvinceLedger: React.FC<ProvinceLedgerProps> = ({
                       >
                         {record.province.toLocaleUpperCase('tr-TR')}
                       </button>
-                      <span className="mt-0.5 block sm:hidden text-[11px] font-normal text-[#525A63]">
+                      <span className="mt-0.5 block sm:hidden text-[0.6875rem] font-normal text-[#525A63]">
                         Tahakkuk: <span className="whitespace-nowrap">{formatCurrency(record.accrual)}</span>
                       </span>
                     </td>

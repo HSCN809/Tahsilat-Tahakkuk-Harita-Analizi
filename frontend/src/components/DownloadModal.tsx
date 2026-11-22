@@ -127,7 +127,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   };
 
   const handleDownload = async () => {
-    if (selectedYear === null || selectedIds.size === 0) return;
+    if (downloading || selectedYear === null || selectedIds.size === 0 || loading) return;
     try {
       setDownloading(true);
       setError(null);
@@ -174,7 +174,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="download-year-select"
-            className="text-[11px] font-bold text-[#525A63] uppercase tracking-[0.05em]"
+            className="text-[0.6875rem] font-bold text-[#525A63] uppercase tracking-[0.05em]"
           >
             Veri Yılı
           </label>
@@ -183,7 +183,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             name="downloadYear"
             value={selectedYear ?? ''}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-2 text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+            className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-2 text-base sm:text-sm text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
           >
             {years.map((y) => (
               <option key={y} value={y}>
@@ -194,16 +194,23 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         </div>
 
         {/* Arama ve Tümünü Seç */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+        <search className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <label htmlFor="download-file-search" className="sr-only">
+              Dosyaları il adına göre filtrele
+            </label>
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525A63]" />
             <input
-              type="text"
-              aria-label="Dosyaları il adına göre filtrele"
+              id="download-file-search"
+              name="fileSearch"
+              type="search"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="İl adına göre filtrele…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] pl-9 pr-3 py-2 text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
+              className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[4px] pl-9 pr-3 py-2 text-base sm:text-sm text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B] transition-colors duration-150"
             />
           </div>
           <button
@@ -214,7 +221,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           >
             {allVisibleSelected ? 'Seçimi Bırak' : 'Tümünü Seç'}
           </button>
-        </div>
+        </search>
 
         {/* Hata */}
         {error && (
@@ -228,9 +235,13 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         )}
 
         {/* Dosya Listesi */}
-        <div className="overflow-y-auto overscroll-contain border border-[#D9D4C9] rounded-[2px] bg-[#FCFBF8] p-1 flex flex-col gap-0.5 min-h-0 flex-1 max-h-[300px]">
+        <div
+          aria-busy={loading}
+          className="overflow-y-auto overscroll-contain [scrollbar-gutter:stable] border border-[#D9D4C9] rounded-[2px] bg-[#FCFBF8] p-1 flex flex-col gap-0.5 min-h-0 flex-1 max-h-[300px]"
+        >
           {loading ? (
             <div className="space-y-2 p-2">
+              <progress aria-label="Dosyalar yükleniyor" className="sr-only" />
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="h-8 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
               ))}
@@ -240,33 +251,39 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               {files.length === 0 ? 'Bu yıl için ham dosya bulunamadı.' : 'Aramaya uygun dosya bulunamadı.'}
             </div>
           ) : (
-            filteredFiles.map((file) => {
-              const checked = selectedIds.has(file.id);
-              return (
-                <label
-                  key={file.id}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-[2px] text-xs font-semibold transition-colors duration-150 cursor-pointer ${
-                    checked
-                      ? 'bg-[#F9EDED] text-[#1E242B]'
-                      : 'text-[#525A63] hover:bg-[#EFECE4] hover:text-[#1E242B]'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleFile(file.id)}
-                    className="w-3.5 h-3.5 accent-[#9E2A2B] cursor-pointer flex-shrink-0"
-                  />
-                  <FileSpreadsheet
-                    className={`w-4 h-4 flex-shrink-0 ${checked ? 'text-[#9E2A2B]' : 'text-[#525A63]'}`}
-                  />
-                  <span className="truncate flex-1">{prettifyFileId(file.id)}</span>
-                  <span className="text-[11px] text-[#525A63] tabular-nums flex-shrink-0">
-                    {formatFileSize(file.size)}
-                  </span>
-                </label>
-              );
-            })
+            <fieldset className="border-0 p-0 m-0 flex flex-col gap-0.5">
+              <legend className="sr-only">İndirilecek il dosyaları</legend>
+              {filteredFiles.map((file) => {
+                const checked = selectedIds.has(file.id);
+                const checkboxId = `download-file-${file.id}`;
+                return (
+                  <label
+                    key={file.id}
+                    htmlFor={checkboxId}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-[2px] text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                      checked
+                        ? 'bg-[#F9EDED] text-[#1E242B]'
+                        : 'text-[#525A63] hover:bg-[#EFECE4] hover:text-[#1E242B]'
+                    }`}
+                  >
+                    <input
+                      id={checkboxId}
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleFile(file.id)}
+                      className="w-3.5 h-3.5 accent-[#9E2A2B] cursor-pointer flex-shrink-0"
+                    />
+                    <FileSpreadsheet
+                      className={`w-4 h-4 flex-shrink-0 ${checked ? 'text-[#9E2A2B]' : 'text-[#525A63]'}`}
+                    />
+                    <span className="truncate flex-1">{prettifyFileId(file.id)}</span>
+                    <span className="text-[0.6875rem] text-[#525A63] tabular-nums flex-shrink-0">
+                      {formatFileSize(file.size)}
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
           )}
         </div>
 
@@ -278,9 +295,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           <button
             type="button"
             onClick={handleDownload}
-            disabled={downloading || selectedIds.size === 0 || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={selectedIds.size === 0 || loading}
+            aria-disabled={downloading || undefined}
+            className="flex items-center gap-2 px-4 py-2 bg-[#9E2A2B] hover:bg-[#822021] text-white text-xs font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:cursor-wait"
           >
+            {downloading && <progress aria-label="Dosyalar sıkıştırılıp indiriliyor" className="sr-only" />}
             {downloading ? (
               <Loader2 className="w-4 h-4 motion-safe:animate-spin" />
             ) : (

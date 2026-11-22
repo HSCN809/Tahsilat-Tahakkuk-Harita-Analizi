@@ -208,7 +208,6 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
 
   return (
     <section
-      aria-label="Coğrafi Dağılım Haritası"
       className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3.5"
     >
       {/* Harita Başlığı ve Gösterim Tipi Sekmeleri */}
@@ -262,6 +261,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
       </p>
       <div
         ref={containerRef}
+        aria-busy={!geoJsonData || !pathGenerator || loading}
         style={{ ['--map-h' as string]: `${calculatedHeight}px` }}
         className="relative w-full aspect-[16/9] sm:aspect-auto sm:h-[var(--map-h)] bg-[#FCFBF8] border border-[#E5DFD2] rounded-[2px] overflow-visible flex items-center justify-center"
         onMouseEnter={invalidateBounds}
@@ -271,14 +271,12 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
           <div
             id="map-province-tooltip"
             role="tooltip"
-            className="absolute z-40 bg-white border border-[#1E242B] text-xs text-[#1E242B] rounded-[3px] p-3 shadow-md pointer-events-none flex flex-col gap-1 min-w-[175px] whitespace-nowrap"
+            className="absolute top-0 left-0 z-40 bg-white border border-[#1E242B] text-xs text-[#1E242B] rounded-[3px] p-3 shadow-md pointer-events-none flex flex-col gap-1 min-w-[175px] whitespace-nowrap will-change-transform"
             style={{
-              left: tooltip.alignLeft ? tooltip.x - 14 : tooltip.x + 14,
-              top: tooltip.alignTop ? tooltip.y - 12 : Math.max(8, tooltip.y + 12),
-              transform: `translate(${tooltip.alignLeft ? '-100%' : '0'}, ${tooltip.alignTop ? '-100%' : '0'})`,
+              transform: `translate3d(${tooltip.alignLeft ? tooltip.x - 14 : tooltip.x + 14}px, ${tooltip.alignTop ? tooltip.y - 12 : Math.max(8, tooltip.y + 12)}px, 0) translate(${tooltip.alignLeft ? '-100%' : '0'}, ${tooltip.alignTop ? '-100%' : '0'})`,
             }}
           >
-            <span className="font-bold text-[13px] text-[#1E242B] border-b border-[#D9D4C9] pb-1 mb-0.5 block">
+            <span className="font-bold text-[0.8125rem] text-[#1E242B] border-b border-[#D9D4C9] pb-1 mb-0.5 block">
               {tooltip.name.toLocaleUpperCase('tr-TR')}
             </span>
             {tooltip.record ? (
@@ -306,6 +304,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
 
         {!geoJsonData || !pathGenerator || loading ? (
           <div className="w-full h-full p-6 flex flex-col items-center justify-center gap-3">
+            <progress aria-label="Harita yükleniyor" className="sr-only" />
             <div className="w-full h-full bg-[#EFECE4]/70 rounded-[2px] motion-safe:animate-pulse flex items-center justify-center">
               <span className="text-xs font-semibold text-[#525A63]">Harita ve il verileri hazırlanıyor…</span>
             </div>
@@ -475,7 +474,7 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
         </span>
 
         <div className="flex items-center gap-2.5 flex-1 max-w-md">
-          <span className="text-[11px] font-semibold text-[#525A63] tabular-nums shrink-0">
+          <span className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums shrink-0">
             {mapType === 'ratio' ? '%0' : '0 ₺'}
           </span>
           <div
@@ -485,10 +484,10 @@ const TurkeyMapComponent: React.FC<TurkeyMapProps> = ({
             }}
           />
           {mapType === 'ratio' ? (
-            <span className="text-[11px] font-semibold text-[#525A63] tabular-nums shrink-0">%100</span>
+            <span className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums shrink-0">%100</span>
           ) : (
             <span
-              className="text-[11px] font-semibold text-[#525A63] tabular-nums max-w-[130px] truncate shrink-0"
+              className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums max-w-[130px] truncate shrink-0"
               title={formatCurrency(maxVal)}
             >
               {formatCurrency(maxVal)}

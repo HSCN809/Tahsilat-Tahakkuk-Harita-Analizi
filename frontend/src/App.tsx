@@ -1,12 +1,15 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Download, ChevronDown, Search, AlertTriangle, Check } from 'lucide-react';
 import { StatsCards } from './components/StatsCards';
 import { TurkeyMap } from './components/Map';
 import { ProvinceInspector } from './components/ProvinceInspector';
 import { ProvinceLedger } from './components/ProvinceLedger';
-import { DownloadModal } from './components/DownloadModal';
 import { fetchYears, fetchConfig, fetchData, fetchGeoJson, fetchBootstrap } from './services/api';
+
+const DownloadModal = lazy(() =>
+  import('./components/DownloadModal').then((m) => ({ default: m.DownloadModal }))
+);
 import { REGIONS, normalizeProvinceName } from './utils/provinces';
 import type { MapType, SortColumn, SortDirection } from './types';
 
@@ -253,7 +256,13 @@ function App() {
     (bootstrapLoading && !bootstrapData) || yearsLoading || geoJsonLoading || (configLoading && !configRes);
 
   return (
-    <div className="min-h-screen bg-[#F7F5F0] text-[#1E242B] flex flex-col">
+    <div className="min-h-dvh bg-[#F7F5F0] text-[#1E242B] flex flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:px-3.5 focus:py-2 focus:bg-white focus:text-[#1E242B] focus:border-2 focus:border-[#9E2A2B] focus:rounded-[4px] focus:text-xs focus:font-bold focus:shadow-lg"
+      >
+        Ana içeriğe geç
+      </a>
       {/* Üst Kurumsal Başlık */}
       <header className="bg-white border-b-2 border-[#1E242B]">
         <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-7 py-3.5 flex flex-wrap items-center justify-between gap-4">
@@ -293,7 +302,7 @@ function App() {
       </header>
 
       {/* Yatay Filtre Çubuğu */}
-      <section
+      <search
         aria-label="Veri Filtreleri"
         className="bg-white border-b border-[#D9D4C9] sticky top-0 z-30"
       >
@@ -311,7 +320,7 @@ function App() {
                 name="year"
                 value={selectedYear || ''}
                 onChange={(e) => handleYearChange(Number(e.target.value))}
-                className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer tabular-nums"
+                className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-base sm:text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer tabular-nums"
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
@@ -335,7 +344,7 @@ function App() {
                 name="month"
                 value={activeMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+                className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-base sm:text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
               >
                 {months.map((m) => (
                   <option key={m} value={m}>
@@ -356,7 +365,7 @@ function App() {
               name="region"
               value={selectedRegion}
               onChange={(e) => handleRegionChange(e.target.value)}
-              className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
+              className="archival-select w-full bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-base sm:text-sm font-semibold text-[#1E242B] focus:border-[#9E2A2B] transition-colors duration-150 cursor-pointer"
             >
               <option value="Tüm Ülke">Tüm Ülke (81 İl)</option>
               {Object.keys(REGIONS).map((reg) => (
@@ -385,12 +394,12 @@ function App() {
                   aria-controls="category-listbox"
                   aria-labelledby="category-label category-value"
                   onClick={() => setCategoryMenuOpen((prev) => !prev)}
-                  className="w-full min-w-0 bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer"
+                  className="w-full min-w-0 bg-[#FAF9F6] border border-[#857E72] hover:border-[#1E242B] rounded-[4px] px-3 py-1.5 text-base sm:text-sm font-semibold text-[#1E242B] flex items-center justify-between gap-2 transition-colors duration-150 cursor-pointer"
                 >
                   <span id="category-value" className="truncate">{activeCategoryName}</span>
                   <span className="inline-flex items-center gap-1.5 shrink-0">
                     {categories.length > 0 && (
-                      <span className="text-[11px] font-semibold text-[#525A63] tabular-nums">
+                      <span className="text-[0.6875rem] font-semibold text-[#525A63] tabular-nums">
                         ({categories.length})
                       </span>
                     )}
@@ -436,19 +445,26 @@ function App() {
                   className="absolute left-0 right-0 top-full mt-0.5 bg-white border border-[#1E242B] rounded-[4px] shadow-lg z-50 p-2 flex flex-col gap-2"
                 >
                   <div className="relative">
+                    <label htmlFor="category-search" className="sr-only">
+                      Vergi türü veya gelir kalemi ara
+                    </label>
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#525A63]" />
                     <input
                       ref={categorySearchRef}
-                      type="text"
+                      id="category-search"
+                      name="categorySearch"
+                      type="search"
                       autoFocus
-                      aria-label="Vergi türü veya gelir kalemi ara"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       placeholder="Vergi türü veya gelir kalemi ara…"
                       value={searchCategory}
                       onChange={(e) => setSearchCategory(e.target.value)}
-                      className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[3px] pl-8 pr-2.5 py-1.5 text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
+                      className="w-full bg-[#FAF9F6] border border-[#857E72] rounded-[3px] pl-8 pr-2.5 py-1.5 text-base sm:text-xs text-[#1E242B] placeholder-[#525A63] focus:border-[#9E2A2B]"
                     />
                   </div>
-                  <div id="category-listbox" role="listbox" aria-label="Gelir kalemleri" className="max-h-64 overflow-y-auto divide-y divide-[#F0ECE2]">
+                  <div id="category-listbox" role="listbox" aria-label="Gelir kalemleri" className="max-h-64 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] divide-y divide-[#F0ECE2]">
                     {filteredCategories.length === 0 ? (
                       <div className="py-4 text-center text-xs text-[#525A63]">
                         Aramaya uygun kalem bulunamadı.
@@ -486,10 +502,10 @@ function App() {
             </div>
           </div>
         </div>
-      </section>
+      </search>
 
       {/* Ana Çalışma Alanı */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-7 py-5 flex flex-col gap-5">
+      <main id="main-content" className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-7 py-5 flex flex-col gap-5">
         {error && (
           <div
             role="alert"
@@ -588,11 +604,13 @@ function App() {
       </footer>
 
       {downloadModalOpen && (
-        <DownloadModal
-          years={years}
-          initialYear={selectedYear}
-          onClose={() => setDownloadModalOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <DownloadModal
+            years={years}
+            initialYear={selectedYear}
+            onClose={() => setDownloadModalOpen(false)}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -128,7 +128,8 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
 
   if (loading) {
     return (
-      <section className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3">
+      <section aria-busy="true" className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3">
+        <progress aria-label="İl verileri yükleniyor" className="sr-only" />
         <div className="h-5 w-40 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
         <div className="h-16 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
         <div className="h-12 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse" />
@@ -139,8 +140,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
   if (inspections.length === 0) {
     return (
       <section
-        aria-label="İl İnceleme ve Kıyaslama"
-        className="bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3"
+        className="@container bg-white border border-[#D9D4C9] rounded-[4px] p-5 flex flex-col gap-3"
       >
         <div className="flex items-center justify-between gap-2 border-b border-[#1E242B] pb-2.5">
           <div className="flex items-center gap-2">
@@ -181,8 +181,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
 
     return (
       <section
-        aria-label="Seçili İl Kıyaslama Paneli"
-        className="bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5 min-h-0 max-h-full overflow-y-auto"
+        className="@container bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5 min-h-0 max-h-full overflow-y-auto"
       >
         <div className="flex items-start justify-between gap-2 border-b border-[#D9D4C9] pb-3">
           <div>
@@ -216,15 +215,15 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
         </div>
 
         {/* Tahakkuk ve Tahsilat Satırı */}
-        <div className="grid grid-cols-2 gap-3 text-xs bg-[#FCFBF8] border border-[#EAE5DA] rounded-[2px] p-3">
+        <div className="grid grid-cols-1 @[260px]:grid-cols-2 gap-3 text-xs bg-[#FCFBF8] border border-[#EAE5DA] rounded-[2px] p-3">
           <div>
-            <span className="block text-[11px] font-semibold text-[#525A63]">Tahakkuk</span>
+            <span className="block text-[0.6875rem] font-semibold text-[#525A63]">Tahakkuk</span>
             <span className="mt-0.5 block text-sm font-bold text-[#1E242B] tabular-nums">
               {formatCurrency(record.accrual)}
             </span>
           </div>
           <div>
-            <span className="block text-[11px] font-semibold text-[#525A63]">Tahsilat</span>
+            <span className="block text-[0.6875rem] font-semibold text-[#525A63]">Tahsilat</span>
             <span className="mt-0.5 block text-sm font-bold text-[#1E242B] tabular-nums">
               {formatCurrency(record.collection)}
             </span>
@@ -242,8 +241,8 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
             </div>
             <div className="h-2 bg-[#EFECE4] rounded-[2px] overflow-hidden">
               <div
-                className={`comparison-bar-fill h-full motion-safe:transition-all motion-safe:duration-200 ${provTone.bgClass}`}
-                style={{ width: `${Math.max(0, Math.min(100, provRatio))}%` }}
+                className={`comparison-bar-fill w-full h-full origin-left motion-safe:transition-transform motion-safe:duration-200 ${provTone.bgClass}`}
+                style={{ transform: `scaleX(${Math.max(0, Math.min(100, provRatio)) / 100})` }}
               />
             </div>
           </div>
@@ -259,8 +258,8 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
               </div>
               <div className="h-1.5 bg-[#EFECE4] rounded-[2px] overflow-hidden">
                 <div
-                  className="comparison-bar-fill h-full bg-[#8A6518] motion-safe:transition-all motion-safe:duration-200"
-                  style={{ width: `${Math.max(0, Math.min(100, regionalAvgRatio))}%` }}
+                  className="comparison-bar-fill w-full h-full origin-left bg-[#8A6518] motion-safe:transition-transform motion-safe:duration-200"
+                  style={{ transform: `scaleX(${Math.max(0, Math.min(100, regionalAvgRatio)) / 100})` }}
                 />
               </div>
             </div>
@@ -277,15 +276,15 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
               </div>
               <div className="h-1.5 bg-[#EFECE4] rounded-[2px] overflow-hidden">
                 <div
-                  className="comparison-bar-fill h-full bg-[#1E242B] motion-safe:transition-all motion-safe:duration-200"
-                  style={{ width: `${Math.max(0, Math.min(100, nationalRatio))}%` }}
+                  className="comparison-bar-fill w-full h-full origin-left bg-[#1E242B] motion-safe:transition-transform motion-safe:duration-200"
+                  style={{ transform: `scaleX(${Math.max(0, Math.min(100, nationalRatio)) / 100})` }}
                 />
               </div>
             </div>
           )}
         </div>
 
-        <p className="text-[11px] text-[#525A63] border-t border-[#EAE5DA] pt-2.5">
+        <p className="text-[0.6875rem] text-[#525A63] border-t border-[#EAE5DA] pt-2.5">
           Kıyaslamak için haritadan veya kütükten başka bir il daha seçin.
         </p>
       </section>
@@ -294,8 +293,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
 
   return (
     <section
-      aria-label="Çoklu İl Kıyaslama Paneli"
-      className="bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5 min-h-0 max-h-full"
+      className="@container bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] rounded-[4px] p-5 flex flex-col gap-3.5 min-h-0 max-h-full"
     >
       <div className="flex items-center justify-between gap-2 border-b border-[#1E242B] pb-2.5">
         <h2 className="text-base font-bold text-[#1E242B] tabular-nums">
@@ -321,7 +319,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
       </div>
 
       {/* Seçilen İller Kıyaslama Listesi */}
-      <ul className="divide-y divide-[#EAE5DA] min-h-0 flex-1 max-h-[360px] lg:max-h-none overflow-y-auto overscroll-contain pr-0.5">
+      <ul className="divide-y divide-[#EAE5DA] min-h-0 flex-1 max-h-[360px] lg:max-h-none overflow-y-auto overscroll-contain [scrollbar-gutter:stable] pr-0.5">
         {inspections.map((item) => {
           const provRatio = item.record.ratio ?? 0;
           const provTone = getRatioTone(provRatio);
@@ -335,7 +333,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
                   <span className="block text-sm font-bold text-[#1E242B] leading-tight truncate">
                     {item.record.province.toLocaleUpperCase('tr-TR')}
                   </span>
-                  <span className="block text-[11px] text-[#525A63] mt-0.5 tabular-nums">
+                  <span className="block text-[0.6875rem] text-[#525A63] mt-0.5 tabular-nums">
                     {item.regionName ?? 'Türkiye'}
                     {item.nationalRank ? ` · TR #${item.nationalRank}` : ''}
                     {item.regionalRank && item.regionalTotal > 0 ? ` · Bölge #${item.regionalRank}` : ''}
@@ -359,8 +357,8 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
 
               <div className="relative h-2 bg-[#EFECE4] rounded-[2px] overflow-hidden">
                 <div
-                  className={`comparison-bar-fill h-full motion-safe:transition-all motion-safe:duration-200 ${provTone.bgClass}`}
-                  style={{ width: `${Math.max(0, Math.min(100, provRatio))}%` }}
+                  className={`comparison-bar-fill w-full h-full origin-left motion-safe:transition-transform motion-safe:duration-200 ${provTone.bgClass}`}
+                  style={{ transform: `scaleX(${Math.max(0, Math.min(100, provRatio)) / 100})` }}
                 />
                 {nationalRatio !== null && (
                   <span
@@ -371,7 +369,7 @@ export const ProvinceInspector: React.FC<ProvinceInspectorProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-x-3 text-xs tabular-nums">
+              <div className="grid grid-cols-1 @[260px]:grid-cols-2 gap-x-3 gap-y-0.5 text-xs tabular-nums">
                 <div className="flex justify-between gap-1 text-[#525A63]">
                   <span>Tahakkuk:</span>
                   <span className="font-semibold text-[#1E242B]">{formatCurrency(item.record.accrual)}</span>

@@ -61,14 +61,25 @@ function getUserMessage(status: number): string {
  * Teknik detayları console.error ile log'a yazar (sadece geliştirici görür).
  * Kullaniciya anlasilir hata mesaji firlatir.
  */
-async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
+async function fetchJson(url: string, signal?: AbortSignal, timeoutMs = 15_000): Promise<unknown> {
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+    : AbortSignal.timeout(timeoutMs);
+
   let response: Response;
   try {
-    response = await fetch(url, { signal });
+    response = await fetch(url, { signal: combinedSignal });
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err;
+    }
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      console.error(`[api] Zaman aşımı: ${url}`, err);
+      throw new Error('Sunucu yanıt vermedi (zaman aşımı). Lütfen tekrar deneyin.', { cause: err });
+    }
     // Ag hatasi (internet kesintisi, DNS, CORS vs.)
     console.error(`[api] Ağ hatası: ${url}`, err);
-    throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+    throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.', { cause: err });
   }
 
   if (!response.ok) {
@@ -129,16 +140,20 @@ export async function fetchFiles(year: number, signal?: AbortSignal): Promise<Fi
  * URL'si üzerinden tarayıcıya dosya olarak kaydettirilir. fetch kullandığımız
  * için hata durumunda kullanıcıya anlamlı mesaj gösterebiliriz.
  */
-export async function downloadFiles(year: number, ids: string[]): Promise<void> {
+export async function downloadFiles(year: number, ids: string[], timeoutMs = 60_000): Promise<void> {
   const query = ids.map(encodeURIComponent).join(',');
   const url = `/api/files/download?year=${year}&files=${query}`;
 
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      console.error(`[api] İndirme zaman aşımı: ${url}`, err);
+      throw new Error('İndirme zaman aşımına uğradı. Daha az dosya seçip tekrar deneyin.', { cause: err });
+    }
     console.error(`[api] Ağ hatası: ${url}`, err);
-    throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+    throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.', { cause: err });
   }
 
   if (!response.ok) {

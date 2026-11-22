@@ -31,7 +31,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   render(): React.ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#F7F5F0] text-[#1E242B] flex items-center justify-center p-6">
+        <main className="min-h-dvh bg-[#F7F5F0] text-[#1E242B] flex items-center justify-center p-6">
           <div className="max-w-md w-full bg-white border border-[#D9D4C9] border-t-2 border-t-[#9E2A2B] p-8 flex flex-col gap-4 text-center">
             <div className="p-3 bg-[#F9EDED] text-[#9E2A2B] border border-[#E8C5C5] rounded-[4px] mx-auto">
               <AlertTriangle className="w-7 h-7" />
@@ -41,18 +41,24 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               Uygulamada bir sorun oluştu. Sayfayı yenilemeyi veya aşağıdaki düğmeye basmayı deneyin.
             </p>
             {this.state.error && (
-              <pre className="text-xs text-[#9E2A2B] bg-[#FCFBF8] border border-[#D9D4C9] rounded-[2px] p-3 overflow-auto max-h-32 text-left">
-                {this.state.error.message}
+              <pre
+                role="region"
+                aria-label="Hata detayı"
+                tabIndex={0}
+                className="text-xs text-[#9E2A2B] bg-[#FCFBF8] border border-[#D9D4C9] rounded-[2px] p-3 overflow-auto max-h-32 text-left"
+              >
+                <code>{this.state.error.message}</code>
               </pre>
             )}
             <button
+              type="button"
               onClick={this.handleRetry}
               className="mt-2 px-4 py-2.5 bg-[#9E2A2B] hover:bg-[#822021] text-white text-sm font-semibold rounded-[4px] transition-colors duration-150 cursor-pointer"
             >
               Tekrar Dene
             </button>
           </div>
-        </div>
+        </main>
       );
     }
 

@@ -46,35 +46,45 @@ const StatsCardsComponent: React.FC<StatsCardsProps> = ({
 
   return (
     <section
-      aria-label="Dönem Özet Göstergeleri"
+      aria-busy={loading}
       className="bg-white border border-[#D9D4C9] grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#D9D4C9]"
     >
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          onClick={() => onMetricClick?.(item.key)}
-          className={`group text-left px-5 py-3.5 transition-colors duration-150 hover:bg-[#FCFBF8] cursor-pointer flex items-baseline justify-between gap-4 ${item.accentTopClass}`}
-          title="İl kütüğünü bu sütuna göre sırala"
-        >
-          <div className="min-w-0">
-            <span className="block text-[11px] font-bold uppercase tracking-[0.06em] text-[#525A63]">
-              {item.label}
+      {loading && <progress aria-label="Özet veriler yükleniyor" className="sr-only" />}
+      {items.map((item) => {
+        const isActive = activeSortColumn === item.key;
+        return (
+          <button
+            key={item.key}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => onMetricClick?.(item.key)}
+            className={`group text-left px-5 py-3.5 transition-colors duration-150 hover:bg-[#FCFBF8] cursor-pointer flex items-baseline justify-between gap-4 ${item.accentTopClass}`}
+          >
+            <span className="block min-w-0">
+              <span className="block text-[0.6875rem] font-bold uppercase tracking-[0.06em] text-[#525A63]">
+                {item.label}
+              </span>
+              <span className={`mt-1 block text-2xl font-bold tracking-[-0.02em] tabular-nums ${item.valueClass ?? 'text-[#1E242B]'}`}>
+                {loading ? (
+                  <span className="inline-block w-36 h-7 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse align-middle" />
+                ) : (
+                  item.value
+                )}
+              </span>
             </span>
-            <div className={`mt-1 text-2xl font-bold tracking-[-0.02em] tabular-nums ${item.valueClass ?? 'text-[#1E242B]'}`}>
-              {loading ? (
-                <span className="inline-block w-36 h-7 bg-[#EFECE4] rounded-[2px] motion-safe:animate-pulse align-middle" />
-              ) : (
-                item.value
-              )}
-            </div>
-          </div>
-          <span className="text-[11px] font-semibold text-[#525A63] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-150 inline-flex items-center gap-1 shrink-0">
-            <ArrowDownWideNarrow className="w-3.5 h-3.5" />
-            Sırala
-          </span>
-        </button>
-      ))}
+            <span
+              className={`text-[0.6875rem] font-semibold transition-opacity duration-150 inline-flex items-center gap-1 shrink-0 ${
+                isActive
+                  ? 'text-[#1E242B] opacity-100'
+                  : 'text-[#525A63] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              }`}
+            >
+              <ArrowDownWideNarrow className="w-3.5 h-3.5" />
+              {isActive ? 'Sıralı' : 'Sırala'}
+            </span>
+          </button>
+        );
+      })}
     </section>
   );
 };
