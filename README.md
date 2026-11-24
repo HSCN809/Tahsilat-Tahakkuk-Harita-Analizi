@@ -1,5 +1,9 @@
 # Tahsilat-Tahakkuk-Harita-Analizi
 
+> 🌍 **Provincial tax collection vs. accrual revenue analytics on interactive maps — hybrid full-stack app: Rust (Axum) API, React dashboard, Selenium data pipeline, deployed on Railway.**
+>
+> _(Details in Turkish below.)_
+
 İl bazında vergi gelirleri (tahsilat/tahakkuk) analizlerini harita ve grafiklerle
 sunan hibrit tam yığın uygulama. Backend Rust (Axum), frontend React (Vite + Nginx), veri
 toplayıcı Selenium tabanlı one-shot Python scraper.
@@ -8,7 +12,7 @@ toplayıcı Selenium tabanlı one-shot Python scraper.
 
 Projenin kurulumu ve çalıştırılması için aşağıdaki kılavuzları inceleyebilirsiniz:
 
-*   **Yerel Geliştirme (Dev) Ortamı**: Detaylı kurulum adımları, portlar ve yerel test yönergeleri için [docs/DEV_ORTAMI.md](file:///c:/Users/ozenh/OneDrive/Desktop/Projelerim/Tahsilat-Tahakkuk-Harita-Analizi/docs/DEV_ORTAMI.md) kılavuzuna bakın.
+*   **Yerel Geliştirme (Dev) Ortamı**: Detaylı kurulum adımları, portlar ve yerel test yönergeleri için [docs/DEV_ORTAMI.md](docs/DEV_ORTAMI.md) kılavuzuna bakın.
 *   **Canlı Yayın (Production)**: Uygulama **Railway** bulut platformu üzerinde çalışmak üzere optimize edilmiştir. Railway'de backend ve frontend **manuel olarak ayrı birer servis** şeklinde oluşturulmalıdır; scraping işlemi Railway'de backend'in `/api/scrape` endpoint'i üzerinden önerilir. `docker-compose.prod.yml` Railway tarafından doğrudan okunmaz. Detaylı kurulum adımları için aşağıdaki [Railway Deployment](#railway-deployment) bölümüne bakın.
 
 ## Railway Deployment
