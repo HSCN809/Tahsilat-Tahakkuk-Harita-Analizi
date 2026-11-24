@@ -1,6 +1,6 @@
 {
-  "name": "Tahsilat & Tahakkuk Harita Analizi",
-  "short_name": "Tahsilat Tahakkuk",
+  "name": "Türkiye Vergi Atlası",
+  "short_name": "Vergi Atlası",
   "description": "Türkiye il bazında vergi gelirleri tahsilat ve tahakkuk oranlarının interaktif harita ve grafik analiz platformu.",
   "start_url": "/",
   "display": "standalone",

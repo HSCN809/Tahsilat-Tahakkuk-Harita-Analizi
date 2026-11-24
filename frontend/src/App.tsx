@@ -298,10 +298,10 @@ function App() {
             </svg>
             <div className="min-w-0">
               <h1 className="text-lg sm:text-xl font-bold text-[#1E242B] tracking-tight leading-snug">
-                Tahsilat &amp; Tahakkuk Harita Analizi
+                Türkiye Vergi Atlası
               </h1>
               <p className="text-xs text-[#525A63] mt-0.5 leading-snug">
-                T.C. Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü Verileri
+                İl Bazlı Tahsilat &amp; Tahakkuk · Hazine ve Maliye Bakanlığı Verileri
               </p>
             </div>
           </div>
@@ -654,7 +654,7 @@ function App() {
               T.C. Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü
             </a>
           </span>
-          <span>Tahsilat &amp; Tahakkuk Harita Analizi © 2026</span>
+          <span>Türkiye Vergi Atlası © 2026</span>
         </div>
       </footer>
 
