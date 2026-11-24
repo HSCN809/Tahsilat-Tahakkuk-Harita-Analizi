@@ -638,6 +638,59 @@ function App() {
           }}
           onSelectProvince={handleSelectProvince}
         />
+
+        {/* 4. Hakkında ve Metodoloji (SEO & Kullanıcı Rehberi) */}
+        <section
+          aria-labelledby="about-methodology-heading"
+          className="bg-white border border-[#D9D4C9] rounded-[4px]"
+        >
+          <div className="px-5 py-3 border-b-2 border-[#1E242B] flex items-center justify-between gap-3">
+            <h2
+              id="about-methodology-heading"
+              className="text-sm font-bold text-[#1E242B] tracking-tight"
+            >
+              Türkiye Vergi Atlası Hakkında ve Metodoloji
+            </h2>
+            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#525A63] shrink-0">
+              2004–2026 · 81 İl
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#EAE5DA]">
+            <div className="p-5 space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#1E242B]">
+                Veri Kaynağı ve Kapsam
+              </h3>
+              <p className="text-[13px] leading-relaxed text-[#525A63]">
+                Türkiye Vergi Atlası, T.C. Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü
+                tarafından yayımlanan genel bütçe gelirlerinin 81 il bazındaki yıllık ve aylık
+                istatistiklerini interaktif harita ve karşılaştırmalı tablolarla sunar.
+              </p>
+            </div>
+
+            <div className="p-5 space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#1E242B]">
+                Tahakkuk, Tahsilat ve Oran
+              </h3>
+              <p className="text-[13px] leading-relaxed text-[#525A63]">
+                Tahakkuk, ilgili dönemde kesinleşen vergi alacağını; tahsilat ise fiilen kasaya
+                giren tutarı ifade eder. Tahsilat/tahakkuk oranı, tahsilatın tahakkuka bölünmesiyle
+                yüzde (%) olarak hesaplanır ve il bazında vergi tahsilat performansını gösterir.
+              </p>
+            </div>
+
+            <div className="p-5 space-y-1.5">
+              <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#1E242B]">
+                Analiz ve Kullanım
+              </h3>
+              <p className="text-[13px] leading-relaxed text-[#525A63]">
+                Harita üzerinden birden fazla ili sabitleyerek Türkiye ortalamasıyla kıyaslayabilir,
+                vergi kategorilerine göre filtreleme yapabilir ve tam dağılım kütüğünde illeri
+                sıralayabilirsiniz. Ham Excel (.xls) kaynak dosyaları üst menüden indirilebilir.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Kaynak ve Telif Alt Bilgisi */}
