@@ -1,5 +1,5 @@
 # Robots.txt - Türkiye Vergi Atlası
-# https://tahsilat-tahakkuk-analizi.up.railway.app
+# https://turkiye-vergi-atlasi.up.railway.app
 
 User-agent: *
 Allow: /
@@ -10,4 +10,4 @@ Disallow: /health
 Disallow: /healthz
 
 # Sitemap location
-Sitemap: https://tahsilat-tahakkuk-analizi.up.railway.app/sitemap.xml
+Sitemap: https://turkiye-vergi-atlasi.up.railway.app/sitemap.xml
