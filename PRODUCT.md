@@ -30,13 +30,13 @@ Turns raw multi-sheet Treasury and Finance Ministry Excel tables (2004–2026) i
 
 - **Frontend-only redesign scope:** Existing Rust/Axum API contract (`/api/*`) remains unchanged; all new interactions (including clicking a province on the map to open a pinned detail/ranking panel comparing against Turkey and region averages) must be built on the frontend using existing API payloads.
 - **Strict self-hosted font CSP:** `frontend/nginx.conf` enforces `font-src 'self'` (only self-hosted or system fonts may load; external font CDNs are blocked).
-- **SEO & PWA preservation:** Must keep the single semantic `<h1>`, Schema.org JSON-LD (`WebSite`, `WebApplication`, `Dataset`), Google Analytics (`G-K2TNMPX1TT`), `robots.txt`, `sitemap.xml`, `site.webmanifest`, `favicon.svg`, `icon-192.png`, `icon-512.png`, and `og-image.png`.
+- **SEO & PWA preservation:** Must keep the single semantic `<h1>`, Schema.org JSON-LD (`WebSite`, `WebApplication`, `Dataset`), Google Analytics (`G-K2TNMPX1TT`), `robots.txt`, `sitemap.xml`, `site.webmanifest`, `favicon.svg`, `icon-192.png`, `icon-512.png`, and `og-image.jpg`.
 - **Official data semantics:** Raw API amounts are in `Bin TL` and scaled by `1000` for human-readable Turkish currency display (`Bin ₺`, `Milyon ₺`, `Milyar ₺`, `Trilyon ₺`). Null/missing values must render honestly rather than coercing to misleading figures.
 - **Confirmed usage scene & binding visual constraint:** Daytime research and reading scene (bright, airy, trustworthy publication/analysis feel). Neon/cyber-HUD effects and cramped bureaucratic Excel-grid aesthetics are explicitly rejected; `index.html` and `site.webmanifest` dark defaults (`#0b0f19` / `color-scheme: dark`) from the legacy UI should be replaced accordingly.
 
 ## Brand Commitments
 
-- **Product name:** Tahsilat & Tahakkuk Harita Analizi
+- **Product name:** Türkiye Vergi Atlası
 - **Language:** Turkish (`tr-TR`) only
 - **Official source attribution:** T.C. Hazine ve Maliye Bakanlığı Muhasebat Genel Müdürlüğü (`muhasebat.hmb.gov.tr`)
 

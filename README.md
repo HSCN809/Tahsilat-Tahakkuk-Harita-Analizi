@@ -1,4 +1,4 @@
-# Tahsilat-Tahakkuk-Harita-Analizi
+# Türkiye Vergi Atlası
 
 > 🌍 **Provincial tax collection vs. accrual revenue analytics on interactive maps — hybrid full-stack app: Rust (Axum) API, React dashboard, Selenium data pipeline, deployed on Railway.**
 >
@@ -7,6 +7,8 @@
 İl bazında vergi gelirleri (tahsilat/tahakkuk) analizlerini harita ve grafiklerle
 sunan hibrit tam yığın uygulama. Backend Rust (Axum), frontend React (Vite + Nginx), veri
 toplayıcı Selenium tabanlı one-shot Python scraper.
+
+Canlı uygulama: https://turkiye-vergi-atlasi.up.railway.app/
 
 ## Dokümantasyon ve Kurulum
 

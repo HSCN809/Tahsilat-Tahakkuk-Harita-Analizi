@@ -1,5 +1,5 @@
 ---
-name: Tahsilat & Tahakkuk Harita Analizi
+name: Türkiye Vergi Atlası
 description: Devlet İstatistik Yıllığı — Archival daylight publication design system for Turkey's 81-province tax accrual and collection statistics.
 colors:
   paper-bone: "#F7F5F0"
@@ -94,13 +94,13 @@ components:
     padding: "4px 10px"
 ---
 
-# Design System: Tahsilat & Tahakkuk Harita Analizi
+# Design System: Türkiye Vergi Atlası
 
 ## Overview
 
 **Creative North Star: "Devlet İstatistik Yıllığı"**
 
-Tahsilat & Tahakkuk Harita Analizi treats public fiscal exploration as an authoritative Turkish statistical yearbook plate built for daytime reading and economic research. Rather than floating glass cards, glowing dark dashboards, or cramped spreadsheet grids, the interface grounds every figure on warm archival paper framed by crisp one-pixel hairlines and heavy charcoal datum rules.
+Türkiye Vergi Atlası treats public fiscal exploration as an authoritative Turkish statistical yearbook plate built for daytime reading and economic research. Rather than floating glass cards, glowing dark dashboards, or cramped spreadsheet grids, the interface grounds every figure on warm archival paper framed by crisp one-pixel hairlines and heavy charcoal datum rules.
 
 Density stays purposeful and scannable: national totals occupy a single unified horizontal strip divided by vertical hairlines, geographic choropleth tones map performance from Treasury crimson through warm ochre to Aegean teal, and every tabular number aligns vertically across summary strips, ranking panels, and the full 81-province ledger.
 
